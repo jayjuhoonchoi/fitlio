@@ -1,9 +1,17 @@
+from pydantic import BaseModel
+from datetime import datetime
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import FitnessClass, Booking
 
 router = APIRouter()
+class ClassCreate(BaseModel):
+    name: str
+    instructor: str
+    schedule: datetime
+    capacity: int = 20
 
 @router.get("/classes")
 def get_classes(db: Session = Depends(get_db)):
@@ -42,3 +50,16 @@ def cancel_booking(class_id: int, member_id: int, db: Session = Depends(get_db))
     booking.status = "cancelled"
     db.commit()
     return {"message": "Booking cancelled successfully"}
+
+@router.post("/classes", status_code=201)
+def create_class(req: ClassCreate, db: Session = Depends(get_db)):
+    fitness_class = FitnessClass(
+        name=req.name,
+        instructor=req.instructor,
+        schedule=req.schedule,
+        capacity=req.capacity
+    )
+    db.add(fitness_class)
+    db.commit()
+    db.refresh(fitness_class)
+    return {"message": "Class created successfully", "id": fitness_class.id}
