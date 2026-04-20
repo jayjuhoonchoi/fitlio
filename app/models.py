@@ -14,3 +14,24 @@ class Member(Base):
     phone = Column(String)
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
+
+class FitnessClass(Base):
+    __tablename__ = "fitness_classes"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, nullable=False)
+    instructor = Column(String, nullable=False)
+    schedule = Column(DateTime, nullable=False)
+    capacity = Column(Integer, default=20)
+    current_count = Column(Integer, default=0)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+class Booking(Base):
+    __tablename__ = "bookings"
+
+    id = Column(Integer, primary_key=True, index=True)
+    member_id = Column(Integer, nullable=False)
+    class_id = Column(Integer, nullable=False)
+    status = Column(String, default="confirmed")
+    created_at = Column(DateTime, default=datetime.utcnow)
+
