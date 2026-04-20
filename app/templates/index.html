@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fitlio - Sports Facility Management</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: Arial, sans-serif; background: #f5f5f5; }
+        .navbar { background: #1a1a2e; color: white; padding: 1rem 2rem; display: flex; justify-content: space-between; align-items: center; }
+        .navbar h1 { font-size: 1.5rem; color: #e94560; }
+        .container { max-width: 1200px; margin: 2rem auto; padding: 0 2rem; }
+        .hero { background: #1a1a2e; color: white; padding: 3rem; border-radius: 12px; margin-bottom: 2rem; }
+        .hero h2 { font-size: 2rem; margin-bottom: 1rem; }
+        .hero p { color: #aaa; }
+        .card { background: white; padding: 1.5rem; border-radius: 12px; margin-bottom: 1rem; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        .card h3 { margin-bottom: 0.5rem; color: #1a1a2e; }
+        .btn { background: #e94560; color: white; border: none; padding: 0.5rem 1.5rem; border-radius: 6px; cursor: pointer; }
+        .btn:hover { background: #c73652; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1rem; }
+        input { width: 100%; padding: 0.5rem; margin: 0.3rem 0 0.8rem; border: 1px solid #ddd; border-radius: 6px; }
+        .tag { background: #e94560; color: white; padding: 0.2rem 0.6rem; border-radius: 20px; font-size: 0.8rem; }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <h1>Fitlio</h1>
+        <div id="nav-auth">
+            <button class="btn" onclick="showLogin()">Login</button>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="hero">
+            <h2>Sports Facility Management</h2>
+            <p>Manage your members, classes, and bookings in one place.</p>
+        </div>
+
+        <div class="card">
+            <h3>Login</h3>
+            <input type="email" id="email" placeholder="Email">
+            <input type="password" id="password" placeholder="Password">
+            <button class="btn" onclick="login()">Login</button>
+            <button class="btn" style="background:#444; margin-left:0.5rem" onclick="register()">Register</button>
+        </div>
+
+        <h3 style="margin: 1rem 0">Available Classes</h3>
+        <div class="grid" id="classes-list">
+            <p>Loading classes...</p>
+        </div>
+    </div>
+
+    <script>
+        let token = localStorage.getItem('token');
+
+        async function login() {
+            const res = await fetch('/auth/login', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    email: document.getElementById('email').value,
+                    password: document.getElementById('password').value
+                })
+            });
+            const data = await res.json();
+            if (data.access_token) {
+                localStorage.setItem('token', data.access_token);
+                alert('Login successful!');
+                loadClasses();
+            } else {
+                alert('Login failed: ' + data.detail);
+            }
+        }
+
+        async function register() {
+            const res = await fetch('/auth/register', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    email: document.getElementById('email').value,
+                    password: document.getElementById('password').value,
+                    full_name: 'New Member'
+                })
+            });
+            const data = await res.json();
+            alert(data.message || data.detail);
+        }
+
+        async function loadClasses() {
+            const res = await fetch('/classes');
+            const classes = await res.json();
+            const list = document.getElementById('classes-list');
+            if (!classes.length) {
+                list.innerHTML = '<p>No classes available yet.</p>';
+                return;
+            }
+            list.innerHTML = classes.map(c => `
+                <div class="card">
+                    <h3>${c.name} <span class="tag">${c.current_count}/${c.capacity}</span></h3>
+                    <p>Instructor: ${c.instructor}</p>
+                    <p>Schedule: ${new Date(c.schedule).toLocaleString()}</p>
+                    <button class="btn" style="margin-top:0.8rem" onclick="bookClass(${c.id})">Book Now</button>
+                </div>
+            `).join('');
+        }
+
+        async function bookClass(classId) {
+            if (!token) { alert('Please login first!'); return; }
+            alert('Booking feature coming soon!');
+        }
+
+        loadClasses();
+    </script>
+</body>
+</html>

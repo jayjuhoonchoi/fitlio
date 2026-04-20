@@ -1,3 +1,7 @@
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import HTMLResponse
+import os
+
 from fastapi import FastAPI
 from app.database import engine
 from app import models
@@ -15,10 +19,13 @@ app = FastAPI(
 app.include_router(auth_router)
 app.include_router(booking_router)
 
+@app.get("/", response_class=HTMLResponse)
+def read_root():
+    with open("app/templates/index.html", "r") as f:
+        return f.read()
+
 @app.get("/health")
 def health_check():
     return {"status": "healthy", "service": "fitlio"}
 
-@app.get("/")
-def root():
-    return {"message": "Welcome to Fitlio API"}
+
