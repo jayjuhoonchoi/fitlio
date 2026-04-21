@@ -76,6 +76,14 @@ resource "aws_security_group" "fitlio_sg" {
     description = "SSH access"
   }
 
+    ingress {
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+    description = "HTTPS access"
+  }
+
   ingress {
     from_port   = 80
     to_port     = 80
@@ -143,4 +151,3 @@ output "fitlio_public_ip" {
   value       = aws_instance.fitlio_server.public_ip
   description = "Public IP of Fitlio server"
 }
-
