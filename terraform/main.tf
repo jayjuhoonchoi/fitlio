@@ -100,6 +100,24 @@ resource "aws_security_group" "fitlio_sg" {
     description = "Fitlio API"
   }
 
+
+  ingress {
+    from_port   = 3000
+    to_port     = 3000
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+    description = "Grafana"
+  }
+
+  ingress {
+    from_port   = 9090
+    to_port     = 9090
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+    description = "Prometheus"
+  }
+
+  
   egress {
     from_port   = 0
     to_port     = 0
