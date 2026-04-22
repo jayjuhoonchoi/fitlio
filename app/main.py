@@ -26,6 +26,5 @@ def read_root():
 
 @app.get("/health")
 def health_check():
-    return {"status": "healthy - pipeline works!", "service": "fitlio"}
-
+    return {"status": "healthy", "service": "fitlio"}
 
