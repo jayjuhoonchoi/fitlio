@@ -8,4 +8,5 @@ postgres_data/
 terraform/.terraform/
 terraform/*.tfstate
 terraform/*.tfstate.backup
-terraform/.terraform.lock.hclvenv/
+terraform/.terraform.lock.hcl
+venv/
