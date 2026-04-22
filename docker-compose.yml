@@ -33,10 +33,11 @@ services:
       - GF_SECURITY_ADMIN_PASSWORD=fitlio123
     depends_on:
       - prometheus
-    node-exporter:
+
+  node-exporter:
     image: prom/node-exporter:latest
     ports:
-      - "9100:9100"  
+      - "9100:9100"
 
 volumes:
   postgres_data:
