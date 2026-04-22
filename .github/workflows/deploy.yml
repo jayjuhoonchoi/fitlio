@@ -18,26 +18,10 @@ jobs:
           python-version: '3.11'
 
       - name: Install dependencies
-        run: |
-          pip install -r requirements.txt pytest httpx
+        run: pip install -r requirements.txt pytest httpx
 
       - name: Run tests
-        run: |
-          python3 -m pytest tests/ -v
-
-      - name: Notify Slack on success
-        if: success()
-        run: |
-          curl -X POST ${{ secrets.SLACK_WEBHOOK_URL }} \
-          -H 'Content-type: application/json' \
-          --data '{"text":"✅ Fitlio 배포 성공!"}'
-
-      - name: Notify Slack on failure
-        if: failure()
-        run: |
-          curl -X POST ${{ secrets.SLACK_WEBHOOK_URL }} \
-          -H 'Content-type: application/json' \
-          --data '{"text":"❌ Fitlio 배포 실패!"}'
+        run: python3 -m pytest tests/ -v
 
   deploy:
     runs-on: ubuntu-latest
@@ -58,4 +42,17 @@ jobs:
             git reset --hard origin/main
             docker-compose down
             docker-compose up -d --build
-            
+
+      - name: Notify Slack on success
+        if: success()
+        run: |
+          curl -X POST ${{ secrets.SLACK_WEBHOOK_URL }} \
+          -H 'Content-type: application/json' \
+          --data '{"text":"✅ Fitlio 배포 성공!"}'
+
+      - name: Notify Slack on failure
+        if: failure()
+        run: |
+          curl -X POST ${{ secrets.SLACK_WEBHOOK_URL }} \
+          -H 'Content-type: application/json' \
+          --data '{"text":"❌ Fitlio 배포 실패!"}'
