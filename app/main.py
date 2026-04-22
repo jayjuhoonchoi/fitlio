@@ -26,6 +26,6 @@ def read_root():
 
 @app.get("/health")
 def health_check():
-    return {"status": "healthy - CI/CD Works!", "service": "fitlio"}
+    return {"status": "healthy", "service": "fitlio"}
 
 
