@@ -1,5 +1,4 @@
 version: '3.8'
-
 services:
   api:
     build: .
@@ -19,8 +18,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
-volumes:
-    prometheus:
+  prometheus:
     image: prom/prometheus:latest
     volumes:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
@@ -35,3 +33,6 @@ volumes:
       - GF_SECURITY_ADMIN_PASSWORD=fitlio123
     depends_on:
       - prometheus
+
+volumes:
+  postgres_data:
