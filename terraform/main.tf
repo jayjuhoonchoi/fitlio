@@ -140,6 +140,18 @@ resource "aws_instance" "fitlio_server" {
   vpc_security_group_ids = [aws_security_group.fitlio_sg.id]
   key_name               = aws_key_pair.fitlio_key.key_name
 
+
+  user_data = <<-EOF
+    #!/bin/bash
+    apt-get update -y
+    apt-get install -y docker.io docker-compose git
+    usermod -aG docker ubuntu
+    su - ubuntu -c "git clone https://github.com/jayjuhoonchoi/fitlio.git /home/ubuntu/fitlio"
+    cd /home/ubuntu/fitlio
+    docker-compose up -d --build
+  EOF
+  
+
   tags = {
     Name        = "fitlio-server"
     Environment = "production"
