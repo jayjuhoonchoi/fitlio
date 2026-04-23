@@ -1,0 +1,60 @@
+<mxfile>
+  <diagram name="Fitlio Architecture">
+    <mxGraphModel>
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <!-- Developer -->
+        <mxCell id="2" value="Developer" style="shape=mxgraph.aws4.user;" vertex="1" parent="1">
+          <mxGeometry x="40" y="160" width="60" height="60" as="geometry"/>
+        </mxCell>
+        <!-- GitHub -->
+        <mxCell id="3" value="GitHub&#xa;(Source Code)" style="shape=mxgraph.vcs.git;" vertex="1" parent="1">
+          <mxGeometry x="160" y="160" width="80" height="60" as="geometry"/>
+        </mxCell>
+        <!-- GitHub Actions -->
+        <mxCell id="4" value="GitHub Actions&#xa;(CI/CD)" style="rounded=1;fillColor=#dae8fc;" vertex="1" parent="1">
+          <mxGeometry x="300" y="160" width="100" height="60" as="geometry"/>
+        </mxCell>
+        <!-- EC2 -->
+        <mxCell id="5" value="AWS EC2&#xa;t3.micro" style="shape=mxgraph.aws4.ec2;" vertex="1" parent="1">
+          <mxGeometry x="460" y="160" width="80" height="60" as="geometry"/>
+        </mxCell>
+        <!-- Nginx -->
+        <mxCell id="6" value="Nginx&#xa;(HTTPS/SSL)" style="rounded=1;fillColor=#d5e8d4;" vertex="1" parent="1">
+          <mxGeometry x="460" y="280" width="80" height="60" as="geometry"/>
+        </mxCell>
+        <!-- FastAPI -->
+        <mxCell id="7" value="FastAPI&#xa;(Backend)" style="rounded=1;fillColor=#d5e8d4;" vertex="1" parent="1">
+          <mxGeometry x="460" y="380" width="80" height="60" as="geometry"/>
+        </mxCell>
+        <!-- PostgreSQL -->
+        <mxCell id="8" value="PostgreSQL&#xa;(Database)" style="shape=mxgraph.aws4.database;" vertex="1" parent="1">
+          <mxGeometry x="460" y="480" width="80" height="60" as="geometry"/>
+        </mxCell>
+        <!-- Prometheus -->
+        <mxCell id="9" value="Prometheus&#xa;(Metrics)" style="rounded=1;fillColor=#ffe6cc;" vertex="1" parent="1">
+          <mxGeometry x="620" y="280" width="80" height="60" as="geometry"/>
+        </mxCell>
+        <!-- Grafana -->
+        <mxCell id="10" value="Grafana&#xa;(Dashboard)" style="rounded=1;fillColor=#ffe6cc;" vertex="1" parent="1">
+          <mxGeometry x="620" y="380" width="80" height="60" as="geometry"/>
+        </mxCell>
+        <!-- Slack -->
+        <mxCell id="11" value="Slack&#xa;(Notifications)" style="rounded=1;fillColor=#e1d5e7;" vertex="1" parent="1">
+          <mxGeometry x="300" y="300" width="100" height="60" as="geometry"/>
+        </mxCell>
+        <!-- Arrows -->
+        <mxCell id="12" edge="1" source="2" target="3" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="13" edge="1" source="3" target="4" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="14" edge="1" source="4" target="5" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="15" edge="1" source="4" target="11" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="16" edge="1" source="5" target="6" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="17" edge="1" source="6" target="7" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="18" edge="1" source="7" target="8" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="19" edge="1" source="5" target="9" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="20" edge="1" source="9" target="10" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
