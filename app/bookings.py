@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import FitnessClass, Booking
 
-router = APIRouter()
+router = APIRouter(redirect_slashes=False)
 class ClassCreate(BaseModel):
     name: str
     instructor: str
