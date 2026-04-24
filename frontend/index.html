@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Fitlio — Sports Facility Management</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Segoe UI', sans-serif; background: #0f0f0f; color: #fff; }
+
+    /* NAV */
+    nav { display: flex; justify-content: space-between; align-items: center;
+          padding: 20px 60px; background: #0f0f0f; border-bottom: 1px solid #222; }
+    nav .logo { font-size: 24px; font-weight: 700; color: #00e676; }
+    nav a { color: #aaa; text-decoration: none; margin-left: 30px; font-size: 14px; }
+    nav a:hover { color: #fff; }
+
+    /* HERO */
+    .hero { text-align: center; padding: 120px 20px 80px; }
+    .hero h1 { font-size: 56px; font-weight: 800; line-height: 1.2;
+               background: linear-gradient(135deg, #00e676, #00b0ff);
+               -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    .hero p { font-size: 20px; color: #aaa; margin: 20px auto; max-width: 560px; }
+    .hero .buttons { margin-top: 40px; display: flex; gap: 16px; justify-content: center; }
+    .btn-primary { background: #00e676; color: #000; padding: 14px 32px;
+                   border-radius: 8px; font-weight: 700; text-decoration: none; font-size: 16px; }
+    .btn-secondary { border: 1px solid #444; color: #fff; padding: 14px 32px;
+                     border-radius: 8px; font-weight: 600; text-decoration: none; font-size: 16px; }
+    .btn-primary:hover { background: #00c853; }
+    .btn-secondary:hover { border-color: #fff; }
+
+    /* FEATURES */
+    .features { padding: 80px 60px; }
+    .features h2 { text-align: center; font-size: 36px; margin-bottom: 50px; }
+    .cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; max-width: 1000px; margin: 0 auto; }
+    .card { background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 12px; padding: 32px; }
+    .card .icon { font-size: 36px; margin-bottom: 16px; }
+    .card h3 { font-size: 20px; margin-bottom: 10px; color: #00e676; }
+    .card p { color: #888; font-size: 14px; line-height: 1.6; }
+
+    /* AUTH */
+    .auth { padding: 80px 60px; background: #111; }
+    .auth h2 { text-align: center; font-size: 36px; margin-bottom: 40px; }
+    .auth-box { max-width: 400px; margin: 0 auto; background: #1a1a1a;
+                border: 1px solid #2a2a2a; border-radius: 12px; padding: 40px; }
+    .auth-tabs { display: flex; margin-bottom: 30px; }
+    .auth-tab { flex: 1; padding: 10px; text-align: center; cursor: pointer;
+                border-bottom: 2px solid #333; color: #888; font-size: 14px; }
+    .auth-tab.active { border-bottom-color: #00e676; color: #00e676; }
+    input { width: 100%; padding: 12px 16px; background: #0f0f0f; border: 1px solid #333;
+            border-radius: 8px; color: #fff; font-size: 14px; margin-bottom: 16px; }
+    input:focus { outline: none; border-color: #00e676; }
+    .btn-submit { width: 100%; padding: 14px; background: #00e676; color: #000;
+                  border: none; border-radius: 8px; font-weight: 700; font-size: 16px; cursor: pointer; }
+    .btn-submit:hover { background: #00c853; }
+    .message { margin-top: 16px; padding: 12px; border-radius: 8px; font-size: 14px; text-align: center; display: none; }
+    .message.success { background: #1b3a2a; color: #00e676; display: block; }
+    .message.error { background: #3a1b1b; color: #ff5252; display: block; }
+
+    /* FOOTER */
+    footer { text-align: center; padding: 40px; color: #444; font-size: 14px; border-top: 1px solid #222; }
+  </style>
+</head>
+<body>
+
+  <nav>
+    <div class="logo">⚡ Fitlio</div>
+    <div>
+      <a href="#features">Features</a>
+      <a href="#auth">Get Started</a>
+      <a href="http://localhost:8000/docs" target="_blank">API Docs</a>
+    </div>
+  </nav>
+
+  <section class="hero">
+    <h1>Manage Your Sports<br>Facility Smarter</h1>
+    <p>Fitlio helps gym and sports facility owners manage classes, bookings, and members — all in one place.</p>
+    <div class="buttons">
+      <a href="#auth" class="btn-primary">Get Started Free</a>
+      <a href="http://localhost:8000/docs" target="_blank" class="btn-secondary">View API Docs</a>
+    </div>
+  </section>
+
+  <section class="features" id="features">
+    <h2>Everything You Need</h2>
+    <div class="cards">
+      <div class="card">
+        <div class="icon">🏋️</div>
+        <h3>Class Management</h3>
+        <p>Create and manage fitness classes with ease. Set capacity, schedule, and let members book instantly.</p>
+      </div>
+      <div class="card">
+        <div class="icon">👥</div>
+        <h3>Member Registration</h3>
+        <p>Secure JWT-based authentication. Members can register, login, and manage their bookings.</p>
+      </div>
+      <div class="card">
+        <div class="icon">📊</div>
+        <h3>Real-time Monitoring</h3>
+        <p>Prometheus + Grafana dashboards give you live insights into system performance and usage.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="auth" id="auth">
+    <h2>Get Started</h2>
+    <div class="auth-box">
+      <div class="auth-tabs">
+        <div class="auth-tab active" onclick="switchTab('login')">Login</div>
+        <div class="auth-tab" onclick="switchTab('register')">Register</div>
+      </div>
+
+      <div id="login-form">
+        <input type="text" id="login-username" placeholder="Username">
+        <input type="password" id="login-password" placeholder="Password">
+        <button class="btn-submit" onclick="handleLogin()">Login</button>
+      </div>
+
+      <div id="register-form" style="display:none">
+        <input type="text" id="reg-username" placeholder="Username">
+        <input type="email" id="reg-email" placeholder="Email">
+        <input type="password" id="reg-password" placeholder="Password">
+        <button class="btn-submit" onclick="handleRegister()">Create Account</button>
+      </div>
+
+      <div class="message" id="message"></div>
+    </div>
+  </section>
+
+  <footer>
+    <p>Built with ❤️ by Jay Juhoon Choi · Deployed on AWS EC2 · CI/CD via GitHub Actions</p>
+  </footer>
+
+  <script>
+    const API = 'http://localhost:8000';
+
+    function switchTab(tab) {
+      document.querySelectorAll('.auth-tab').forEach(t => t.classList.remove('active'));
+      event.target.classList.add('active');
+      document.getElementById('login-form').style.display = tab === 'login' ? 'block' : 'none';
+      document.getElementById('register-form').style.display = tab === 'register' ? 'block' : 'none';
+      document.getElementById('message').className = 'message';
+    }
+
+    function showMessage(text, type) {
+      const el = document.getElementById('message');
+      el.textContent = text;
+      el.className = `message ${type}`;
+    }
+
+    async function handleLogin() {
+      const username = document.getElementById('login-username').value;
+      const password = document.getElementById('login-password').value;
+      try {
+        const res = await fetch(`${API}/auth/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: `username=${username}&password=${password}`
+        });
+        const data = await res.json();
+        if (res.ok) showMessage('✅ Login successful!', 'success');
+        else showMessage(`❌ ${data.detail}`, 'error');
+      } catch (e) {
+        showMessage('❌ Cannot connect to server', 'error');
+      }
+    }
+
+    async function handleRegister() {
+      const username = document.getElementById('reg-username').value;
+      const email = document.getElementById('reg-email').value;
+      const password = document.getElementById('reg-password').value;
+      try {
+        const res = await fetch(`${API}/auth/register`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, email, password })
+        });
+        const data = await res.json();
+        if (res.ok) showMessage('✅ Account created! Please login.', 'success');
+        else showMessage(`❌ ${data.detail}`, 'error');
+      } catch (e) {
+        showMessage('❌ Cannot connect to server', 'error');
+      }
+    }
+  </script>
+
+</body>
+</html>

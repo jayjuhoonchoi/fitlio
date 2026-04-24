@@ -165,6 +165,12 @@ resource "aws_instance" "fitlio_server" {
     apt-get install -y docker.io docker-compose git
     usermod -aG docker ubuntu
     su - ubuntu -c "git clone https://github.com/jayjuhoonchoi/fitlio.git /home/ubuntu/fitlio"
+    cat > /home/ubuntu/fitlio/.env << 'ENVEOF'
+    POSTGRES_USER=fitlio
+    POSTGRES_PASSWORD=fitlio123
+    POSTGRES_DB=fitlio
+    GRAFANA_PASSWORD=fitlio123
+    ENVEOF
     cd /home/ubuntu/fitlio
     docker-compose up -d --build
   EOF
