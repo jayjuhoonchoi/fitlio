@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fitlio Check-in</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, sans-serif;
+            background: #0f172a;
+            color: white;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .logo { font-size: 2rem; font-weight: 800; color: #6366f1; margin-bottom: 8px; }
+        .subtitle { color: #94a3b8; margin-bottom: 40px; font-size: 1.1rem; }
+        .card {
+            background: #1e293b;
+            border-radius: 20px;
+            padding: 40px;
+            width: 100%;
+            max-width: 480px;
+            box-shadow: 0 25px 50px rgba(0,0,0,0.4);
+        }
+        .card h2 { font-size: 1.5rem; margin-bottom: 30px; text-align: center; }
+        label { display: block; color: #94a3b8; margin-bottom: 8px; font-size: 0.9rem; }
+        select, input {
+            width: 100%;
+            padding: 16px;
+            background: #0f172a;
+            border: 2px solid #334155;
+            border-radius: 12px;
+            color: white;
+            font-size: 1.1rem;
+            margin-bottom: 20px;
+            outline: none;
+        }
+        select:focus, input:focus { border-color: #6366f1; }
+        input[type="text"] {
+            font-size: 2rem;
+            text-align: center;
+            letter-spacing: 8px;
+            font-weight: 700;
+        }
+        button {
+            width: 100%;
+            padding: 18px;
+            background: #6366f1;
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 1.2rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        button:hover { background: #4f46e5; }
+        .result {
+            margin-top: 24px;
+            padding: 20px;
+            border-radius: 12px;
+            text-align: center;
+            font-size: 1.1rem;
+            font-weight: 600;
+            display: none;
+        }
+        .result.success { background: #064e3b; color: #34d399; }
+        .result.error { background: #450a0a; color: #f87171; }
+    </style>
+</head>
+<body>
+    <div class="logo">Fitlio</div>
+    <div class="subtitle">Staff Check-in Terminal</div>
+
+    <div class="card">
+        <h2>🏋️ Class Check-in</h2>
+
+        <label>Select Class</label>
+        <select id="classSelect">
+            <option value="">Loading classes...</option>
+        </select>
+
+        <label>Phone Last 4 Digits</label>
+        <input
+            type="text"
+            id="phone4"
+            maxlength="4"
+            placeholder="0000"
+            autocomplete="off"
+        />
+
+        <button onclick="checkIn()">✅ Check In</button>
+
+        <div class="result" id="result"></div>
+    </div>
+
+    <script>
+        const API = 'https://fitlio-jay.duckdns.org';
+
+        // 수업 목록 로드
+        async function loadClasses() {
+            try {
+                const res = await fetch(`${API}/classes`);
+                const classes = await res.json();
+                const select = document.getElementById('classSelect');
+                select.innerHTML = '<option value="">-- Select a class --</option>';
+                classes.forEach(c => {
+                    const date = new Date(c.schedule).toLocaleString();
+                    select.innerHTML += `<option value="${c.id}">${c.name} — ${date}</option>`;
+                });
+            } catch (e) {
+                document.getElementById('classSelect').innerHTML = '<option>Failed to load classes</option>';
+            }
+        }
+
+        async function checkIn() {
+            const class_id = parseInt(document.getElementById('classSelect').value);
+            const phone_last4 = document.getElementById('phone4').value.trim();
+            const resultDiv = document.getElementById('result');
+
+            if (!class_id || phone_last4.length !== 4) {
+                resultDiv.className = 'result error';
+                resultDiv.style.display = 'block';
+                resultDiv.textContent = '⚠️ Please select a class and enter 4-digit phone number';
+                return;
+            }
+
+            try {
+                const res = await fetch(`${API}/check-in`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ class_id, phone_last4 })
+                });
+                const data = await res.json();
+
+                if (res.ok) {
+                    resultDiv.className = 'result success';
+                    resultDiv.textContent = data.message;
+                    document.getElementById('phone4').value = '';
+                } else {
+                    resultDiv.className = 'result error';
+                    resultDiv.textContent = '❌ ' + data.detail;
+                }
+            } catch (e) {
+                resultDiv.className = 'result error';
+                resultDiv.textContent = '❌ Cannot connect to server';
+            }
+            resultDiv.style.display = 'block';
+
+            // 3초 후 결과 숨기기
+            setTimeout(() => { resultDiv.style.display = 'none'; }, 3000);
+        }
+
+        // 엔터키로 체크인
+        document.addEventListener('DOMContentLoaded', () => {
+            loadClasses();
+            document.getElementById('phone4').addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') checkIn();
+            });
+        });
+    </script>
+</body>
+</html>
