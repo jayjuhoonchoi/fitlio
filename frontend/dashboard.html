@@ -306,7 +306,7 @@
   // 클래스 로드
   async function loadClasses() {
     try {
-      const res = await fetch(`${API}/classes`, {
+      const res = await fetch(`${API}/classes/`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const data = await res.json();
