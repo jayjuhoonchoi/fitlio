@@ -57,3 +57,12 @@ class Payment(Base):
     status = Column(String, default="pending")  # pending, completed, failed
     stripe_payment_intent_id = Column(String)  # Stripe 연동용
     created_at = Column(DateTime, default=datetime.utcnow)
+
+class Attendance(Base):
+    __tablename__ = "attendances"
+
+    id = Column(Integer, primary_key=True, index=True)
+    member_id = Column(Integer, nullable=False)
+    class_id = Column(Integer, nullable=False)
+    checked_in_at = Column(DateTime, default=datetime.utcnow)
+    status = Column(String, default="present")  # present, late, absent
