@@ -35,3 +35,25 @@ class Booking(Base):
     status = Column(String, default="confirmed")
     created_at = Column(DateTime, default=datetime.utcnow)
 
+
+class Membership(Base):
+    __tablename__ = "memberships"
+    id = Column(Integer, primary_key=True, index=True)
+    member_id = Column(Integer, nullable=False)
+    plan = Column(String, nullable=False)  # monthly, yearly
+    status = Column(String, default="active")  # active, expired, cancelled
+    start_date = Column(DateTime, default=datetime.utcnow)
+    end_date = Column(DateTime, nullable=False)
+    auto_renew = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+class Payment(Base):
+    __tablename__ = "payments"
+    id = Column(Integer, primary_key=True, index=True)
+    member_id = Column(Integer, nullable=False)
+    membership_id = Column(Integer, nullable=False)
+    amount = Column(Integer, nullable=False)  # cents (e.g. 5000 = $50.00)
+    currency = Column(String, default="aud")
+    status = Column(String, default="pending")  # pending, completed, failed
+    stripe_payment_intent_id = Column(String)  # Stripe 연동용
+    created_at = Column(DateTime, default=datetime.utcnow)
