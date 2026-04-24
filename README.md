@@ -54,4 +54,4 @@ git clone git@github.com:jayjuhoonchoi/fitlio.git
 cd fitlio
 cp .env.example .env  # fill in your values
 docker compose up
-```
+``` 
