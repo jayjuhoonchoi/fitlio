@@ -58,7 +58,7 @@
     <div>
       <a href="#features">Features</a>
       <a href="#auth">Get Started</a>
-      <a href="/api/docs" target="_blank">API Docs</a>
+      <a href="/auth/docs" target="_blank">API Docs</a>
     </div>
   </nav>
 
@@ -67,7 +67,7 @@
     <p>Fitlio helps gym and sports facility owners manage classes, bookings, and members — all in one place.</p>
     <div class="buttons">
       <a href="#auth" class="btn-primary">Get Started Free</a>
-      <a href="/api/docs" target="_blank" class="btn-secondary">View API Docs</a>
+      <a href="/auth/docs" target="_blank" class="btn-secondary">View API Docs</a>
     </div>
   </section>
 
@@ -151,8 +151,14 @@
           body: JSON.stringify({ username, email, password })
         });
         const data = await res.json();
-        if (res.ok) showMessage('✅ Login successful!', 'success');
-        else showMessage(`❌ ${JSON.stringify(data.detail)}`, 'error');
+        if (res.ok) {
+          localStorage.setItem('fitlio_token', data.access_token);
+          localStorage.setItem('fitlio_member_id', data.member_id);
+          localStorage.setItem('fitlio_username', username);
+          window.location.href = '/dashboard.html';
+        } else {
+          showMessage(`❌ ${JSON.stringify(data.detail)}`, 'error');
+        }
       } catch (e) {
         showMessage('❌ Cannot connect to server', 'error');
       }
@@ -167,11 +173,15 @@
         const res = await fetch(`${API}/auth/register`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ username, email, password })
+          body: JSON.stringify({ full_name, username, email, password })
         });
         const data = await res.json();
-        if (res.ok) showMessage('✅ Account created! Please login.', 'success');
-        else showMessage(`❌ ${JSON.stringify(data.detail)}`, 'error');
+        if (res.ok) {
+          showMessage('✅ Account created! Please login.', 'success');
+          switchTab('login', { target: document.querySelector('.auth-tab') });
+        } else {
+          showMessage(`❌ ${JSON.stringify(data.detail)}`, 'error');
+        }
       } catch (e) {
         showMessage('❌ Cannot connect to server', 'error');
       }
