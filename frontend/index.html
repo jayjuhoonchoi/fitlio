@@ -33,15 +33,18 @@
     .card p { color: #888; font-size: 14px; line-height: 1.6; }
     .auth { padding: 80px 60px; background: #111; }
     .auth h2 { text-align: center; font-size: 36px; margin-bottom: 40px; }
-    .auth-box { max-width: 400px; margin: 0 auto; background: #1a1a1a;
+    .auth-box { max-width: 420px; margin: 0 auto; background: #1a1a1a;
                 border: 1px solid #2a2a2a; border-radius: 12px; padding: 40px; }
     .auth-tabs { display: flex; margin-bottom: 30px; }
     .auth-tab { flex: 1; padding: 10px; text-align: center; cursor: pointer;
                 border-bottom: 2px solid #333; color: #888; font-size: 14px; }
     .auth-tab.active { border-bottom-color: #00e676; color: #00e676; }
-    input { width: 100%; padding: 12px 16px; background: #0f0f0f; border: 1px solid #333;
+    input, select { width: 100%; padding: 12px 16px; background: #0f0f0f; border: 1px solid #333;
             border-radius: 8px; color: #fff; font-size: 14px; margin-bottom: 16px; }
-    input:focus { outline: none; border-color: #00e676; }
+    input:focus, select:focus { outline: none; border-color: #00e676; }
+    .phone-row { display: flex; gap: 8px; }
+    .phone-row select { width: 60%; margin-bottom: 16px; }
+    .phone-row input { width: 40%; }
     .btn-submit { width: 100%; padding: 14px; background: #00e676; color: #000;
                   border: none; border-radius: 8px; font-weight: 700; font-size: 16px; cursor: pointer; }
     .btn-submit:hover { background: #00c853; }
@@ -101,7 +104,6 @@
       </div>
 
       <div id="login-form">
-        <input type="text" id="login-username" placeholder="Username">
         <input type="email" id="login-email" placeholder="Email">
         <input type="password" id="login-password" placeholder="Password">
         <button class="btn-submit" onclick="handleLogin()">Login</button>
@@ -109,9 +111,33 @@
 
       <div id="register-form" style="display:none">
         <input type="text" id="reg-fullname" placeholder="Full Name">
-        <input type="text" id="reg-username" placeholder="Username">
         <input type="email" id="reg-email" placeholder="Email">
         <input type="password" id="reg-password" placeholder="Password">
+        <div class="phone-row">
+          <select id="reg-country">
+            <option value="US">🇺🇸 +1 USA</option>
+            <option value="CN">🇨🇳 +86 China</option>
+            <option value="DE">🇩🇪 +49 Germany</option>
+            <option value="JP">🇯🇵 +81 Japan</option>
+            <option value="IN">🇮🇳 +91 India</option>
+            <option value="GB">🇬🇧 +44 UK</option>
+            <option value="FR">🇫🇷 +33 France</option>
+            <option value="BR">🇧🇷 +55 Brazil</option>
+            <option value="IT">🇮🇹 +39 Italy</option>
+            <option value="CA">🇨🇦 +1 Canada</option>
+            <option value="KR">🇰🇷 +82 Korea</option>
+            <option value="RU">🇷🇺 +7 Russia</option>
+            <option value="AU" selected>🇦🇺 +61 Australia</option>
+            <option value="ES">🇪🇸 +34 Spain</option>
+            <option value="MX">🇲🇽 +52 Mexico</option>
+            <option value="ID">🇮🇩 +62 Indonesia</option>
+            <option value="NL">🇳🇱 +31 Netherlands</option>
+            <option value="SA">🇸🇦 +966 Saudi Arabia</option>
+            <option value="TR">🇹🇷 +90 Turkey</option>
+            <option value="CH">🇨🇭 +41 Switzerland</option>
+          </select>
+          <input type="tel" id="reg-phone" placeholder="Phone number">
+        </div>
         <button class="btn-submit" onclick="handleRegister()">Create Account</button>
       </div>
 
@@ -141,23 +167,22 @@
     }
 
     async function handleLogin() {
-      const username = document.getElementById('login-username').value;
       const email = document.getElementById('login-email').value;
       const password = document.getElementById('login-password').value;
       try {
         const res = await fetch(`${API}/auth/login`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ username, email, password })
+          body: JSON.stringify({ email, password })
         });
         const data = await res.json();
         if (res.ok) {
           localStorage.setItem('fitlio_token', data.access_token);
           localStorage.setItem('fitlio_member_id', data.member_id);
-          localStorage.setItem('fitlio_username', username);
+          localStorage.setItem('fitlio_full_name', data.full_name);
           window.location.href = '/dashboard.html';
         } else {
-          showMessage(`❌ ${JSON.stringify(data.detail)}`, 'error');
+          showMessage(`❌ ${data.detail}`, 'error');
         }
       } catch (e) {
         showMessage('❌ Cannot connect to server', 'error');
@@ -166,21 +191,28 @@
 
     async function handleRegister() {
       const full_name = document.getElementById('reg-fullname').value;
-      const username = document.getElementById('reg-username').value;
       const email = document.getElementById('reg-email').value;
       const password = document.getElementById('reg-password').value;
+      const country_code = document.getElementById('reg-country').value;
+      const phone = document.getElementById('reg-phone').value;
+
+      if (!phone) {
+        showMessage('❌ Phone number is required', 'error');
+        return;
+      }
+
       try {
         const res = await fetch(`${API}/auth/register`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ full_name, username, email, password })
+          body: JSON.stringify({ full_name, email, password, country_code, phone })
         });
         const data = await res.json();
         if (res.ok) {
           showMessage('✅ Account created! Please login.', 'success');
           switchTab('login', { target: document.querySelector('.auth-tab') });
         } else {
-          showMessage(`❌ ${JSON.stringify(data.detail)}`, 'error');
+          showMessage(`❌ ${data.detail}`, 'error');
         }
       } catch (e) {
         showMessage('❌ Cannot connect to server', 'error');
