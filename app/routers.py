@@ -38,7 +38,7 @@ def register(req: RegisterRequest, db: Session = Depends(get_db)):
             status_code=400,
             detail=f"Invalid country code '{req.country_code}'. Valid codes: {', '.join(COUNTRY_CODES.keys())}"
         )
-full_phone = f"{COUNTRY_CODES[country]}-{req.phone}"
+    full_phone = f"{COUNTRY_CODES[country]}-{req.phone}"
 
     full_phone = f"{COUNTRY_CODES[req.country_code]}-{req.phone}"
 
