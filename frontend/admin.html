@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fitlio Admin</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, sans-serif;
+            background: #0f172a;
+            color: white;
+            min-height: 100vh;
+            padding: 30px 20px;
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+        }
+        .logo { font-size: 1.8rem; font-weight: 800; color: #6366f1; }
+        .subtitle { color: #94a3b8; font-size: 0.9rem; }
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 16px;
+            margin-bottom: 30px;
+        }
+        .stat-card {
+            background: #1e293b;
+            border-radius: 16px;
+            padding: 24px;
+            text-align: center;
+        }
+        .stat-number { font-size: 2.5rem; font-weight: 800; color: #6366f1; }
+        .stat-label { color: #94a3b8; font-size: 0.85rem; margin-top: 6px; }
+        .section {
+            background: #1e293b;
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 20px;
+        }
+        .section h2 { font-size: 1.1rem; margin-bottom: 16px; color: #e2e8f0; }
+        table { width: 100%; border-collapse: collapse; }
+        th { text-align: left; color: #64748b; font-size: 0.8rem; padding: 8px 12px; border-bottom: 1px solid #334155; }
+        td { padding: 10px 12px; border-bottom: 1px solid #1e293b; font-size: 0.9rem; color: #cbd5e1; }
+        tr:last-child td { border-bottom: none; }
+        .badge {
+            display: inline-block;
+            padding: 2px 10px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+        .badge-present { background: #064e3b; color: #34d399; }
+        .badge-late { background: #451a03; color: #fb923c; }
+        .loading { color: #64748b; text-align: center; padding: 20px; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div>
+            <div class="logo">Fitlio</div>
+            <div class="subtitle">Admin Dashboard</div>
+        </div>
+        <div style="color: #64748b; font-size: 0.85rem;" id="lastUpdated"></div>
+    </div>
+
+    <div class="stats">
+        <div class="stat-card">
+            <div class="stat-number" id="totalMembers">-</div>
+            <div class="stat-label">Total Members</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-number" id="todayAttendance">-</div>
+            <div class="stat-label">Today's Check-ins</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-number" id="totalClasses">-</div>
+            <div class="stat-label">Total Classes</div>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>📋 Recent Check-ins</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Member</th>
+                    <th>Class</th>
+                    <th>Time</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody id="attendanceTable">
+                <tr><td colspan="4" class="loading">Loading...</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="section">
+        <h2>👥 Members</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Email</th>
+                    <th>Phone</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody id="membersTable">
+                <tr><td colspan="4" class="loading">Loading...</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <script>
+        const API = 'https://fitlio-jay.duckdns.org';
+
+        async function loadStats() {
+            try {
+                const res = await fetch(`${API}/admin/stats`);
+                const data = await res.json();
+                document.getElementById('totalMembers').textContent = data.total_members;
+                document.getElementById('todayAttendance').textContent = data.today_attendance;
+                document.getElementById('totalClasses').textContent = data.total_classes;
+            } catch (e) {
+                console.error('Stats error:', e);
+            }
+        }
+
+        async function loadAttendances() {
+            try {
+                const res = await fetch(`${API}/admin/attendances/recent`);
+                const data = await res.json();
+                const tbody = document.getElementById('attendanceTable');
+                if (data.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="4" class="loading">No check-ins yet</td></tr>';
+                    return;
+                }
+                tbody.innerHTML = data.map(a => `
+                    <tr>
+                        <td>${a.member_name}</td>
+                        <td>${a.class_name}</td>
+                        <td>${new Date(a.checked_in_at).toLocaleString()}</td>
+                        <td><span class="badge badge-${a.status}">${a.status}</span></td>
+                    </tr>
+                `).join('');
+            } catch (e) {
+                console.error('Attendance error:', e);
+            }
+        }
+
+        async function loadMembers() {
+            try {
+                const res = await fetch(`${API}/admin/members`);
+                const data = await res.json();
+                const tbody = document.getElementById('membersTable');
+                if (data.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="4" class="loading">No members yet</td></tr>';
+                    return;
+                }
+                tbody.innerHTML = data.map(m => `
+                    <tr>
+                        <td>${m.full_name}</td>
+                        <td>${m.email}</td>
+                        <td>${m.phone || '-'}</td>
+                        <td><span class="badge ${m.is_active ? 'badge-present' : 'badge-late'}">${m.is_active ? 'active' : 'inactive'}</span></td>
+                    </tr>
+                `).join('');
+            } catch (e) {
+                console.error('Members error:', e);
+            }
+        }
+
+        document.getElementById('lastUpdated').textContent = 'Updated: ' + new Date().toLocaleTimeString();
+        loadStats();
+        loadAttendances();
+        loadMembers();
+
+        // 30초마다 자동 새로고침
+        setInterval(() => {
+            loadStats();
+            loadAttendances();
+            loadMembers();
+            document.getElementById('lastUpdated').textContent = 'Updated: ' + new Date().toLocaleTimeString();
+        }, 30000);
+    </script>
+</body>
+</html>
