@@ -17,6 +17,29 @@
             justify-content: center;
             padding: 20px;
         }
+        .lang-switch {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            display: flex;
+            background: #1e293b;
+            border-radius: 20px;
+            padding: 4px;
+        }
+        .lang-btn {
+            padding: 6px 16px;
+            border-radius: 16px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: #94a3b8;
+            border: none;
+            background: none;
+        }
+        .lang-btn.active {
+            background: #6366f1;
+            color: white;
+        }
         .logo { font-size: 2rem; font-weight: 800; color: #6366f1; margin-bottom: 8px; }
         .subtitle { color: #94a3b8; margin-bottom: 40px; font-size: 1.1rem; }
         .card {
@@ -47,6 +70,15 @@
             letter-spacing: 8px;
             font-weight: 700;
         }
+        .nearest-badge {
+            display: inline-block;
+            background: #1e3a5f;
+            color: #60a5fa;
+            font-size: 0.75rem;
+            padding: 3px 10px;
+            border-radius: 20px;
+            margin-bottom: 8px;
+        }
         button {
             width: 100%;
             padding: 18px;
@@ -65,27 +97,76 @@
             padding: 20px;
             border-radius: 12px;
             text-align: center;
-            font-size: 1.1rem;
-            font-weight: 600;
             display: none;
         }
-        .result.success { background: #064e3b; color: #34d399; }
-        .result.error { background: #450a0a; color: #f87171; }
+        .result.success {
+            background: #064e3b;
+            color: #34d399;
+        }
+        .result.error {
+            background: #450a0a;
+            color: #f87171;
+        }
+        .result .member-name {
+            font-size: 1.4rem;
+            font-weight: 800;
+            margin-bottom: 8px;
+        }
+        .result .class-info {
+            font-size: 1rem;
+            margin-bottom: 12px;
+            color: #a7f3d0;
+        }
+        .membership-bar {
+            background: #0f172a;
+            border-radius: 8px;
+            padding: 12px;
+            margin-top: 8px;
+        }
+        .membership-bar .plan-name {
+            font-size: 0.8rem;
+            color: #94a3b8;
+            margin-bottom: 6px;
+        }
+        .progress-bar {
+            height: 8px;
+            background: #1e293b;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-bottom: 6px;
+        }
+        .progress-fill {
+            height: 100%;
+            background: #6366f1;
+            border-radius: 4px;
+            transition: width 0.5s;
+        }
+        .progress-text {
+            font-size: 0.85rem;
+            color: #e2e8f0;
+            font-weight: 600;
+        }
     </style>
 </head>
 <body>
+    <div class="lang-switch">
+        <button class="lang-btn active" onclick="setLang('en')">EN</button>
+        <button class="lang-btn" onclick="setLang('ko')">한국어</button>
+    </div>
+
     <div class="logo">Fitlio</div>
-    <div class="subtitle">Staff Check-in Terminal</div>
+    <div class="subtitle" id="subtitle">Staff Check-in Terminal</div>
 
     <div class="card">
-        <h2>🏋️ Class Check-in</h2>
+        <h2 id="title">🏋️ Class Check-in</h2>
 
-        <label>Select Class</label>
+        <div class="nearest-badge" id="nearest-badge">⚡ Auto-selected: Nearest class</div>
+        <label id="label-class">Select Class</label>
         <select id="classSelect">
             <option value="">Loading classes...</option>
         </select>
 
-        <label>Phone Last 4 Digits</label>
+        <label id="label-phone">Phone Last 4 Digits</label>
         <input
             type="text"
             id="phone4"
@@ -94,39 +175,110 @@
             autocomplete="off"
         />
 
-        <button onclick="checkIn()">✅ Check In</button>
+        <button onclick="checkIn()" id="btn-checkin">✅ Check In</button>
 
-        <div class="result" id="result"></div>
+        <div class="result" id="result">
+            <div class="member-name" id="result-name"></div>
+            <div class="class-info" id="result-class"></div>
+            <div class="membership-bar" id="membership-bar" style="display:none">
+                <div class="plan-name" id="plan-name"></div>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progress-fill"></div>
+                </div>
+                <div class="progress-text" id="progress-text"></div>
+            </div>
+        </div>
     </div>
 
     <script>
         const API = 'https://fitlio-jay.duckdns.org';
+        let currentLang = 'en';
 
-        // 수업 목록 로드
+        const i18n = {
+            en: {
+                subtitle: 'Staff Check-in Terminal',
+                title: '🏋️ Class Check-in',
+                nearestBadge: '⚡ Auto-selected: Nearest class',
+                labelClass: 'Select Class',
+                labelPhone: 'Phone Last 4 Digits',
+                btnCheckin: '✅ Check In',
+                unlimited: '♾️ Unlimited Plan',
+                remaining: 'remaining this month',
+                alreadyChecked: '⚠️ Already checked in today',
+                notFound: '❌ Member not found',
+                noClass: '❌ Please select a class',
+                noPhone: '⚠️ Please enter 4-digit phone number',
+                checkedIn: 'checked in!',
+            },
+            ko: {
+                subtitle: '직원 체크인 단말기',
+                title: '🏋️ 수업 체크인',
+                nearestBadge: '⚡ 자동 선택: 가장 임박한 수업',
+                labelClass: '수업 선택',
+                labelPhone: '전화번호 뒷자리 4자리',
+                btnCheckin: '✅ 체크인',
+                unlimited: '♾️ 무제한 이용권',
+                remaining: '이번 달 남은 횟수',
+                alreadyChecked: '⚠️ 오늘 이미 체크인했습니다',
+                notFound: '❌ 회원을 찾을 수 없습니다',
+                noClass: '❌ 수업을 선택해주세요',
+                noPhone: '⚠️ 전화번호 뒷자리 4자리를 입력해주세요',
+                checkedIn: '님 체크인 완료!',
+            }
+        };
+
+        function setLang(lang) {
+            currentLang = lang;
+            const t = i18n[lang];
+            document.getElementById('subtitle').textContent = t.subtitle;
+            document.getElementById('title').textContent = t.title;
+            document.getElementById('nearest-badge').textContent = t.nearestBadge;
+            document.getElementById('label-class').textContent = t.labelClass;
+            document.getElementById('label-phone').textContent = t.labelPhone;
+            document.getElementById('btn-checkin').textContent = t.btnCheckin;
+            document.querySelectorAll('.lang-btn').forEach(b => b.classList.remove('active'));
+            event.target.classList.add('active');
+        }
+
         async function loadClasses() {
             try {
+                // 가장 임박한 수업 먼저 가져오기
+                const nearestRes = await fetch(`${API}/classes/nearest`);
+                const nearest = nearestRes.ok ? await nearestRes.json() : null;
+
+                // 전체 수업 목록
                 const res = await fetch(`${API}/classes`);
                 const classes = await res.json();
                 const select = document.getElementById('classSelect');
-                select.innerHTML = '<option value="">-- Select a class --</option>';
+                select.innerHTML = '';
+
                 classes.forEach(c => {
                     const date = new Date(c.schedule).toLocaleString();
-                    select.innerHTML += `<option value="${c.id}">${c.name} — ${date}</option>`;
+                    const option = document.createElement('option');
+                    option.value = c.id;
+                    option.textContent = `${c.name} — ${date}`;
+                    if (nearest && c.id === nearest.id) {
+                        option.selected = true;
+                    }
+                    select.appendChild(option);
                 });
             } catch (e) {
-                document.getElementById('classSelect').innerHTML = '<option>Failed to load classes</option>';
+                document.getElementById('classSelect').innerHTML = '<option>Failed to load</option>';
             }
         }
 
         async function checkIn() {
+            const t = i18n[currentLang];
             const class_id = parseInt(document.getElementById('classSelect').value);
             const phone_last4 = document.getElementById('phone4').value.trim();
             const resultDiv = document.getElementById('result');
 
-            if (!class_id || phone_last4.length !== 4) {
-                resultDiv.className = 'result error';
-                resultDiv.style.display = 'block';
-                resultDiv.textContent = '⚠️ Please select a class and enter 4-digit phone number';
+            if (!class_id) {
+                showError(t.noClass);
+                return;
+            }
+            if (phone_last4.length !== 4) {
+                showError(t.noPhone);
                 return;
             }
 
@@ -139,24 +291,70 @@
                 const data = await res.json();
 
                 if (res.ok) {
-                    resultDiv.className = 'result success';
-                    resultDiv.textContent = data.message;
+                    showSuccess(data, t);
                     document.getElementById('phone4').value = '';
                 } else {
-                    resultDiv.className = 'result error';
-                    resultDiv.textContent = '❌ ' + data.detail;
+                    if (data.detail === 'Already checked in today') {
+                        showError(t.alreadyChecked);
+                    } else if (data.detail === 'Member not found') {
+                        showError(t.notFound);
+                    } else {
+                        showError('❌ ' + data.detail);
+                    }
                 }
             } catch (e) {
-                resultDiv.className = 'result error';
-                resultDiv.textContent = '❌ Cannot connect to server';
+                showError('❌ Cannot connect to server');
             }
-            resultDiv.style.display = 'block';
 
-            // 3초 후 결과 숨기기
-            setTimeout(() => { resultDiv.style.display = 'none'; }, 3000);
+            setTimeout(() => { resultDiv.style.display = 'none'; }, 5000);
         }
 
-        // 엔터키로 체크인
+        function showSuccess(data, t) {
+            const resultDiv = document.getElementById('result');
+            resultDiv.className = 'result success';
+            resultDiv.style.display = 'block';
+
+            document.getElementById('result-name').textContent =
+                currentLang === 'ko'
+                    ? `${data.member_name}${t.checkedIn}`
+                    : `${data.member_name} ${t.checkedIn}`;
+
+            const classTime = new Date(data.checked_in_at).toLocaleTimeString();
+            document.getElementById('result-class').textContent = `${data.class_name} • ${classTime}`;
+
+            const membershipBar = document.getElementById('membership-bar');
+            if (data.membership) {
+                membershipBar.style.display = 'block';
+                if (data.membership.plan === 'unlimited') {
+                    document.getElementById('plan-name').textContent = t.unlimited;
+                    document.getElementById('progress-fill').style.width = '100%';
+                    document.getElementById('progress-text').textContent = '♾️';
+                } else {
+                    const used = data.membership.used;
+                    const limit = data.membership.limit;
+                    const pct = Math.min((used / limit) * 100, 100);
+                    document.getElementById('plan-name').textContent =
+                        currentLang === 'ko' ? `이번 달 ${used} / ${limit} 사용` : `${used} / ${limit} used this month`;
+                    document.getElementById('progress-fill').style.width = `${pct}%`;
+                    document.getElementById('progress-text').textContent =
+                        currentLang === 'ko'
+                            ? `${limit - used}회 ${t.remaining}`
+                            : `${limit - used} ${t.remaining}`;
+                }
+            } else {
+                membershipBar.style.display = 'none';
+            }
+        }
+
+        function showError(msg) {
+            const resultDiv = document.getElementById('result');
+            resultDiv.className = 'result error';
+            resultDiv.style.display = 'block';
+            document.getElementById('result-name').textContent = msg;
+            document.getElementById('result-class').textContent = '';
+            document.getElementById('membership-bar').style.display = 'none';
+        }
+
         document.addEventListener('DOMContentLoaded', () => {
             loadClasses();
             document.getElementById('phone4').addEventListener('keypress', (e) => {

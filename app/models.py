@@ -40,7 +40,8 @@ class Membership(Base):
     __tablename__ = "memberships"
     id = Column(Integer, primary_key=True, index=True)
     member_id = Column(Integer, nullable=False)
-    plan = Column(String, nullable=False)  # monthly, yearly
+    plan = Column(String, nullable=False)  # unlimited, weekly_2, weekly_3, weekly_5
+    monthly_limit = Column(Integer, nullable=True)  # None = 무제한, 8/12/20 = 제한
     status = Column(String, default="active")  # active, expired, cancelled
     start_date = Column(DateTime, default=datetime.utcnow)
     end_date = Column(DateTime, nullable=False)
