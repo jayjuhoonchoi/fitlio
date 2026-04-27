@@ -17,11 +17,11 @@ def get_db_connection():
 def fetch_expiring_members(cursor, days: int):
     target_date = (datetime.now() + timedelta(days=days)).date()
     cursor.execute("""
-        SELECT u.name, u.phone, m.end_date
+        SELECT u.full_name, u.phone, m.end_date
         FROM memberships m
-        JOIN users u ON m.user_id = u.id
+        JOIN members u ON m.member_id = u.id
         WHERE m.end_date::date = %s
-        AND m.is_active = true
+        AND m.status = 'active'
     """, (target_date,))
     return cursor.fetchall()
 
