@@ -12,20 +12,40 @@ resource "aws_iam_role" "lambda_role" {
   })
 }
 
-# Lambda 기본 실행 권한 붙이기
+# Lambda 기본 실행 권한
 resource "aws_iam_role_policy_attachment" "lambda_basic" {
   role       = aws_iam_role.lambda_role.name
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 }
 
-# psycopg2 Lambda Layer (AWS 공식 제공)
+# Lambda VPC 접근 권한 (VPC 안에 넣으려면 필요)
+resource "aws_iam_role_policy_attachment" "lambda_vpc" {
+  role       = aws_iam_role.lambda_role.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
+}
+
+# Lambda 전용 Security Group
+resource "aws_security_group" "lambda_sg" {
+  name        = "fitlio-lambda-sg"
+  description = "Security group for Lambda"
+  vpc_id      = aws_vpc.fitlio_vpc.id
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+}
+
+# psycopg2 Lambda Layer
 resource "aws_lambda_layer_version" "psycopg2" {
   filename            = "${path.module}/../lambda/psycopg2-layer.zip"
   layer_name          = "psycopg2"
   compatible_runtimes = ["python3.11"]
 }
 
-# Lambda 함수
+# Lambda 함수 (VPC 안에 배치)
 resource "aws_lambda_function" "membership_alert" {
   filename         = "${path.module}/../lambda/membership_alert.zip"
   function_name    = "fitlio-membership-alert"
@@ -35,9 +55,14 @@ resource "aws_lambda_function" "membership_alert" {
   timeout          = 30
   layers           = [aws_lambda_layer_version.psycopg2.arn]
 
+  vpc_config {
+    subnet_ids         = [aws_subnet.public.id]
+    security_group_ids = [aws_security_group.lambda_sg.id]
+  }
+
   environment {
     variables = {
-      DB_HOST           = var.db_host
+      DB_HOST           = aws_instance.fitlio_server.private_ip
       DB_NAME           = "fitlio"
       DB_USER           = "fitlio"
       DB_PASSWORD       = var.db_password

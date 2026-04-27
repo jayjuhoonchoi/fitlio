@@ -76,7 +76,7 @@ resource "aws_security_group" "fitlio_sg" {
     description = "SSH access"
   }
 
-    ingress {
+  ingress {
     from_port   = 443
     to_port     = 443
     protocol    = "tcp"
@@ -100,7 +100,6 @@ resource "aws_security_group" "fitlio_sg" {
     description = "Fitlio API"
   }
 
-
   ingress {
     from_port   = 3000
     to_port     = 3000
@@ -117,7 +116,14 @@ resource "aws_security_group" "fitlio_sg" {
     description = "Prometheus"
   }
 
-  
+  ingress {
+    from_port       = 5432
+    to_port         = 5432
+    protocol        = "tcp"
+    security_groups = [aws_security_group.lambda_sg.id]
+    description     = "PostgreSQL - Lambda only"
+  }
+
   egress {
     from_port   = 0
     to_port     = 0
