@@ -13,6 +13,9 @@ from app.admin import router as admin_router
 
 models.Base.metadata.create_all(bind=engine)
 
+from app.seed import seed_database
+seed_database()
+
 app = FastAPI(
     title="Fitlio",
     description="Sports facility management platform",
