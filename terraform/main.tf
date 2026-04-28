@@ -11,6 +11,9 @@ provider "aws" {
   region = "ap-southeast-2"
 }
 
+# ─────────────────────────────────────────
+# VPC
+# ─────────────────────────────────────────
 resource "aws_vpc" "fitlio_vpc" {
   cidr_block           = "10.0.0.0/16"
   enable_dns_hostnames = true
@@ -20,6 +23,7 @@ resource "aws_vpc" "fitlio_vpc" {
     Name        = "fitlio-vpc"
     Environment = "production"
     Project     = "fitlio"
+    ManagedBy   = "terraform"
   }
 }
 
@@ -63,6 +67,9 @@ resource "aws_route_table_association" "public" {
   route_table_id = aws_route_table.public.id
 }
 
+# ─────────────────────────────────────────
+# Security Group
+# ─────────────────────────────────────────
 resource "aws_security_group" "fitlio_sg" {
   name        = "fitlio-sg"
   description = "Security group for Fitlio EC2"
@@ -77,19 +84,19 @@ resource "aws_security_group" "fitlio_sg" {
   }
 
   ingress {
-    from_port   = 443
-    to_port     = 443
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-    description = "HTTPS access"
-  }
-
-  ingress {
     from_port   = 80
     to_port     = 80
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
     description = "HTTP access"
+  }
+
+  ingress {
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+    description = "HTTPS access"
   }
 
   ingress {
@@ -117,11 +124,11 @@ resource "aws_security_group" "fitlio_sg" {
   }
 
   ingress {
-    from_port       = 5432
-    to_port         = 5432
-    protocol        = "tcp"
-    security_groups = [aws_security_group.lambda_sg.id]
-    description     = "PostgreSQL - Lambda only"
+    from_port   = 5432
+    to_port     = 5432
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+    description = "PostgreSQL - Lambda access"
   }
 
   egress {
@@ -138,6 +145,9 @@ resource "aws_security_group" "fitlio_sg" {
   }
 }
 
+# ─────────────────────────────────────────
+# Key Pair
+# ─────────────────────────────────────────
 resource "aws_key_pair" "fitlio_key" {
   key_name   = "fitlio-key"
   public_key = file("~/.ssh/id_ed25519.pub")
@@ -147,6 +157,9 @@ resource "aws_key_pair" "fitlio_key" {
   }
 }
 
+# ─────────────────────────────────────────
+# AMI
+# ─────────────────────────────────────────
 data "aws_ami" "ubuntu" {
   most_recent = true
   owners      = ["099720109477"]
@@ -157,13 +170,15 @@ data "aws_ami" "ubuntu" {
   }
 }
 
+# ─────────────────────────────────────────
+# EC2
+# ─────────────────────────────────────────
 resource "aws_instance" "fitlio_server" {
   ami                    = data.aws_ami.ubuntu.id
   instance_type          = "t3.micro"
   subnet_id              = aws_subnet.public.id
   vpc_security_group_ids = [aws_security_group.fitlio_sg.id]
   key_name               = aws_key_pair.fitlio_key.key_name
-
 
   user_data = <<-EOF
     #!/bin/bash
@@ -180,16 +195,34 @@ resource "aws_instance" "fitlio_server" {
     cd /home/ubuntu/fitlio
     docker-compose up -d --build
   EOF
-  
 
   tags = {
     Name        = "fitlio-server"
     Environment = "production"
     Project     = "fitlio"
+    ManagedBy   = "terraform"
   }
 }
 
+# ─────────────────────────────────────────
+# Outputs
+# ─────────────────────────────────────────
 output "fitlio_public_ip" {
   value       = aws_instance.fitlio_server.public_ip
-  description = "Public IP of Fitlio server"
+  description = "Public IP of Fitlio EC2 server"
+}
+
+output "fitlio_url" {
+  value       = "https://fitlio-jay.duckdns.org"
+  description = "Fitlio service URL"
+}
+
+output "grafana_url" {
+  value       = "http://${aws_instance.fitlio_server.public_ip}:3000"
+  description = "Grafana monitoring URL"
+}
+
+output "prometheus_url" {
+  value       = "http://${aws_instance.fitlio_server.public_ip}:9090"
+  description = "Prometheus metrics URL"
 }
