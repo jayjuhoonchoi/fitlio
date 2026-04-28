@@ -10,6 +10,40 @@ def hash_password(password: str) -> str:
     return hashlib.sha256(password.encode()).hexdigest()
 
 
+def print_report(members: list, classes: list, memberships: list, db: Session):
+    expiring_7 = db.query(models.Membership).filter(
+        models.Membership.end_date <= datetime.now() + timedelta(days=7),
+        models.Membership.end_date >= datetime.now(),
+        models.Membership.status == "active"
+    ).count()
+
+    expiring_3 = db.query(models.Membership).filter(
+        models.Membership.end_date <= datetime.now() + timedelta(days=3),
+        models.Membership.end_date >= datetime.now(),
+        models.Membership.status == "active"
+    ).count()
+
+    expiring_1 = db.query(models.Membership).filter(
+        models.Membership.end_date <= datetime.now() + timedelta(days=1),
+        models.Membership.end_date >= datetime.now(),
+        models.Membership.status == "active"
+    ).count()
+
+    print("")
+    print("╔════════════════════════════════════════════╗")
+    print("║       🏋️  Fitlio Database Seeded            ║")
+    print("╠════════════════════════════════════════════╣")
+    print(f"║  👥 Members         │ {len(members)} created              ║")
+    print(f"║  🥋 Classes         │ {len(classes)} created              ║")
+    print(f"║  💳 Memberships     │ {len(memberships)} created              ║")
+    print("╠════════════════════════════════════════════╣")
+    print(f"║  ⚠️  Expiring in 7 days  │ {expiring_7} member(s)         ║")
+    print(f"║  🔴 Expiring in 3 days  │ {expiring_3} member(s)         ║")
+    print(f"║  🚨 Expiring tomorrow   │ {expiring_1} member(s)         ║")
+    print("╚════════════════════════════════════════════╝")
+    print("")
+
+
 def seed_members(db: Session) -> list:
     members_data = [
         {"email": "jay.choi@fitlio.com", "full_name": "Jay Choi", "phone": "+82-10-1234-5678"},
@@ -18,7 +52,6 @@ def seed_members(db: Session) -> list:
         {"email": "hyunwoo.lee@fitlio.com", "full_name": "Hyunwoo Lee", "phone": "+82-10-4567-8901"},
         {"email": "jiyeon.choi@fitlio.com", "full_name": "Jiyeon Choi", "phone": "+82-10-5678-9012"},
     ]
-
     members = []
     for data in members_data:
         existing = db.query(models.Member).filter_by(email=data["email"]).first()
@@ -33,23 +66,20 @@ def seed_members(db: Session) -> list:
             )
             db.add(member)
             members.append(member)
-
     db.commit()
     for m in members:
         db.refresh(m)
-
     return members
 
 
 def seed_classes(db: Session) -> list:
     classes_data = [
-        {"name": "BJJ Fundamentals", "day_of_week": "Monday", "start_time": "10:00", "end_time": "11:30", "capacity": 20},
-        {"name": "Wrestling", "day_of_week": "Wednesday", "start_time": "10:00", "end_time": "11:30", "capacity": 15},
-        {"name": "Advanced Grappling", "day_of_week": "Friday", "start_time": "10:00", "end_time": "11:30", "capacity": 10},
-        {"name": "Open Mat", "day_of_week": "Saturday", "start_time": "11:00", "end_time": "13:00", "capacity": 30},
-        {"name": "Kids BJJ", "day_of_week": "Tuesday", "start_time": "16:00", "end_time": "17:00", "capacity": 12},
+        {"name": "BJJ Fundamentals", "schedule": datetime.now() + timedelta(days=1, hours=10), "capacity": 20},
+        {"name": "Wrestling", "schedule": datetime.now() + timedelta(days=2, hours=10), "capacity": 15},
+        {"name": "Advanced Grappling", "schedule": datetime.now() + timedelta(days=3, hours=10), "capacity": 10},
+        {"name": "Open Mat", "schedule": datetime.now() + timedelta(days=4, hours=11), "capacity": 30},
+        {"name": "Kids BJJ", "schedule": datetime.now() + timedelta(days=5, hours=16), "capacity": 12},
     ]
-
     classes = []
     for data in classes_data:
         existing = db.query(models.FitnessClass).filter_by(name=data["name"]).first()
@@ -57,14 +87,11 @@ def seed_classes(db: Session) -> list:
             fitness_class = models.FitnessClass(
                 name=data["name"],
                 instructor="Jay Choi",
-                day_of_week=data["day_of_week"],
-                start_time=data["start_time"],
-                end_time=data["end_time"],
+                schedule=data["schedule"],
                 capacity=data["capacity"]
             )
             db.add(fitness_class)
             classes.append(fitness_class)
-
     db.commit()
     return classes
 
@@ -77,7 +104,6 @@ def seed_memberships(db: Session, members: list) -> list:
         {"plan": "unlimited", "days_offset": 30},
         {"plan": "3x_week", "days_offset": 60},
     ]
-
     memberships = []
     for member, plan_data in zip(members, plans):
         existing = db.query(models.Membership).filter_by(member_id=member.id).first()
@@ -91,7 +117,6 @@ def seed_memberships(db: Session, members: list) -> list:
             )
             db.add(membership)
             memberships.append(membership)
-
     db.commit()
     return memberships
 
@@ -99,30 +124,26 @@ def seed_memberships(db: Session, members: list) -> list:
 def seed_database():
     db: Session = SessionLocal()
     try:
-        print("Checking database seed status...")
+        print("🔍 Checking database seed status...")
 
         member_count = db.query(models.Member).count()
         if member_count >= 5:
-            print(f"Database already seeded ({member_count} members). Skipping.")
+            print(f"✅ Database already seeded ({member_count} members). Skipping.")
             return
 
-        print("Seeding database...")
+        print("🌱 Seeding database...")
 
         members = seed_members(db)
         classes = seed_classes(db)
         memberships = seed_memberships(db, members)
 
-        print("✅ Database seeded successfully!")
-        print(f"   → {len(members)} members created")
-        print(f"   → {len(classes)} classes created")
-        print(f"   → {len(memberships)} memberships created")
-        print(f"   → Lambda test: 3 memberships expiring within 7 days")
+        print_report(members, classes, memberships, db)
 
     except IntegrityError as e:
-        print(f"IntegrityError during seeding: {e}")
+        print(f"❌ IntegrityError during seeding: {e}")
         db.rollback()
     except Exception as e:
-        print(f"Unexpected error during seeding: {e}")
+        print(f"❌ Unexpected error during seeding: {e}")
         db.rollback()
     finally:
         db.close()
