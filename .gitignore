@@ -12,3 +12,4 @@ terraform/.terraform.lock.hcl
 venv/
 *.tfstate
 *.tfstate.backup
+terraform/terraform.tfstate*.backup
