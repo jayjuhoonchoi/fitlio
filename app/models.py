@@ -13,6 +13,7 @@ class Member(Base):
     full_name = Column(String, nullable=False)
     phone = Column(String)
     is_active = Column(Boolean, default=True)
+    language = Column(String, default="en")
     created_at = Column(DateTime, default=datetime.utcnow)
 
 class FitnessClass(Base):
