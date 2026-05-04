@@ -204,7 +204,7 @@ resource "aws_instance" "fitlio_server" {
 
     # ── 4. DuckDNS IP 업데이트 ───────────────────────
     PUBLIC_IP=$(curl -s http://checkip.amazonaws.com)
-    curl -s "https://www.duckdns.org/update?domains=fitlio-jay&token=${duckdns_token}&ip=$PUBLIC_IP"
+    curl -s "https://www.duckdns.org/update?domains=fitlio-jay&token=${var.duckdns_token}&ip=$PUBLIC_IP"
     echo "DuckDNS updated: $PUBLIC_IP"
 
     # ── 5. DNS 전파 대기 ─────────────────────────────
