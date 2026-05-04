@@ -13,3 +13,4 @@ venv/
 *.tfstate
 *.tfstate.backup
 terraform/terraform.tfstate*.backup
+terraform/*.tfvars

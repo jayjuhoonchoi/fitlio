@@ -16,3 +16,8 @@ variable "slack_webhook_url" {
   type        = string
   sensitive   = true
 }
+variable "duckdns_token" {
+  description = "DuckDNS token for dynamic DNS update"
+  type        = string
+  sensitive   = true
+}
