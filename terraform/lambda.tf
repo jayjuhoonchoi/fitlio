@@ -67,3 +67,89 @@ resource "aws_lambda_permission" "allow_eventbridge" {
   principal     = "events.amazonaws.com"
   source_arn    = aws_cloudwatch_event_rule.daily_9am.arn
 }
+
+# ─────────────────────────────────────────
+# S3 백업 버킷 (이미 생성됨 - import용)
+# ─────────────────────────────────────────
+resource "aws_s3_bucket" "db_backup" {
+  bucket = "fitlio-db-backup-jay"
+}
+
+resource "aws_s3_bucket_versioning" "db_backup" {
+  bucket = aws_s3_bucket.db_backup.id
+  versioning_configuration {
+    status = "Enabled"
+  }
+}
+
+# ─────────────────────────────────────────
+# Lambda S3 접근 권한
+# ─────────────────────────────────────────
+resource "aws_iam_role_policy" "lambda_s3_backup" {
+  name = "fitlio-lambda-s3-backup"
+  role = aws_iam_role.lambda_role.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect   = "Allow"
+      Action   = ["s3:PutObject", "s3:GetObject", "s3:ListBucket"]
+      Resource = [
+        aws_s3_bucket.db_backup.arn,
+        "${aws_s3_bucket.db_backup.arn}/*"
+      ]
+    }]
+  })
+}
+
+# ─────────────────────────────────────────
+# Lambda 백업 함수
+# ─────────────────────────────────────────
+data "archive_file" "backup_lambda" {
+  type        = "zip"
+  source_file = "${path.module}/../lambda/backup/handler.py"
+  output_path = "${path.module}/../lambda/backup/handler.zip"
+}
+
+resource "aws_lambda_function" "db_backup" {
+  filename         = data.archive_file.backup_lambda.output_path
+  function_name    = "fitlio-db-backup"
+  role             = aws_iam_role.lambda_role.arn
+  handler          = "handler.lambda_handler"
+  runtime          = "python3.11"
+  timeout          = 300
+  layers           = ["arn:aws:lambda:ap-southeast-2:238391222114:layer:psycopg2:9"]
+
+  source_code_hash = data.archive_file.backup_lambda.output_base64sha256
+
+  environment {
+    variables = {
+      DB_HOST     = aws_instance.fitlio_server.public_ip
+      DB_NAME     = "fitlio"
+      DB_USER     = "fitlio"
+      DB_PASSWORD = "fitlio123"
+      S3_BUCKET   = aws_s3_bucket.db_backup.bucket
+    }
+  }
+}
+
+# ─────────────────────────────────────────
+# EventBridge - 매일 자정 UTC (한국 오전 9시)
+# ─────────────────────────────────────────
+resource "aws_cloudwatch_event_rule" "daily_backup" {
+  name                = "fitlio-daily-backup"
+  schedule_expression = "cron(0 0 * * ? *)"
+}
+
+resource "aws_cloudwatch_event_target" "backup_target" {
+  rule      = aws_cloudwatch_event_rule.daily_backup.name
+  target_id = "fitlio-db-backup"
+  arn       = aws_lambda_function.db_backup.arn
+}
+
+resource "aws_lambda_permission" "allow_eventbridge_backup" {
+  statement_id  = "AllowEventBridgeBackup"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.db_backup.function_name
+  principal     = "events.amazonaws.com"
+  source_arn    = aws_cloudwatch_event_rule.daily_backup.arn
+}
