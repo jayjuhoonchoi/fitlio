@@ -305,6 +305,18 @@ resource "aws_instance" "fitlio_server" {
     docker-compose down
     docker-compose up -d --build
 
+    # ── k3s 설치 및 K8s 매니페스트 자동 적용 ──────────────────────
+    curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION="v1.35.4+k3s1" sh -
+    until kubectl get nodes 2>/dev/null | grep -q "Ready"; do
+      echo "k3s 노드 준비 대기 중..."
+      sleep 5
+    done
+    echo "✅ k3s Ready"
+    kubectl create namespace fitlio --dry-run=client -o yaml | kubectl apply -f -
+    kubectl apply -f /home/ubuntu/fitlio/k8s/
+    echo "✅ K8s 매니페스트 적용 완료"
+    # ───────────────────────────────────────────────────────────────
+    
   EOF
 
   tags = {
