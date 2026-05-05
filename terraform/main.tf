@@ -180,6 +180,11 @@ resource "aws_instance" "fitlio_server" {
   vpc_security_group_ids = [aws_security_group.fitlio_sg.id]
   key_name               = aws_key_pair.fitlio_key.key_name
 
+  root_block_device {
+    volume_size = 20
+    volume_type = "gp3"
+  }
+
   user_data = <<-EOF
     #!/bin/bash
     set -e

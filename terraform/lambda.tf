@@ -73,6 +73,10 @@ resource "aws_lambda_permission" "allow_eventbridge" {
 # ─────────────────────────────────────────
 resource "aws_s3_bucket" "db_backup" {
   bucket = "fitlio-db-backup-jay"
+
+  lifecycle {
+    prevent_destroy = true
+  }
 }
 
 resource "aws_s3_bucket_versioning" "db_backup" {
@@ -117,7 +121,7 @@ resource "aws_lambda_function" "db_backup" {
   handler          = "handler.lambda_handler"
   runtime          = "python3.11"
   timeout          = 300
-  layers           = ["arn:aws:lambda:ap-southeast-2:238391222114:layer:psycopg2:9"]
+  layers           = ["arn:aws:lambda:ap-southeast-2:238391222114:layer:psycopg2:10"]
 
   source_code_hash = data.archive_file.backup_lambda.output_base64sha256
 
