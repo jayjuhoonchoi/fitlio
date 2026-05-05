@@ -14,3 +14,4 @@ venv/
 *.tfstate.backup
 terraform/terraform.tfstate*.backup
 terraform/*.tfvars
+lambda/backup/handler.zip
