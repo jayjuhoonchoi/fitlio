@@ -1,0 +1,18 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: fitlio
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/jayjuhoonchoi/fitlio
+    targetRevision: HEAD
+    path: k8s
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: fitlio
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
