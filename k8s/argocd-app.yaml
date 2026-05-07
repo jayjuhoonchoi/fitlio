@@ -8,7 +8,10 @@ spec:
   source:
     repoURL: https://github.com/jayjuhoonchoi/fitlio
     targetRevision: HEAD
-    path: k8s
+    path: helm/fitlio
+    helm:
+      valueFiles:
+      - values.yaml
   destination:
     server: https://kubernetes.default.svc
     namespace: fitlio
