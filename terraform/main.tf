@@ -231,7 +231,7 @@ resource "aws_instance" "fitlio_server" {
     NGINXEOF
 
     cd /home/ubuntu/fitlio
-    docker-compose up -d nginx
+    # docker-compose up -d nginx  # disabled: Traefik handles port 80/443
     sleep 10
 
     # ── 7. certbot 인증서 발급 ───────────────────────
