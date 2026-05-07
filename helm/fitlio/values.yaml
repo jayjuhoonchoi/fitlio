@@ -1,0 +1,26 @@
+namespace: fitlio
+
+api:
+  replicaCount: 2
+  image:
+    repository: jayjuhoonchoi/fitlio-api
+    tag: latest
+    pullPolicy: Always
+  service:
+    port: 8000
+
+postgres:
+  image:
+    repository: postgres
+    tag: "15"
+  env:
+    db: fitlio
+    user: fitlio
+  service:
+    port: 5432
+
+ingress:
+  host: fitlio-jay.duckdns.org
+  tls:
+    secretName: fitlio-tls-prod
+    clusterIssuer: letsencrypt-prod
