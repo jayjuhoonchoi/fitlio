@@ -1,0 +1,3 @@
+# Helm Chart for Fitlio Kubernetes deployment
+*.tgz
+.DS_Store
