@@ -1,0 +1,14 @@
+api:
+  replicaCount: 1
+  image:
+    tag: dev
+
+postgres:
+  image:
+    tag: "15"
+
+ingress:
+  host: dev.fitlio-jay.duckdns.org
+  tls:
+    secretName: fitlio-tls-dev
+    clusterIssuer: letsencrypt-staging
