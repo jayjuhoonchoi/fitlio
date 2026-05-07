@@ -1,0 +1,10 @@
+api:
+  replicaCount: 2
+  image:
+    tag: latest
+
+ingress:
+  host: fitlio-jay.duckdns.org
+  tls:
+    secretName: fitlio-tls-prod
+    clusterIssuer: letsencrypt-prod
