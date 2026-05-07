@@ -315,7 +315,21 @@ resource "aws_instance" "fitlio_server" {
     kubectl create namespace fitlio --dry-run=client -o yaml | kubectl apply -f -
     kubectl apply -f /home/ubuntu/fitlio/k8s/
     echo "✅ K8s 매니페스트 적용 완료"
+    # ── 쿠버네티스 kubeconfig 권한 ─────────────────────────────
+    chmod 644 /etc/rancher/k3s/k3s.yaml
+    # ── Swap 2GB (ArgoCD OOM 방지) ────────────────────────────
+    fallocate -l 2G /swapfile
+    chmod 600 /swapfile
+    mkswap /swapfile
+    swapon /swapfile
+    echo '/swapfile none swap sw 0 0' >> /etc/fstab
+    # ── cert-manager 자동 설치 ────────────────────────────────
+    kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.16.3/cert-manager.yaml
+    sleep 60
+    kubectl apply -f /home/ubuntu/fitlio/k8s/cluster-issuer-prod.yaml
+    echo "✅ 클러스터 부트스트랩 완료"
     # ───────────────────────────────────────────────────────────────
+    
     
   EOF
 
