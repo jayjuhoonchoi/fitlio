@@ -1,0 +1,15 @@
+🏋️ Fitlio has been deployed!
+
+Application URL:
+  https://{{ .Values.ingress.host }}
+
+API replicas: {{ .Values.api.replicaCount }}
+Image tag:    {{ .Values.api.image.tag }}
+
+Check status:
+  kubectl get pods -n {{ .Values.namespace }}
+  kubectl get ingress -n {{ .Values.namespace }}
+
+Docs:
+  https://{{ .Values.ingress.host }}/docs
+
