@@ -222,16 +222,6 @@ resource "aws_instance" "fitlio_server" {
     # ── 6. namespace 생성 ─────────────────────────────────────
     kubectl create namespace fitlio --dry-run=client -o yaml | kubectl apply -f -
     echo "✅ namespace 완료"
-    # ── 7. Secret 생성 ───────────────────────────────────────
-    kubectl create secret generic fitlio-env \
-      --namespace=fitlio \
-      --from-literal=POSTGRES_USER=fitlio \
-      --from-literal=POSTGRES_PASSWORD=Fitlio2026Secure \
-      --from-literal=POSTGRES_DB=fitlio \
-      --from-literal=DATABASE_URL=postgresql://fitlio:Fitlio2026Secure@db:5432/fitlio \
-      --from-literal=GRAFANA_PASSWORD=Grafana2026Secure \
-      --dry-run=client -o yaml | kubectl apply -f -
-    echo "✅ Secret 생성 완료"
 
     # ── 8. K8s 매니페스트 적용 ───────────────────────────────
     kubectl apply -f /home/ubuntu/fitlio/k8s/
