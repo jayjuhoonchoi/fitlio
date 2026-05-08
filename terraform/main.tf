@@ -190,146 +190,59 @@ resource "aws_instance" "fitlio_server" {
     set -e
     exec > /var/log/user-data.log 2>&1
 
-    # ── 1. 기본 패키지 ──────────────────────────────
+    # ── 1. 필수 패키지 ────────────────────────────────────────
     apt-get update -y
-    apt-get install -y docker.io docker-compose git curl certbot
+    apt-get install -y git curl
 
-    usermod -aG docker ubuntu
-
-    # ── 2. 코드 clone ────────────────────────────────
-    su - ubuntu -c "git clone https://github.com/jayjuhoonchoi/fitlio.git /home/ubuntu/fitlio"
-
-    # ── 3. .env 생성 ─────────────────────────────────
-    cat > /home/ubuntu/fitlio/.env << 'ENVEOF'
-    POSTGRES_USER=fitlio
-    POSTGRES_PASSWORD=fitlio123
-    POSTGRES_DB=fitlio
-    GRAFANA_PASSWORD=fitlio123
-    ENVEOF
-
-    # ── 4. DuckDNS IP 업데이트 ───────────────────────
-    PUBLIC_IP=$(curl -s http://checkip.amazonaws.com)
-    curl -s "https://www.duckdns.org/update?domains=fitlio-jay&token=${var.duckdns_token}&ip=$PUBLIC_IP"
-    echo "DuckDNS updated: $PUBLIC_IP"
-
-    # ── 5. DNS 전파 대기 ─────────────────────────────
-    sleep 60
-
-    # ── 6. nginx HTTP 임시 모드로 먼저 시작 ──────────
-    mkdir -p /var/www/certbot
-    cat > /home/ubuntu/fitlio/nginx/nginx.conf << 'NGINXEOF'
-    server {
-        listen 80;
-        server_name fitlio-jay.duckdns.org;
-        location /.well-known/acme-challenge/ {
-            root /var/www/certbot;
-        }
-        location / {
-            return 200 'ok';
-        }
-    }
-    NGINXEOF
-
-    cd /home/ubuntu/fitlio
-    # docker-compose up -d nginx  # disabled: Traefik handles port 80/443
-    sleep 10
-
-    # ── 7. certbot 인증서 발급 ───────────────────────
-    certbot certonly --webroot \
-      -w /var/www/certbot \
-      -d fitlio-jay.duckdns.org \
-      --email jayjuhoonchoi@gmail.com \
-      --agree-tos \
-      --non-interactive
-
-    # ── 8. nginx HTTPS config 원복 ───────────────────
-    cat > /home/ubuntu/fitlio/nginx/nginx.conf << 'NGINXEOF'
-    server {
-        listen 80;
-        server_name fitlio-jay.duckdns.org;
-        return 301 https://$host$request_uri;
-    }
-    server {
-        listen 443 ssl;
-        server_name fitlio-jay.duckdns.org;
-        ssl_certificate /etc/letsencrypt/live/fitlio-jay.duckdns.org/fullchain.pem;
-        ssl_certificate_key /etc/letsencrypt/live/fitlio-jay.duckdns.org/privkey.pem;
-        location /auth/ {
-            proxy_pass http://api:8000/auth/;
-            proxy_set_header Host $host;
-            proxy_set_header X-Real-IP $remote_addr;
-            add_header Access-Control-Allow-Origin *;
-        }
-        location /classes {
-            proxy_pass http://api:8000/classes;
-            proxy_set_header Host $host;
-            proxy_set_header X-Real-IP $remote_addr;
-            add_header Access-Control-Allow-Origin *;
-        }
-        location /payments/ {
-            proxy_pass http://api:8000/payments/;
-            proxy_set_header Host $host;
-            proxy_set_header X-Real-IP $remote_addr;
-            add_header Access-Control-Allow-Origin *;
-        }
-        location /check-in {
-            proxy_pass http://api:8000/check-in;
-            proxy_set_header Host $host;
-            proxy_set_header X-Real-IP $remote_addr;
-            add_header Access-Control-Allow-Origin *;
-        }
-        location /attendances {
-            proxy_pass http://api:8000/attendances;
-            proxy_set_header Host $host;
-            proxy_set_header X-Real-IP $remote_addr;
-            add_header Access-Control-Allow-Origin *;
-        }
-        location /admin/ {
-            proxy_pass http://api:8000/admin/;
-            proxy_set_header Host $host;
-            proxy_set_header X-Real-IP $remote_addr;
-            add_header Access-Control-Allow-Origin *;
-        }
-        location /.well-known/acme-challenge/ {
-            root /var/www/certbot;
-        }
-        location / {
-            root /usr/share/nginx/html;
-            index index.html;
-            try_files $uri $uri.html $uri/ =404;
-        }
-    }
-    NGINXEOF
-
-    # ── 9. 전체 서비스 시작 ──────────────────────────
-
-    # ── k3s 설치 및 K8s 매니페스트 자동 적용 ──────────────────────
-    curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION="v1.35.4+k3s1" sh -
-    until kubectl get nodes 2>/dev/null | grep -q "Ready"; do
-      echo "k3s 노드 준비 대기 중..."
-      sleep 5
-    done
-    echo "✅ k3s Ready"
-    kubectl create namespace fitlio --dry-run=client -o yaml | kubectl apply -f -
-    kubectl apply -f /home/ubuntu/fitlio/k8s/
-    echo "✅ K8s 매니페스트 적용 완료"
-    # ── 쿠버네티스 kubeconfig 권한 ─────────────────────────────
-    chmod 644 /etc/rancher/k3s/k3s.yaml
-    # ── Swap 2GB (ArgoCD OOM 방지) ────────────────────────────
+    # ── 2. Swap 2GB (ArgoCD OOM 방지) ────────────────────────
     fallocate -l 2G /swapfile
     chmod 600 /swapfile
     mkswap /swapfile
     swapon /swapfile
     echo '/swapfile none swap sw 0 0' >> /etc/fstab
-    # ── cert-manager 자동 설치 ────────────────────────────────
+    echo "✅ Swap 완료"
+
+    # ── 3. fitlio 레포 클론 ───────────────────────────────────
+    git clone https://github.com/jayjuhoonchoi/fitlio.git /home/ubuntu/fitlio
+    chown -R ubuntu:ubuntu /home/ubuntu/fitlio
+    echo "✅ Git clone 완료"
+
+    # ── 4. k3s 설치 ───────────────────────────────────────────
+    curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION="v1.29.4+k3s1" sh -
+    until kubectl get nodes 2>/dev/null | grep -q "Ready"; do
+      echo "k3s 노드 준비 대기 중..."
+      sleep 5
+    done
+    echo "✅ k3s Ready"
+
+    # ── 5. kubeconfig 권한 ────────────────────────────────────
+    chmod 644 /etc/rancher/k3s/k3s.yaml
+    export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
+
+    # ── 6. namespace 생성 ─────────────────────────────────────
+    kubectl create namespace fitlio --dry-run=client -o yaml | kubectl apply -f -
+    echo "✅ namespace 완료"
+    # ── 7. Secret 생성 ───────────────────────────────────────
+    kubectl create secret generic fitlio-env \
+      --namespace=fitlio \
+      --from-literal=POSTGRES_USER=fitlio \
+      --from-literal=POSTGRES_PASSWORD=Fitlio2026Secure \
+      --from-literal=POSTGRES_DB=fitlio \
+      --from-literal=GRAFANA_PASSWORD=Grafana2026Secure \
+      --dry-run=client -o yaml | kubectl apply -f -
+    echo "✅ Secret 생성 완료"
+
+    # ── 8. K8s 매니페스트 적용 ───────────────────────────────
+    kubectl apply -f /home/ubuntu/fitlio/k8s/
+    echo "✅ K8s 매니페스트 적용 완료"
+
+    # ── 9. cert-manager 설치 ─────────────────────────────────
     kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.16.3/cert-manager.yaml
     sleep 60
     kubectl apply -f /home/ubuntu/fitlio/k8s/cluster-issuer-prod.yaml
     echo "✅ 클러스터 부트스트랩 완료"
-    # ───────────────────────────────────────────────────────────────
-    
-    
   EOF
+
 
   tags = {
     Name        = "fitlio-server"
