@@ -302,8 +302,6 @@ resource "aws_instance" "fitlio_server" {
     NGINXEOF
 
     # ── 9. 전체 서비스 시작 ──────────────────────────
-    docker-compose down
-    docker-compose up -d --build
 
     # ── k3s 설치 및 K8s 매니페스트 자동 적용 ──────────────────────
     curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION="v1.35.4+k3s1" sh -
