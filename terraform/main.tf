@@ -241,7 +241,11 @@ resource "aws_instance" "fitlio_server" {
     kubectl apply -f /home/ubuntu/fitlio/k8s/
     echo "✅ K8s 매니페스트 적용 완료"
 
-    # ── 9. cert-manager 설치 ─────────────────────────────────
+    # ── 9. Sealed Secrets 컨트롤러 설치 ──────────────────────
+    kubectl apply -f https://github.com/bitnami-labs/sealed-secrets/releases/download/v0.27.1/controller.yaml
+    echo "✅ Sealed Secrets 컨트롤러 설치 완료"
+
+    # ── 10. cert-manager 설치 ─────────────────────────────────
     kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.16.3/cert-manager.yaml
     sleep 60
     kubectl apply -f /home/ubuntu/fitlio/k8s/cluster-issuer-prod.yaml
