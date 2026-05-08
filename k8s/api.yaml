@@ -18,15 +18,33 @@ spec:
         image: jayjuhoonchoi/fitlio:latest
         env:
         - name: DATABASE_URL
-          value: "postgresql://fitlio:fitlio123@db:5432/fitlio"
+          valueFrom:
+            secretKeyRef:
+              name: fitlio-env        # Secret 이름
+              key: DATABASE_URL       # Secret 안의 키
         ports:
         - containerPort: 8000
+        livenessProbe:
+          httpGet:
+            path: /health            # 강사 의식 있나? 없으면 재시작
+            port: 8000
+          initialDelaySeconds: 15    # 첫 15초는 봐줌 (앱 뜨는 시간)
+          periodSeconds: 10          # 10초마다 체크
+          failureThreshold: 3        # 3번 연속 실패 시 재시작
         readinessProbe:
           httpGet:
-            path: /docs
+            path: /health            # 손님 받을 준비 됐나? 안 되면 트래픽 차단
             port: 8000
-          initialDelaySeconds: 10
-          periodSeconds: 5
+          initialDelaySeconds: 10    # liveness보다 먼저 체크
+          periodSeconds: 5           # 5초마다 체크
+          failureThreshold: 3        # 3번 연속 실패 시 트래픽 차단
+        resources:
+          requests:
+            memory: "128Mi"          # k8s가 이 양은 무조건 확보 (스케줄링 기준)
+            cpu: "100m"              # 0.1 코어 보장
+          limits:
+            memory: "256Mi"          # 이 이상 쓰면 OOM kill
+            cpu: "500m"              # 0.5 코어 이상 못 씀
 ---
 apiVersion: v1
 kind: Service
