@@ -292,9 +292,9 @@ resource "aws_instance" "fitlio_server" {
     KEY_OBJECT="sealed-secrets/kube-system-sealed-secrets-key.yaml"
     export AWS_REGION="ap-southeast-2"
 
-    if aws s3api head-object --bucket "${KEY_BUCKET}" --key "${KEY_OBJECT}" >/dev/null 2>&1; then
+    if aws s3api head-object --bucket "$KEY_BUCKET" --key "$KEY_OBJECT" >/dev/null 2>&1; then
       echo "✅ S3에서 sealed-secrets 키 백업 발견 → 복구"
-      aws s3 cp "s3://${KEY_BUCKET}/${KEY_OBJECT}" /tmp/sealed-secrets-key.yaml
+      aws s3 cp "s3://$KEY_BUCKET/$KEY_OBJECT" /tmp/sealed-secrets-key.yaml
       # 기존 자동생성 키 제거 후 복구 적용
       kubectl -n kube-system delete secret -l sealedsecrets.bitnami.com/sealed-secrets-key --ignore-not-found=true
       kubectl apply -f /tmp/sealed-secrets-key.yaml
@@ -304,7 +304,7 @@ resource "aws_instance" "fitlio_server" {
     else
       echo "⚠️ S3 키 백업 없음 → 현재 키를 백업"
       kubectl -n kube-system get secret -l sealedsecrets.bitnami.com/sealed-secrets-key -o yaml > /tmp/sealed-secrets-key.yaml
-      aws s3 cp /tmp/sealed-secrets-key.yaml "s3://${KEY_BUCKET}/${KEY_OBJECT}"
+      aws s3 cp /tmp/sealed-secrets-key.yaml "s3://$KEY_BUCKET/$KEY_OBJECT"
       echo "✅ sealed-secrets 키 백업 완료"
     fi
 
