@@ -237,18 +237,30 @@ resource "aws_instance" "fitlio_server" {
     kubectl create namespace fitlio --dry-run=client -o yaml | kubectl apply -f -
     echo "✅ namespace 완료"
 
-    # ── 8. K8s 매니페스트 적용 ───────────────────────────────
-    kubectl apply -f /home/ubuntu/fitlio/k8s/
-    echo "✅ K8s 매니페스트 적용 완료"
-
-    # ── 9. Sealed Secrets 컨트롤러 설치 ──────────────────────
+    # ── 7. Sealed Secrets 컨트롤러 설치 (CRD 먼저) ─────────────
     kubectl apply -f https://github.com/bitnami-labs/sealed-secrets/releases/download/v0.27.1/controller.yaml
+    kubectl -n kube-system rollout status deploy/sealed-secrets-controller --timeout=180s
     echo "✅ Sealed Secrets 컨트롤러 설치 완료"
 
-    # ── 10. cert-manager 설치 ─────────────────────────────────
+    # ── 8. cert-manager 설치 (CRD 먼저) ───────────────────────
     kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.16.3/cert-manager.yaml
-    sleep 60
+    kubectl -n cert-manager rollout status deploy/cert-manager --timeout=300s
+    kubectl -n cert-manager rollout status deploy/cert-manager-webhook --timeout=300s
+    kubectl -n cert-manager rollout status deploy/cert-manager-cainjector --timeout=300s
+    echo "✅ cert-manager 설치 완료"
+
+    # ── 9. SealedSecret / ClusterIssuer 등 CRD 의존 리소스 적용 ──
+    # NOTE: ArgoCD Application CRD는 여기서 설치하지 않으므로 argocd-app.yaml은 적용하지 않음
+    kubectl apply -f /home/ubuntu/fitlio/k8s/sealed-secret.yaml
     kubectl apply -f /home/ubuntu/fitlio/k8s/cluster-issuer-prod.yaml
+    echo "✅ CRD 의존 리소스 적용 완료"
+
+    # ── 10. Fitlio 앱 리소스 적용 (CRD 의존 없음) ─────────────
+    kubectl apply -f /home/ubuntu/fitlio/k8s/postgres.yaml
+    kubectl apply -f /home/ubuntu/fitlio/k8s/api.yaml
+    kubectl apply -f /home/ubuntu/fitlio/k8s/ingress.yaml
+    echo "✅ Fitlio 리소스 적용 완료"
+
     echo "✅ 클러스터 부트스트랩 완료"
   EOF
 
