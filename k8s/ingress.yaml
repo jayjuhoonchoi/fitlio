@@ -4,17 +4,21 @@ metadata:
   name: fitlio-ingress
   namespace: fitlio
   annotations:
-    nginx.ingress.kubernetes.io/rewrite-target: /
+    cert-manager.io/cluster-issuer: letsencrypt-prod
 spec:
   ingressClassName: traefik
+  tls:
+    - hosts:
+        - fitlio-jay.duckdns.org
+      secretName: fitlio-tls
   rules:
-  - host: fitlio-jay.duckdns.org
-    http:
-      paths:
-      - path: /
-        pathType: Prefix
-        backend:
-          service:
-            name: api
-            port:
-              number: 8000
+    - host: fitlio-jay.duckdns.org
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: api
+                port:
+                  number: 8000
