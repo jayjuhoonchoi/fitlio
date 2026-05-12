@@ -43,3 +43,11 @@ Owners get a live dashboard with attendance stats and membership status.
 ## 🌐 DNS (DuckDNS)
 Terraform allocates an **Elastic IP** for the Fitlio EC2 instance, so the **public IPv4 stays the same across normal stop/start** (unlike ephemeral public IPs). Still keep `fitlio-jay.duckdns.org` pointed at the address from `terraform output` (first deploy, accidental DNS drift, or EIP replacement).
 If the recorded IP and DuckDNS diverge, clients may see **HTTPS timeouts** even when the cluster and app are healthy.
+
+## ⚡ Quick ops (copy/paste helpers)
+From `terraform/`:
+
+- **Print Elastic IP:** `terraform output -raw ec2_public_ip`
+- **Print example SSH:** `terraform output -raw ssh_example`
+- **HTTPS health (after DNS points at the EIP):** `curl -fsS -o /dev/null -w "%{http_code}\n" https://fitlio-jay.duckdns.org/health`
+- **Check public DNS (bypass local cache):** `dig +short fitlio-jay.duckdns.org A @8.8.8.8`
