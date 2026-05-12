@@ -39,3 +39,6 @@ Owners get a live dashboard with attendance stats and membership status.
 🇰🇷🇦🇺 Korean/English language switch  
 🤖 Serverless membership expiry alerts (Lambda + EventBridge)  
 🌱 Automated DB seeding with startup report
+
+## 🌐 DNS (DuckDNS)
+If the EC2 **public IPv4** changes (instance recreate, or stop/start without an Elastic IP), update the DuckDNS **A record** for `fitlio-jay.duckdns.org` to match the current value from `terraform output`. Otherwise clients may see **HTTPS timeouts** even when the cluster and app are healthy.
