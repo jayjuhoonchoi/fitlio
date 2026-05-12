@@ -41,4 +41,5 @@ Owners get a live dashboard with attendance stats and membership status.
 🌱 Automated DB seeding with startup report
 
 ## 🌐 DNS (DuckDNS)
-If the EC2 **public IPv4** changes (instance recreate, or stop/start without an Elastic IP), update the DuckDNS **A record** for `fitlio-jay.duckdns.org` to match the current value from `terraform output`. Otherwise clients may see **HTTPS timeouts** even when the cluster and app are healthy.
+Terraform allocates an **Elastic IP** for the Fitlio EC2 instance, so the **public IPv4 stays the same across normal stop/start** (unlike ephemeral public IPs). Still keep `fitlio-jay.duckdns.org` pointed at the address from `terraform output` (first deploy, accidental DNS drift, or EIP replacement).
+If the recorded IP and DuckDNS diverge, clients may see **HTTPS timeouts** even when the cluster and app are healthy.

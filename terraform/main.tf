@@ -340,11 +340,28 @@ resource "aws_instance" "fitlio_server" {
 }
 
 # ─────────────────────────────────────────
+# Elastic IP (stable public IPv4 for DuckDNS / SSH bookmarks)
+# ─────────────────────────────────────────
+resource "aws_eip" "fitlio_eip" {
+  domain = "vpc"
+
+  tags = {
+    Name    = "fitlio-eip"
+    Project = "fitlio"
+  }
+}
+
+resource "aws_eip_association" "fitlio_eip_assoc" {
+  instance_id   = aws_instance.fitlio_server.id
+  allocation_id = aws_eip.fitlio_eip.id
+}
+
+# ─────────────────────────────────────────
 # Outputs
 # ─────────────────────────────────────────
 output "fitlio_public_ip" {
-  value       = aws_instance.fitlio_server.public_ip
-  description = "Public IP of Fitlio EC2 server"
+  value       = aws_eip.fitlio_eip.public_ip
+  description = "Stable public IPv4 (Elastic IP) for Fitlio EC2"
 }
 
 output "fitlio_url" {
@@ -353,11 +370,11 @@ output "fitlio_url" {
 }
 
 output "grafana_url" {
-  value       = "http://${aws_instance.fitlio_server.public_ip}:3000"
+  value       = "http://${aws_eip.fitlio_eip.public_ip}:3000"
   description = "Grafana monitoring URL"
 }
 
 output "prometheus_url" {
-  value       = "http://${aws_instance.fitlio_server.public_ip}:9090"
+  value       = "http://${aws_eip.fitlio_eip.public_ip}:9090"
   description = "Prometheus metrics URL"
 }
