@@ -69,7 +69,8 @@
       document.getElementById("summary").innerHTML=t("load");
       const r=await fetch("/api/me/summary",{headers:auth});
       if(r.status===401){ localStorage.clear(); location.href="/login/member"; return; }
-      const d=await r.json();
+      if(!r.ok){ document.getElementById("summary").innerHTML='<div class="meta">—</div>'; return; }
+      const d=await r.json().catch(()=>({}));
       const m=d.membership;
       document.getElementById("summary").innerHTML = m
         ? `<div class="stat">${d.member.full_name}</div><div class="meta">${t("days")}: <b>${m.days_left??"—"}</b></div><div class="meta">${t("visits")}: <b>${m.visits_this_month}</b>${m.monthly_limit!=null?` / ${m.monthly_limit}`:""}</div><div class="meta">plan: ${escape(m.plan)} · ends ${new Date(m.end_date).toLocaleString()}</div>`
@@ -78,7 +79,8 @@
     async function loadClasses(){
       const el=document.getElementById("classes"); el.innerHTML="";
       const r=await fetch("/classes");
-      const list=await r.json();
+      if(!r.ok){ el.innerHTML='<div class="card">—</div>'; return; }
+      const list=await r.json().catch(()=>[]);
       if(!list.length){ el.innerHTML='<div class="card">—</div>'; return; }
       el.innerHTML=list.map(c=>`<div class="card"><strong>${escape(c.name)}</strong><div class="meta">${escape(c.instructor)} · ${new Date(c.schedule).toLocaleString()}</div><div class="meta">${c.current_count}/${c.capacity}</div><button class="btn" data-bid="${c.id}">${t("book")}</button></div>`).join("");
       el.querySelectorAll("[data-bid]").forEach(b=>b.onclick=()=>book(b.dataset.bid));

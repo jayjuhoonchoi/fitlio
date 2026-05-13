@@ -1,5 +1,5 @@
 from calendar import monthrange
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
@@ -33,10 +33,29 @@ def get_stats(db: Session = Depends(get_db), _: dict = Depends(require_admin)):
         .count()
     )
     total_classes = db.query(FitnessClass).count()
+    active_memberships = (
+        db.query(Membership)
+        .filter(Membership.status == "active", Membership.end_date >= datetime.utcnow())
+        .count()
+    )
+    pending_notifications = (
+        db.query(NotificationRequest).filter(NotificationRequest.status == "pending").count()
+    )
+    upcoming_7d_classes = (
+        db.query(FitnessClass)
+        .filter(
+            FitnessClass.schedule >= datetime.utcnow(),
+            FitnessClass.schedule <= datetime.utcnow() + timedelta(days=7),
+        )
+        .count()
+    )
     return {
         "total_members": total_members,
         "today_attendance": today_attendance,
         "total_classes": total_classes,
+        "active_memberships": active_memberships,
+        "pending_notifications": pending_notifications,
+        "upcoming_7d_classes": upcoming_7d_classes,
     }
 
 
@@ -50,6 +69,8 @@ def sales_summary(
     now = datetime.utcnow()
     y = year or now.year
     m = month or now.month
+    if m < 1 or m > 12:
+        raise HTTPException(status_code=400, detail="Month must be between 1 and 12")
     last = monthrange(y, m)[1]
     start = datetime(y, m, 1)
     end = datetime(y, m, last, 23, 59, 59)
@@ -78,6 +99,58 @@ def sales_summary(
         "total_amount_cents": int(q or 0),
         "total_amount": (int(q or 0)) / 100.0,
     }
+
+
+@router.get("/sales/trend")
+def sales_trend(
+    months: int = 6,
+    db: Session = Depends(get_db),
+    _: dict = Depends(require_admin),
+):
+    if months < 1 or months > 24:
+        raise HTTPException(status_code=400, detail="Months must be between 1 and 24")
+    now = datetime.utcnow()
+    y = now.year
+    m = now.month
+    points = []
+    for _ in range(months):
+        last = monthrange(y, m)[1]
+        start = datetime(y, m, 1)
+        end = datetime(y, m, last, 23, 59, 59)
+        total = (
+            db.query(func.coalesce(func.sum(Payment.amount), 0))
+            .filter(
+                Payment.status == "completed",
+                Payment.created_at >= start,
+                Payment.created_at <= end,
+            )
+            .scalar()
+        )
+        count = (
+            db.query(Payment)
+            .filter(
+                Payment.status == "completed",
+                Payment.created_at >= start,
+                Payment.created_at <= end,
+            )
+            .count()
+        )
+        points.append(
+            {
+                "year": y,
+                "month": m,
+                "label": f"{y}-{m:02d}",
+                "payment_count": count,
+                "total_amount_cents": int(total or 0),
+                "total_amount": int(total or 0) / 100.0,
+            }
+        )
+        m -= 1
+        if m == 0:
+            m = 12
+            y -= 1
+    points.reverse()
+    return {"months": months, "points": points}
 
 
 @router.get("/attendances/recent")
@@ -241,6 +314,7 @@ def update_instructor(
     if not row:
         raise HTTPException(status_code=404, detail="Instructor not found")
     if body.display_name is not None:
+        old_name = row.display_name
         dup = (
             db.query(InstructorProfile)
             .filter(
@@ -252,6 +326,11 @@ def update_instructor(
         if dup:
             raise HTTPException(status_code=400, detail="Instructor name already exists")
         row.display_name = body.display_name.strip()
+        (
+            db.query(FitnessClass)
+            .filter(FitnessClass.instructor == old_name)
+            .update({"instructor": row.display_name}, synchronize_session=False)
+        )
     if body.hourly_rate_cents is not None:
         row.hourly_rate_cents = body.hourly_rate_cents
     if body.pay_per_class_cents is not None:
@@ -274,6 +353,19 @@ def delete_instructor(
     row = db.query(InstructorProfile).filter(InstructorProfile.id == instructor_id).first()
     if not row:
         raise HTTPException(status_code=404, detail="Instructor not found")
+    has_upcoming = (
+        db.query(FitnessClass)
+        .filter(
+            FitnessClass.instructor == row.display_name,
+            FitnessClass.schedule >= datetime.utcnow(),
+        )
+        .first()
+    )
+    if has_upcoming:
+        raise HTTPException(
+            status_code=400,
+            detail="Cannot delete instructor with upcoming classes",
+        )
     db.delete(row)
     db.commit()
     return {"deleted": True}
@@ -285,6 +377,20 @@ def create_class_admin(
     db: Session = Depends(get_db),
     _: dict = Depends(require_admin),
 ):
+    if body.schedule <= datetime.utcnow():
+        raise HTTPException(status_code=400, detail="Class schedule must be in the future")
+    has_instructor_profiles = db.query(InstructorProfile).count() > 0
+    if has_instructor_profiles:
+        profile = (
+            db.query(InstructorProfile)
+            .filter(InstructorProfile.display_name == body.instructor.strip())
+            .first()
+        )
+        if not profile:
+            raise HTTPException(
+                status_code=400,
+                detail="Instructor must exist in instructor profiles",
+            )
     row = FitnessClass(
         name=body.name.strip(),
         instructor=body.instructor.strip(),
@@ -312,8 +418,30 @@ def update_class_admin(
     if body.instructor is not None:
         row.instructor = body.instructor.strip()
     if body.schedule is not None:
+        if body.schedule <= datetime.utcnow():
+            raise HTTPException(
+                status_code=400, detail="Class schedule must be in the future"
+            )
         row.schedule = body.schedule
+    if body.instructor is not None:
+        has_instructor_profiles = db.query(InstructorProfile).count() > 0
+        if has_instructor_profiles:
+            profile = (
+                db.query(InstructorProfile)
+                .filter(InstructorProfile.display_name == body.instructor.strip())
+                .first()
+            )
+            if not profile:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Instructor must exist in instructor profiles",
+                )
     if body.capacity is not None:
+        if body.capacity < row.current_count:
+            raise HTTPException(
+                status_code=400,
+                detail="Capacity cannot be lower than current bookings",
+            )
         row.capacity = body.capacity
         row.current_count = min(row.current_count, row.capacity)
     db.commit()
