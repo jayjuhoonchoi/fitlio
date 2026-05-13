@@ -413,29 +413,80 @@
 
         function toast(msg, ok) {
             const el = document.getElementById("toast");
-            el.textContent = msg;
+            el.textContent = toUserText(msg, ok ? "Done." : "Something went wrong.");
             el.className = "toast " + (ok ? "ok" : "err") + " show";
             clearTimeout(toast._t);
             toast._t = setTimeout(() => { el.classList.remove("show"); }, 4200);
         }
 
-        /** FastAPI: detail string | {detail: [...]} validation errors */
+        /** Never pass raw objects to the DOM (shows as [object Object]). */
+        function toUserText(value, fallback) {
+            if (value == null || value === "") return fallback;
+            const t = typeof value;
+            if (t === "string") return value;
+            if (t === "number" || t === "boolean") return String(value);
+            if (Array.isArray(value)) {
+                const parts = value.map((x) => toUserText(x, "")).filter(Boolean);
+                return parts.length ? parts.join(" ") : fallback;
+            }
+            if (t === "object") {
+                if (typeof value.msg === "string") return value.msg;
+                if (typeof value.message === "string") return value.message;
+                try {
+                    return JSON.stringify(value);
+                } catch (_) {
+                    return fallback;
+                }
+            }
+            return fallback;
+        }
+
+        /** FastAPI: detail string | object | validation array */
         function formatApiError(data) {
-            if (!data || data.detail == null) return "Request failed. Please try again.";
+            if (!data) return "Request failed. Please try again.";
             const d = data.detail;
+            if (d == null) return "Request failed. Please try again.";
             if (typeof d === "string") return d;
             if (Array.isArray(d)) {
-                return d
-                    .map((e) => (e && typeof e.msg === "string" ? e.msg : JSON.stringify(e)))
-                    .join(" ");
+                const parts = d.map((e) => {
+                    if (e == null) return "";
+                    if (typeof e === "string") return e;
+                    if (typeof e === "object") {
+                        if (typeof e.msg === "string") return e.msg;
+                        if (typeof e.message === "string") return e.message;
+                        const loc = Array.isArray(e.loc) ? e.loc.filter(Boolean).join(" → ") : "";
+                        const typ = typeof e.type === "string" ? e.type : "";
+                        if (loc || typ) return [loc, typ].filter(Boolean).join(": ");
+                        try {
+                            return JSON.stringify(e);
+                        } catch (_) {
+                            return "";
+                        }
+                    }
+                    return String(e);
+                });
+                const s = parts.filter(Boolean).join(" ");
+                return s || "Invalid input. Check the form and try again.";
+            }
+            if (typeof d === "object") {
+                if (typeof d.msg === "string") return d.msg;
+                if (typeof d.message === "string") return d.message;
+                try {
+                    return Object.entries(d)
+                        .map(([k, v]) => k + ": " + toUserText(v, "(see docs)"))
+                        .join("; ");
+                } catch (_) {
+                    return "Request failed. Please try again.";
+                }
             }
             return "Request failed. Please try again.";
         }
 
         function setAuthMessage(text, ok) {
             const el = document.getElementById("auth-message");
-            el.textContent = text || "";
-            el.className = text ? (ok ? "ok" : "err") : "";
+            const s = toUserText(text, "");
+            el.textContent = s;
+            el.className = s ? (ok ? "ok" : "err") : "";
         }
 
         function setAuthLoading(loading) {
@@ -543,7 +594,10 @@
             }
             setAuthLoading(false);
             if (res.ok) {
-                const msg = data.message || "Account created. You can sign in now.";
+                const msg = toUserText(
+                    data.message,
+                    "Account created. You can sign in now."
+                );
                 setAuthMessage(msg, true);
                 toast(msg, true);
             } else {
