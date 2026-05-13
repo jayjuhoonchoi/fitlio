@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Fitlio — Member</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: system-ui, sans-serif; background: #0f172a; color: #e2e8f0; min-height: 100vh; }
+    header { padding: 1rem 1.25rem; border-bottom: 1px solid #334155; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: .5rem; }
+    .lang button { font-size: .72rem; margin-left: .25rem; padding: .2rem .45rem; border-radius: 6px; border: 1px solid #475569; background: transparent; color: #cbd5e1; cursor: pointer; }
+    .lang button.on { border-color: #34d399; color: #34d399; }
+    main { padding: 1.25rem; max-width: 960px; margin: 0 auto; }
+    .grid { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+    .card { background: rgba(255,255,255,.05); border: 1px solid #334155; border-radius: 14px; padding: 1rem; }
+    .card h3 { font-size: .95rem; margin-bottom: .5rem; color: #94a3b8; }
+    .stat { font-size: 1.35rem; font-weight: 700; color: #34d399; }
+    .btn { padding: .45rem .85rem; border-radius: 8px; border: none; font-weight: 600; cursor: pointer; background: #34d399; color: #042f2e; margin-top: .5rem; margin-right: .35rem; }
+    .btn2 { background: transparent; color: #5eead4; border: 1px solid #475569; }
+    .meta { font-size: .85rem; color: #94a3b8; margin-top: .35rem; }
+    #log { margin-top: 1rem; font-size: .85rem; color: #fca5a5; min-height: 1.2em; }
+  </style>
+</head>
+<body>
+  <header>
+    <strong>Fitlio · <span data-i18n="mem">Member</span></strong>
+    <div>
+      <span class="lang"><button type="button" id="ko">KO</button><button type="button" id="en">EN</button></span>
+      <button type="button" class="btn btn2" id="out" data-i18n="out">Sign out</button>
+    </div>
+  </header>
+  <main>
+    <div class="grid" style="margin-bottom:1.25rem">
+      <div class="card"><h3 data-i18n="sum">My summary</h3><div id="summary">…</div></div>
+      <div class="card"><h3 data-i18n="pay">Membership payment (demo)</h3>
+        <p class="meta" data-i18n="payd">Creates active membership + completed payment record.</p>
+        <button class="btn" id="pm" data-i18n="m30">Monthly</button>
+        <button class="btn" id="py" data-i18n="y365">Yearly</button>
+      </div>
+    </div>
+    <h2 style="font-size:1.05rem;margin-bottom:.75rem" data-i18n="cls">Open classes</h2>
+    <div class="grid" id="classes"></div>
+    <p id="log"></p>
+  </main>
+  <script>
+    const token = localStorage.getItem("token");
+    const memberId = localStorage.getItem("member_id");
+    if (!token || !memberId) location.href = "/login/member";
+    const auth = { Authorization: "Bearer " + token };
+    const S = {
+      en: { mem:"Member", out:"Sign out", sum:"My summary", pay:"Pay membership", payd:"Demo: creates membership + payment.", m30:"Monthly", y365:"Yearly", cls:"Open classes", visits:"Visits this month", days:"Days left", none:"No active pass", book:"Book", booked:"Booked", fail:"Failed", load:"Loading…" },
+      ko: { mem:"회원", out:"로그아웃", sum:"내 요약", pay:"이용권 결제", payd:"데모: 이용권+결제 기록 생성.", m30:"월간", y365:"연간", cls:"수업 목록", visits:"이번 달 방문", days:"남은 일수", none:"이용권 없음", book:"예약", booked:"예약됨", fail:"실패", load:"불러오는 중…" }
+    };
+    let lang = localStorage.getItem("fitlio_lang")||"ko";
+    function t(k){ return S[lang][k]||k; }
+    function apply(){ document.querySelectorAll("[data-i18n]").forEach(el=>{el.textContent=t(el.getAttribute("data-i18n"));}); document.getElementById("ko").classList.toggle("on",lang==="ko"); document.getElementById("en").classList.toggle("on",lang==="en"); loadSummary(); loadClasses(); }
+    document.getElementById("ko").onclick=()=>{lang="ko";localStorage.setItem("fitlio_lang",lang);apply();};
+    document.getElementById("en").onclick=()=>{lang="en";localStorage.setItem("fitlio_lang",lang);apply();};
+    document.getElementById("out").onclick=()=>{localStorage.clear();location.href="/login/member";};
+    async function loadSummary(){
+      document.getElementById("summary").innerHTML=t("load");
+      const r=await fetch("/api/me/summary",{headers:auth});
+      if(r.status===401){ localStorage.clear(); location.href="/login/member"; return; }
+      const d=await r.json();
+      const m=d.membership;
+      document.getElementById("summary").innerHTML = m
+        ? `<div class="stat">${d.member.full_name}</div><div class="meta">${t("days")}: <b>${m.days_left??"—"}</b></div><div class="meta">${t("visits")}: <b>${m.visits_this_month}</b>${m.monthly_limit!=null?` / ${m.monthly_limit}`:""}</div><div class="meta">plan: ${m.plan} · ends ${new Date(m.end_date).toLocaleString()}</div>`
+        : `<div class="meta">${t("none")}</div>`;
+    }
+    async function loadClasses(){
+      const el=document.getElementById("classes"); el.innerHTML="";
+      const r=await fetch("/classes");
+      const list=await r.json();
+      if(!list.length){ el.innerHTML='<div class="card">—</div>'; return; }
+      el.innerHTML=list.map(c=>`<div class="card"><strong>${escape(c.name)}</strong><div class="meta">${c.instructor} · ${new Date(c.schedule).toLocaleString()}</div><div class="meta">${c.current_count}/${c.capacity}</div><button class="btn" data-bid="${c.id}">${t("book")}</button></div>`).join("");
+      el.querySelectorAll("[data-bid]").forEach(b=>b.onclick=()=>book(b.dataset.bid));
+    }
+    function escape(s){ const d=document.createElement("div"); d.textContent=s; return d.innerHTML; }
+    async function book(id){
+      document.getElementById("log").textContent="";
+      const r=await fetch("/classes/"+id+"/book?member_id="+encodeURIComponent(memberId),{method:"POST",headers:auth});
+      const d=await r.json().catch(()=>({}));
+      document.getElementById("log").textContent = r.ok ? t("booked")+" #"+(d.booking_id||"") : (d.detail||t("fail"));
+      loadSummary(); loadClasses();
+    }
+    document.getElementById("pm").onclick=()=>pay("monthly");
+    document.getElementById("py").onclick=()=>pay("yearly");
+    async function pay(plan){
+      document.getElementById("log").textContent="";
+      const r=await fetch("/payments/membership?member_id="+encodeURIComponent(memberId),{method:"POST",headers:{...auth,"Content-Type":"application/json"},body:JSON.stringify({plan})});
+      const d=await r.json().catch(()=>({}));
+      document.getElementById("log").textContent = r.ok ? "OK · payment #"+(d.payment&&d.payment.id) : (typeof d.detail==="string"?d.detail:t("fail"));
+      loadSummary();
+    }
+    apply();
+  </script>
+</body>
+</html>

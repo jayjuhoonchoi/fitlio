@@ -57,6 +57,7 @@ def seed_members(db: Session) -> list:
                 hashed_password=hash_password("fitlio1234!"),
                 full_name=data["full_name"],
                 phone=data["phone"],
+                role="member",
                 is_active=True,
                 created_at=datetime.now() - timedelta(days=90)
             )
@@ -117,14 +118,48 @@ def seed_memberships(db: Session, members: list) -> list:
     return memberships
 
 
+def ensure_admin_user(db: Session) -> None:
+    if db.query(models.Member).filter_by(email="admin@fitlio.com").first():
+        return
+    db.add(
+        models.Member(
+            email="admin@fitlio.com",
+            hashed_password=hash_password("AdminFitlio1!"),
+            full_name="Site Admin",
+            phone="+82-10-0000-0001",
+            role="admin",
+            is_active=True,
+        )
+    )
+    db.commit()
+
+
+def ensure_instructor_profiles(db: Session) -> None:
+    if db.query(models.InstructorProfile).count() > 0:
+        return
+    db.add(
+        models.InstructorProfile(
+            display_name="Jay Choi",
+            hourly_rate_cents=120_000,
+            pay_per_class_cents=180_000,
+            email="jay.choi@fitlio.com",
+            notes="Seeded profile — matches class instructor name",
+        )
+    )
+    db.commit()
+
+
 def seed_database():
     db: Session = SessionLocal()
     try:
+        ensure_admin_user(db)
+        ensure_instructor_profiles(db)
+
         print("🔍 Checking database seed status...")
 
         member_count = db.query(models.Member).count()
-        if member_count >= 5:
-            print(f"✅ Database already seeded ({member_count} members). Skipping.")
+        if member_count >= 6:
+            print(f"✅ Demo members already present ({member_count} rows). Skipping bulk demo seed.")
             return
 
         print("🌱 Seeding database...")

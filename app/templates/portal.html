@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Fitlio</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: system-ui, sans-serif; min-height: 100vh; background: #0f172a; color: #e2e8f0; display: grid; place-items: center; padding: 1.5rem; }
+    .box { max-width: 520px; width: 100%; }
+    h1 { font-size: 1.75rem; margin-bottom: 0.5rem; }
+    p { color: #94a3b8; margin-bottom: 1.5rem; line-height: 1.5; }
+    .row { display: grid; gap: 1rem; }
+    @media (min-width: 480px) { .row { grid-template-columns: 1fr 1fr; } }
+    a.card {
+      display: block; padding: 1.25rem; border-radius: 14px; text-decoration: none; color: inherit;
+      background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.12);
+      transition: transform .15s, border-color .15s;
+    }
+    a.card:hover { transform: translateY(-2px); border-color: #34d399; }
+    a.card strong { display: block; font-size: 1.1rem; margin-bottom: .35rem; }
+    a.card span { font-size: .85rem; color: #94a3b8; }
+    .lang { margin-top: 1.5rem; display: flex; gap: .5rem; justify-content: center; }
+    .lang button { background: transparent; border: 1px solid #475569; color: #cbd5e1; padding: .35rem .75rem; border-radius: 8px; cursor: pointer; }
+    .lang button.active { border-color: #34d399; color: #34d399; }
+  </style>
+</head>
+<body>
+  <div class="box">
+    <h1 data-i18n="title">Fitlio</h1>
+    <p data-i18n="sub">Choose how you want to sign in.</p>
+    <div class="row">
+      <a class="card" href="/login/member"><strong data-i18n="m1">Member</strong><span data-i18n="m2">Book classes, pay, see passes</span></a>
+      <a class="card" href="/admin-login"><strong data-i18n="a1">Admin</strong><span data-i18n="a2">Dashboard, sales, staff, alerts</span></a>
+    </div>
+    <div class="lang">
+      <button type="button" id="Lko">한국어</button>
+      <button type="button" id="Len">English</button>
+    </div>
+  </div>
+  <script>
+    const S = {
+      en: { title: "Fitlio", sub: "Choose how you want to sign in.", m1: "Member", m2: "Book classes, pay, see passes", a1: "Admin", a2: "Dashboard, sales, staff, alerts" },
+      ko: { title: "핏리오", sub: "로그인 유형을 선택하세요.", m1: "회원", m2: "수업 예약, 결제, 이용권 확인", a1: "관리자", a2: "대시보드, 매출, 강사, 알림" }
+    };
+    let lang = localStorage.getItem("fitlio_lang") || "ko";
+    function apply() {
+      const t = S[lang];
+      document.querySelectorAll("[data-i18n]").forEach(el => { const k = el.getAttribute("data-i18n"); if (t[k]) el.textContent = t[k]; });
+      document.getElementById("Lko").classList.toggle("active", lang === "ko");
+      document.getElementById("Len").classList.toggle("active", lang === "en");
+    }
+    document.getElementById("Lko").onclick = () => { lang = "ko"; localStorage.setItem("fitlio_lang", lang); apply(); };
+    document.getElementById("Len").onclick = () => { lang = "en"; localStorage.setItem("fitlio_lang", lang); apply(); };
+    apply();
+  </script>
+</body>
+</html>

@@ -14,6 +14,7 @@ class Member(Base):
     phone = Column(String)
     is_active = Column(Boolean, default=True)
     language = Column(String, default="en")
+    role = Column(String(32), nullable=False, default="member")  # member | admin
     created_at = Column(DateTime, default=datetime.utcnow)
 
 class FitnessClass(Base):
@@ -68,3 +69,28 @@ class Attendance(Base):
     class_id = Column(Integer, nullable=False)
     checked_in_at = Column(DateTime, default=datetime.utcnow)
     status = Column(String, default="present")  # present, late, absent
+
+
+class InstructorProfile(Base):
+    """Payroll: match display_name to FitnessClass.instructor string."""
+
+    __tablename__ = "instructor_profiles"
+
+    id = Column(Integer, primary_key=True, index=True)
+    display_name = Column(String, unique=True, nullable=False, index=True)
+    hourly_rate_cents = Column(Integer, nullable=False, default=50_000)  # KRW-style cents unit
+    pay_per_class_cents = Column(Integer, nullable=False, default=80_000)  # flat per scheduled class
+    email = Column(String, nullable=True)
+    notes = Column(String, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class NotificationRequest(Base):
+    __tablename__ = "notification_requests"
+
+    id = Column(Integer, primary_key=True, index=True)
+    member_id = Column(Integer, nullable=True)
+    topic = Column(String(64), nullable=False)
+    message = Column(String(512), nullable=False)
+    status = Column(String(32), nullable=False, default="pending")  # pending | sent | failed
+    created_at = Column(DateTime, default=datetime.utcnow)

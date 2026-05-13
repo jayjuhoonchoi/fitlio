@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import FitnessClass, Booking
+from app.deps import get_current_user, require_admin
 
 router = APIRouter(redirect_slashes=False)
 class ClassCreate(BaseModel):
@@ -19,7 +20,14 @@ def get_classes(db: Session = Depends(get_db)):
     return classes
 
 @router.post("/classes/{class_id}/book")
-def book_class(class_id: int, member_id: int, db: Session = Depends(get_db)):
+def book_class(
+    class_id: int,
+    member_id: int,
+    db: Session = Depends(get_db),
+    user: dict = Depends(get_current_user),
+):
+    if member_id != user["id"]:
+        raise HTTPException(status_code=403, detail="Cannot book for another account")
     # Lock the class row so concurrent bookings cannot overshoot capacity (PostgreSQL).
     fitness_class = (
         db.query(FitnessClass)
@@ -50,7 +58,14 @@ def book_class(class_id: int, member_id: int, db: Session = Depends(get_db)):
     return {"message": "Class booked successfully", "booking_id": booking.id}
 
 @router.delete("/classes/{class_id}/cancel")
-def cancel_booking(class_id: int, member_id: int, db: Session = Depends(get_db)):
+def cancel_booking(
+    class_id: int,
+    member_id: int,
+    db: Session = Depends(get_db),
+    user: dict = Depends(get_current_user),
+):
+    if member_id != user["id"]:
+        raise HTTPException(status_code=403, detail="Cannot cancel for another account")
     fitness_class = (
         db.query(FitnessClass)
         .filter(FitnessClass.id == class_id)
@@ -76,7 +91,11 @@ def cancel_booking(class_id: int, member_id: int, db: Session = Depends(get_db))
     return {"message": "Booking cancelled successfully"}
 
 @router.post("/classes", status_code=201)
-def create_class(req: ClassCreate, db: Session = Depends(get_db)):
+def create_class(
+    req: ClassCreate,
+    db: Session = Depends(get_db),
+    _: dict = Depends(require_admin),
+):
     fitness_class = FitnessClass(
         name=req.name,
         instructor=req.instructor,

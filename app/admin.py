@@ -1,53 +1,298 @@
-from fastapi import APIRouter
-from sqlalchemy.orm import Session
-from fastapi import Depends
-from app.database import get_db
-from app.models import Member, FitnessClass, Attendance
+from calendar import monthrange
 from datetime import datetime
+
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel, Field
+from sqlalchemy import func
+from sqlalchemy.orm import Session
+
+from app.database import get_db
+from app.deps import require_admin
+from app.models import (
+    Attendance,
+    FitnessClass,
+    InstructorProfile,
+    Member,
+    Membership,
+    NotificationRequest,
+    Payment,
+)
 
 router = APIRouter(prefix="/admin")
 
-@router.get("/stats")
-def get_stats(db: Session = Depends(get_db)):
-    # 전체 회원 수
-    total_members = db.query(Member).count()
 
-    # 오늘 출석 수
+@router.get("/stats")
+def get_stats(db: Session = Depends(get_db), _: dict = Depends(require_admin)):
+    total_members = db.query(Member).count()
     today = datetime.utcnow().date()
     today_start = datetime(today.year, today.month, today.day)
-    today_attendance = db.query(Attendance).filter(
-        Attendance.checked_in_at >= today_start
-    ).count()
-
-    # 전체 수업 수
+    today_attendance = (
+        db.query(Attendance)
+        .filter(Attendance.checked_in_at >= today_start)
+        .count()
+    )
     total_classes = db.query(FitnessClass).count()
-
     return {
         "total_members": total_members,
         "today_attendance": today_attendance,
         "total_classes": total_classes,
     }
 
-@router.get("/attendances/recent")
-def get_recent_attendances(db: Session = Depends(get_db)):
-    # 최근 20개 체크인 기록
-    attendances = db.query(Attendance).order_by(
-        Attendance.checked_in_at.desc()
-    ).limit(20).all()
 
+@router.get("/sales")
+def sales_summary(
+    year: int | None = None,
+    month: int | None = None,
+    db: Session = Depends(get_db),
+    _: dict = Depends(require_admin),
+):
+    now = datetime.utcnow()
+    y = year or now.year
+    m = month or now.month
+    last = monthrange(y, m)[1]
+    start = datetime(y, m, 1)
+    end = datetime(y, m, last, 23, 59, 59)
+    q = (
+        db.query(func.coalesce(func.sum(Payment.amount), 0))
+        .filter(
+            Payment.status == "completed",
+            Payment.created_at >= start,
+            Payment.created_at <= end,
+        )
+        .scalar()
+    )
+    count = (
+        db.query(Payment)
+        .filter(
+            Payment.status == "completed",
+            Payment.created_at >= start,
+            Payment.created_at <= end,
+        )
+        .count()
+    )
+    return {
+        "year": y,
+        "month": m,
+        "completed_payment_count": count,
+        "total_amount_cents": int(q or 0),
+        "total_amount": (int(q or 0)) / 100.0,
+    }
+
+
+@router.get("/attendances/recent")
+def get_recent_attendances(db: Session = Depends(get_db), _: dict = Depends(require_admin)):
+    attendances = (
+        db.query(Attendance).order_by(Attendance.checked_in_at.desc()).limit(20).all()
+    )
     result = []
     for a in attendances:
         member = db.query(Member).filter(Member.id == a.member_id).first()
-        fitness_class = db.query(FitnessClass).filter(FitnessClass.id == a.class_id).first()
-        result.append({
-            "member_name": member.full_name if member else "Unknown",
-            "class_name": fitness_class.name if fitness_class else "Unknown",
-            "checked_in_at": a.checked_in_at,
-            "status": a.status
-        })
+        fitness_class = (
+            db.query(FitnessClass).filter(FitnessClass.id == a.class_id).first()
+        )
+        result.append(
+            {
+                "member_name": member.full_name if member else "Unknown",
+                "class_name": fitness_class.name if fitness_class else "Unknown",
+                "checked_in_at": a.checked_in_at,
+                "status": a.status,
+            }
+        )
     return result
 
+
 @router.get("/members")
-def get_members(db: Session = Depends(get_db)):
+def get_members(db: Session = Depends(get_db), _: dict = Depends(require_admin)):
     members = db.query(Member).all()
-    return [{"id": m.id, "full_name": m.full_name, "email": m.email, "phone": m.phone, "is_active": m.is_active, "created_at": m.created_at} for m in members]
+    return [
+        {
+            "id": m.id,
+            "full_name": m.full_name,
+            "email": m.email,
+            "phone": m.phone,
+            "is_active": m.is_active,
+            "role": getattr(m, "role", "member"),
+            "created_at": m.created_at,
+        }
+        for m in members
+    ]
+
+
+@router.get("/payments")
+def list_payments(
+    limit: int = 100,
+    db: Session = Depends(get_db),
+    _: dict = Depends(require_admin),
+):
+    rows = (
+        db.query(Payment).order_by(Payment.created_at.desc()).limit(min(limit, 500)).all()
+    )
+    return [
+        {
+            "id": p.id,
+            "member_id": p.member_id,
+            "membership_id": p.membership_id,
+            "amount": p.amount / 100.0,
+            "currency": p.currency,
+            "status": p.status,
+            "created_at": p.created_at,
+        }
+        for p in rows
+    ]
+
+
+@router.get("/classes")
+def list_classes_admin(db: Session = Depends(get_db), _: dict = Depends(require_admin)):
+    classes = db.query(FitnessClass).order_by(FitnessClass.schedule.asc()).all()
+    return [
+        {
+            "id": c.id,
+            "name": c.name,
+            "instructor": c.instructor,
+            "schedule": c.schedule,
+            "capacity": c.capacity,
+            "current_count": c.current_count,
+        }
+        for c in classes
+    ]
+
+
+class InstructorCreate(BaseModel):
+    display_name: str = Field(..., min_length=1)
+    hourly_rate_cents: int = Field(50_000, ge=0)
+    pay_per_class_cents: int = Field(80_000, ge=0)
+    email: str | None = None
+    notes: str | None = None
+
+
+@router.get("/instructors")
+def list_instructors(db: Session = Depends(get_db), _: dict = Depends(require_admin)):
+    rows = db.query(InstructorProfile).order_by(InstructorProfile.display_name).all()
+    return [
+        {
+            "id": r.id,
+            "display_name": r.display_name,
+            "hourly_rate_cents": r.hourly_rate_cents,
+            "pay_per_class_cents": r.pay_per_class_cents,
+            "email": r.email,
+            "notes": r.notes,
+        }
+        for r in rows
+    ]
+
+
+@router.post("/instructors", status_code=201)
+def create_instructor(
+    body: InstructorCreate,
+    db: Session = Depends(get_db),
+    _: dict = Depends(require_admin),
+):
+    exists = (
+        db.query(InstructorProfile)
+        .filter(InstructorProfile.display_name == body.display_name)
+        .first()
+    )
+    if exists:
+        raise HTTPException(status_code=400, detail="Instructor name already exists")
+    row = InstructorProfile(
+        display_name=body.display_name.strip(),
+        hourly_rate_cents=body.hourly_rate_cents,
+        pay_per_class_cents=body.pay_per_class_cents,
+        email=body.email,
+        notes=body.notes,
+    )
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+    return {"id": row.id, "display_name": row.display_name}
+
+
+@router.get("/instructors/{instructor_id}/payroll")
+def instructor_payroll(
+    instructor_id: int,
+    year: int,
+    month: int,
+    db: Session = Depends(get_db),
+    _: dict = Depends(require_admin),
+):
+    prof = db.query(InstructorProfile).filter(InstructorProfile.id == instructor_id).first()
+    if not prof:
+        raise HTTPException(status_code=404, detail="Instructor not found")
+    last = monthrange(year, month)[1]
+    start = datetime(year, month, 1)
+    end = datetime(year, month, last, 23, 59, 59)
+    cnt = (
+        db.query(FitnessClass)
+        .filter(
+            FitnessClass.instructor == prof.display_name,
+            FitnessClass.schedule >= start,
+            FitnessClass.schedule <= end,
+        )
+        .count()
+    )
+    gross = cnt * prof.pay_per_class_cents
+    hours_equivalent = cnt * 1.5
+    hourly_based = int(hours_equivalent * prof.hourly_rate_cents)
+    recommended = max(gross, hourly_based)
+    return {
+        "instructor_id": prof.id,
+        "display_name": prof.display_name,
+        "year": year,
+        "month": month,
+        "classes_scheduled": cnt,
+        "pay_per_class_cents": prof.pay_per_class_cents,
+        "hourly_rate_cents": prof.hourly_rate_cents,
+        "flat_total_cents": gross,
+        "hourly_based_total_cents": hourly_based,
+        "recommended_monthly_pay_cents": recommended,
+        "recommended_monthly_pay": recommended / 100.0,
+    }
+
+
+class NotificationCreate(BaseModel):
+    member_id: int | None = None
+    topic: str = Field(..., min_length=1)
+    message: str = Field(..., min_length=1)
+
+
+@router.get("/notifications")
+def list_notifications(
+    limit: int = 50,
+    db: Session = Depends(get_db),
+    _: dict = Depends(require_admin),
+):
+    rows = (
+        db.query(NotificationRequest)
+        .order_by(NotificationRequest.created_at.desc())
+        .limit(min(limit, 200))
+        .all()
+    )
+    return [
+        {
+            "id": r.id,
+            "member_id": r.member_id,
+            "topic": r.topic,
+            "message": r.message,
+            "status": r.status,
+            "created_at": r.created_at,
+        }
+        for r in rows
+    ]
+
+
+@router.post("/notifications", status_code=201)
+def create_notification(
+    body: NotificationCreate,
+    db: Session = Depends(get_db),
+    _: dict = Depends(require_admin),
+):
+    row = NotificationRequest(
+        member_id=body.member_id,
+        topic=body.topic.strip(),
+        message=body.message.strip(),
+        status="pending",
+    )
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+    return {"id": row.id, "status": row.status}

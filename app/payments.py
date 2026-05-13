@@ -1,9 +1,12 @@
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
+
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
+from sqlalchemy.orm import Session
+
 from app.database import get_db
 from app import models
+from app.deps import get_current_user
 
 router = APIRouter(prefix="/payments", tags=["payments"])
 
@@ -19,8 +22,11 @@ class PaymentCreate(BaseModel):
 def create_membership(
     data: MembershipCreate,
     member_id: int,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    user: dict = Depends(get_current_user),
 ):
+    if member_id != user["id"]:
+        raise HTTPException(status_code=403, detail="Cannot purchase for another account")
     # 기간 설정
     if data.plan == "monthly":
         end_date = datetime.utcnow() + timedelta(days=30)
@@ -74,7 +80,13 @@ def create_membership(
     }
 
 @router.get("/membership/{member_id}")
-def get_membership(member_id: int, db: Session = Depends(get_db)):
+def get_membership(
+    member_id: int,
+    db: Session = Depends(get_db),
+    user: dict = Depends(get_current_user),
+):
+    if member_id != user["id"]:
+        raise HTTPException(status_code=403, detail="Forbidden")
     membership = db.query(models.Membership).filter(
         models.Membership.member_id == member_id,
         models.Membership.status == "active"
@@ -92,7 +104,13 @@ def get_membership(member_id: int, db: Session = Depends(get_db)):
     }
 
 @router.get("/history/{member_id}")
-def get_payment_history(member_id: int, db: Session = Depends(get_db)):
+def get_payment_history(
+    member_id: int,
+    db: Session = Depends(get_db),
+    user: dict = Depends(get_current_user),
+):
+    if member_id != user["id"]:
+        raise HTTPException(status_code=403, detail="Forbidden")
     payments = db.query(models.Payment).filter(
         models.Payment.member_id == member_id
     ).all()

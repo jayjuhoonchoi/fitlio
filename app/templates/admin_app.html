@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Fitlio — Admin</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: system-ui, sans-serif; background: #18120b; color: #fef3c7; display: flex; min-height: 100vh; }
+    nav { width: 200px; background: #0c0a09; border-right: 1px solid #292524; padding: 1rem .75rem; flex-shrink: 0; }
+    nav button { display: block; width: 100%; text-align: left; padding: .5rem .6rem; margin-bottom: .25rem; border: none; border-radius: 8px; background: transparent; color: #d6d3d1; cursor: pointer; font-size: .85rem; }
+    nav button.on, nav button:hover { background: #292524; color: #fde68a; }
+    main { flex: 1; padding: 1rem 1.25rem; overflow: auto; }
+    h1 { font-size: 1.15rem; margin-bottom: 1rem; color: #fdba74; }
+    pre, .box { background: #0c0a09; border: 1px solid #44403c; border-radius: 10px; padding: .75rem; font-size: .78rem; overflow: auto; max-height: 70vh; white-space: pre-wrap; word-break: break-word; }
+    .row { display: flex; gap: .5rem; flex-wrap: wrap; margin-bottom: .75rem; align-items: center; }
+    input, select, textarea { padding: .4rem .5rem; border-radius: 8px; border: 1px solid #57534e; background: #1c1917; color: #fef3c7; }
+    .btn { padding: .4rem .75rem; border-radius: 8px; border: none; background: #ea580c; color: #fff; font-weight: 600; cursor: pointer; }
+    .lang { margin-bottom: 1rem; }
+    .lang button { font-size: .7rem; padding: .15rem .4rem; margin-right: .25rem; border-radius: 6px; border: 1px solid #57534e; background: transparent; color: #d6d3d1; cursor: pointer; }
+    .lang button.on { border-color: #fb923c; color: #fdba74; }
+    #out { margin-top: 1rem; width: 100%; }
+  </style>
+</head>
+<body>
+  <nav>
+    <div class="lang"><button type="button" id="ko">KO</button><button type="button" id="en">EN</button></div>
+    <button type="button" class="on" data-tab="dash" data-i18n="t0">Dashboard</button>
+    <button type="button" data-tab="sales" data-i18n="t1">Sales</button>
+    <button type="button" data-tab="pay" data-i18n="t2">Payments</button>
+    <button type="button" data-tab="mem" data-i18n="t3">Members</button>
+    <button type="button" data-tab="cls" data-i18n="t4">Classes</button>
+    <button type="button" data-tab="ins" data-i18n="t5">Instructors</button>
+    <button type="button" data-tab="sal" data-i18n="t6">Payroll</button>
+    <button type="button" data-tab="not" data-i18n="t7">Notifications</button>
+    <button type="button" class="btn" id="out" data-i18n="out">Sign out</button>
+  </nav>
+  <main>
+    <h1 id="title">Dashboard</h1>
+    <div id="panel"></div>
+  </main>
+  <script>
+    const token = localStorage.getItem("token");
+    if (!token || localStorage.getItem("user_role") !== "admin") location.href = "/admin-login";
+    const H = { Authorization: "Bearer " + token };
+    const S = {
+      en: { t0:"Dashboard",t1:"Sales",t2:"Payments",t3:"Members",t4:"Classes",t5:"Instructors",t6:"Payroll",t7:"Notifications",out:"Sign out", dash:"Overview", sales:"Monthly sales", pay:"Recent payments", mem:"All members", cls:"Schedule", ins:"Profiles + add", sal:"Select instructor + month", not:"Queue + create", go:"Load", cr:"Create request", topic:"Topic", msg:"Message", mid:"Member id (opt)", addins:"Add instructor", name:"Display name (matches class)", run:"Calculate payroll" },
+      ko: { t0:"대시보드",t1:"매출",t2:"결제",t3:"회원",t4:"수업",t5:"강사",t6:"급여",t7:"알림",out:"로그아웃", dash:"요약", sales:"월 매출", pay:"결제 목록", mem:"전체 회원", cls:"일정", ins:"프로필·추가", sal:"강사+월 선택", not:"대기열·생성", go:"불러오기", cr:"알림 요청", topic:"주제", msg:"내용", mid:"회원번호(선택)", addins:"강사 추가", name:"표시 이름(수업 강사명과 동일)", run:"급여 계산" }
+    };
+    let lang = localStorage.getItem("fitlio_lang")||"ko";
+    function t(k){ return S[lang][k]||k; }
+    function applyNav(){ document.querySelectorAll("nav [data-i18n]").forEach(b=>{ if(b.id!=="out") b.textContent=t(b.getAttribute("data-i18n")); }); document.getElementById("out").textContent=t("out"); document.getElementById("ko").classList.toggle("on",lang==="ko"); document.getElementById("en").classList.toggle("on",lang==="en"); }
+    document.getElementById("ko").onclick=()=>{lang="ko";localStorage.setItem("fitlio_lang",lang);applyNav(); render(currentTab);};
+    document.getElementById("en").onclick=()=>{lang="en";localStorage.setItem("fitlio_lang",lang);applyNav(); render(currentTab);};
+    document.getElementById("out").onclick=()=>{localStorage.clear();location.href="/admin-login";};
+    let currentTab="dash";
+    document.querySelectorAll("nav [data-tab]").forEach(b=>{
+      b.onclick=()=>{ document.querySelectorAll("nav [data-tab]").forEach(x=>x.classList.remove("on")); b.classList.add("on"); currentTab=b.dataset.tab; render(currentTab); };
+    });
+    async function api(path, opt={}){ const r=await fetch(path,{...opt,headers:{...H,...opt.headers||{}}}); if(r.status===401||r.status===403){ localStorage.clear(); location.href="/admin-login"; return null;} return r; }
+    async function render(tab){
+      applyNav();
+      const p=document.getElementById("panel"); p.innerHTML="";
+      const title=document.getElementById("title");
+      if(tab==="dash"){ title.textContent=t("dash"); const r=await api("/admin/stats"); if(!r)return; p.innerHTML="<pre>"+JSON.stringify(await r.json(),null,2)+"</pre>"; return;}
+      if(tab==="sales"){ title.textContent=t("sales"); const now=new Date();
+        p.innerHTML=`<div class="row"><label>Year</label><input id="sy" type="number" value="${now.getFullYear()}"><label>Month</label><input id="sm" type="number" min="1" max="12" value="${now.getMonth()+1}"><button class="btn" id="sg">${t("go")}</button></div><div id="sx"></div>`;
+        document.getElementById("sg").onclick=async()=>{ const r=await api("/admin/sales?year="+document.getElementById("sy").value+"&month="+document.getElementById("sm").value); if(r) document.getElementById("sx").innerHTML="<pre>"+JSON.stringify(await r.json(),null,2)+"</pre>"; }; return;}
+      if(tab==="pay"){ title.textContent=t("pay"); const r=await api("/admin/payments"); if(!r)return; p.innerHTML="<pre>"+JSON.stringify(await r.json(),null,2)+"</pre>"; return;}
+      if(tab==="mem"){ title.textContent=t("mem"); const r=await api("/admin/members"); if(!r)return; p.innerHTML="<pre>"+JSON.stringify(await r.json(),null,2)+"</pre>"; return;}
+      if(tab==="cls"){ title.textContent=t("cls"); const r=await api("/admin/classes"); if(!r)return; p.innerHTML="<pre>"+JSON.stringify(await r.json(),null,2)+"</pre>"; return;}
+      if(tab==="ins"){ title.textContent=t("ins"); const r=await api("/admin/instructors"); let j=[]; if(r) j=await r.json();
+        p.innerHTML=`<pre>${JSON.stringify(j,null,2)}</pre><h2 style="margin:1rem 0 .5rem;font-size:1rem">${t("addins")}</h2><div class="row"><input id="inm" placeholder="${t("name")}"><input id="ih" type="number" placeholder="hourly cents" value="120000"><input id="ip" type="number" placeholder="per class cents" value="180000"><button class="btn" id="iad">OK</button></div>`;
+        document.getElementById("iad").onclick=async()=>{ const body={display_name:document.getElementById("inm").value.trim(),hourly_rate_cents:+document.getElementById("ih").value,pay_per_class_cents:+document.getElementById("ip").value};
+          const rr=await api("/admin/instructors",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)}); if(rr&&rr.ok) render("ins"); }; return;}
+      if(tab==="sal"){ title.textContent=t("sal"); const r=await api("/admin/instructors"); let opts="<option value=''>—</option>"; if(r){ (await r.json()).forEach(i=>{ opts+=`<option value="${i.id}">${i.display_name}</option>`; }); }
+        const now=new Date();
+        p.innerHTML=`<div class="row"><select id="sid">${opts}</select><input id="py" type="number" value="${now.getFullYear()}"><input id="pm" type="number" min="1" max="12" value="${now.getMonth()+1}"><button class="btn" id="sr">${t("run")}</button></div><div id="so"></div>`;
+        document.getElementById("sr").onclick=async()=>{ const id=document.getElementById("sid").value; if(!id)return; const rr=await api("/admin/instructors/"+id+"/payroll?year="+document.getElementById("py").value+"&month="+document.getElementById("pm").value); if(rr) document.getElementById("so").innerHTML="<pre>"+JSON.stringify(await rr.json(),null,2)+"</pre>"; }; return;}
+      if(tab==="not"){ title.textContent=t("not"); const r=await api("/admin/notifications"); let list=[]; if(r) list=await r.json();
+        p.innerHTML=`<pre>${JSON.stringify(list,null,2)}</pre><h2 style="margin:1rem 0 .5rem;font-size:1rem">${t("cr")}</h2><div class="row"><input id="nt" placeholder="${t("topic")}"><input id="nm" placeholder="${t("mid")}"></div><textarea id="nx" style="width:100%;min-height:70px;margin:.5rem 0" placeholder="${t("msg")}"></textarea><button class="btn" id="nc">OK</button>`;
+        document.getElementById("nc").onclick=async()=>{ const mid=document.getElementById("nm").value.trim(); const body={topic:document.getElementById("nt").value.trim(),message:document.getElementById("nx").value.trim(),member_id: mid?+mid:null};
+          const rr=await api("/admin/notifications",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)}); if(rr&&rr.ok) render("not"); };
+      }
+    }
+    applyNav(); render("dash");
+  </script>
+</body>
+</html>
