@@ -3,222 +3,56 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Fitlio — Sports Facility Management</title>
+  <title>Fitlio</title>
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: 'Segoe UI', sans-serif; background: #0f0f0f; color: #fff; }
-    nav { display: flex; justify-content: space-between; align-items: center;
-          padding: 20px 60px; background: #0f0f0f; border-bottom: 1px solid #222; }
-    nav .logo { font-size: 24px; font-weight: 700; color: #00e676; }
-    nav a { color: #aaa; text-decoration: none; margin-left: 30px; font-size: 14px; }
-    nav a:hover { color: #fff; }
-    .hero { text-align: center; padding: 120px 20px 80px; }
-    .hero h1 { font-size: 56px; font-weight: 800; line-height: 1.2;
-               background: linear-gradient(135deg, #00e676, #00b0ff);
-               -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-    .hero p { font-size: 20px; color: #aaa; margin: 20px auto; max-width: 560px; }
-    .hero .buttons { margin-top: 40px; display: flex; gap: 16px; justify-content: center; }
-    .btn-primary { background: #00e676; color: #000; padding: 14px 32px;
-                   border-radius: 8px; font-weight: 700; text-decoration: none; font-size: 16px; }
-    .btn-secondary { border: 1px solid #444; color: #fff; padding: 14px 32px;
-                     border-radius: 8px; font-weight: 600; text-decoration: none; font-size: 16px; }
-    .btn-primary:hover { background: #00c853; }
-    .btn-secondary:hover { border-color: #fff; }
-    .features { padding: 80px 60px; }
-    .features h2 { text-align: center; font-size: 36px; margin-bottom: 50px; }
-    .cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; max-width: 1000px; margin: 0 auto; }
-    .card { background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 12px; padding: 32px; }
-    .card .icon { font-size: 36px; margin-bottom: 16px; }
-    .card h3 { font-size: 20px; margin-bottom: 10px; color: #00e676; }
-    .card p { color: #888; font-size: 14px; line-height: 1.6; }
-    .auth { padding: 80px 60px; background: #111; }
-    .auth h2 { text-align: center; font-size: 36px; margin-bottom: 40px; }
-    .auth-box { max-width: 420px; margin: 0 auto; background: #1a1a1a;
-                border: 1px solid #2a2a2a; border-radius: 12px; padding: 40px; }
-    .auth-tabs { display: flex; margin-bottom: 30px; }
-    .auth-tab { flex: 1; padding: 10px; text-align: center; cursor: pointer;
-                border-bottom: 2px solid #333; color: #888; font-size: 14px; }
-    .auth-tab.active { border-bottom-color: #00e676; color: #00e676; }
-    input, select { width: 100%; padding: 12px 16px; background: #0f0f0f; border: 1px solid #333;
-            border-radius: 8px; color: #fff; font-size: 14px; margin-bottom: 16px; }
-    input:focus, select:focus { outline: none; border-color: #00e676; }
-    .phone-row { display: flex; gap: 8px; }
-    .phone-row select { width: 60%; margin-bottom: 16px; }
-    .phone-row input { width: 40%; }
-    .btn-submit { width: 100%; padding: 14px; background: #00e676; color: #000;
-                  border: none; border-radius: 8px; font-weight: 700; font-size: 16px; cursor: pointer; }
-    .btn-submit:hover { background: #00c853; }
-    .message { margin-top: 16px; padding: 12px; border-radius: 8px; font-size: 14px; text-align: center; display: none; }
-    .message.success { background: #1b3a2a; color: #00e676; display: block; }
-    .message.error { background: #3a1b1b; color: #ff5252; display: block; }
-    footer { text-align: center; padding: 40px; color: #444; font-size: 14px; border-top: 1px solid #222; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: system-ui, sans-serif; min-height: 100vh; background: #0f172a; color: #e2e8f0; display: grid; place-items: center; padding: 1.5rem; }
+    .box { max-width: 520px; width: 100%; }
+    h1 { font-size: 1.75rem; margin-bottom: 0.5rem; }
+    p { color: #94a3b8; margin-bottom: 1.5rem; line-height: 1.5; }
+    .row { display: grid; gap: 1rem; }
+    @media (min-width: 480px) { .row { grid-template-columns: 1fr 1fr; } }
+    a.card {
+      display: block; padding: 1.25rem; border-radius: 14px; text-decoration: none; color: inherit;
+      background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.12);
+      transition: transform .15s, border-color .15s;
+    }
+    a.card:hover { transform: translateY(-2px); border-color: #34d399; }
+    a.card strong { display: block; font-size: 1.1rem; margin-bottom: .35rem; }
+    a.card span { font-size: .85rem; color: #94a3b8; }
+    .lang { margin-top: 1.5rem; display: flex; gap: .5rem; justify-content: center; }
+    .lang button { background: transparent; border: 1px solid #475569; color: #cbd5e1; padding: .35rem .75rem; border-radius: 8px; cursor: pointer; }
+    .lang button.active { border-color: #34d399; color: #34d399; }
   </style>
 </head>
 <body>
-
-  <nav>
-    <div class="logo">⚡ Fitlio</div>
-    <div>
-      <a href="#features">Features</a>
-      <a href="#auth">Get Started</a>
-      <a href="/auth/docs" target="_blank">API Docs</a>
+  <div class="box">
+    <h1 data-i18n="title">Fitlio</h1>
+    <p data-i18n="sub">Choose how you want to sign in.</p>
+    <div class="row">
+      <a class="card" href="/login/member"><strong data-i18n="m1">Member</strong><span data-i18n="m2">Book classes, pay, see passes</span></a>
+      <a class="card" href="/admin-login"><strong data-i18n="a1">Admin</strong><span data-i18n="a2">Dashboard, sales, staff, alerts</span></a>
     </div>
-  </nav>
-
-  <section class="hero">
-    <h1>Manage Your Sports<br>Facility Smarter</h1>
-    <p>Fitlio helps gym and sports facility owners manage classes, bookings, and members — all in one place.</p>
-    <div class="buttons">
-      <a href="#auth" class="btn-primary">Get Started Free</a>
-      <a href="/auth/docs" target="_blank" class="btn-secondary">View API Docs</a>
+    <div class="lang">
+      <button type="button" id="Lko">한국어</button>
+      <button type="button" id="Len">English</button>
     </div>
-  </section>
-
-  <section class="features" id="features">
-    <h2>Everything You Need</h2>
-    <div class="cards">
-      <div class="card">
-        <div class="icon">🏋️</div>
-        <h3>Class Management</h3>
-        <p>Create and manage fitness classes with ease. Set capacity, schedule, and let members book instantly.</p>
-      </div>
-      <div class="card">
-        <div class="icon">👥</div>
-        <h3>Member Registration</h3>
-        <p>Secure JWT-based authentication. Members can register, login, and manage their bookings.</p>
-      </div>
-      <div class="card">
-        <div class="icon">📊</div>
-        <h3>Real-time Monitoring</h3>
-        <p>Prometheus + Grafana dashboards give you live insights into system performance and usage.</p>
-      </div>
-    </div>
-  </section>
-
-  <section class="auth" id="auth">
-    <h2>Get Started</h2>
-    <div class="auth-box">
-      <div class="auth-tabs">
-        <div class="auth-tab active" onclick="switchTab('login', event)">Login</div>
-        <div class="auth-tab" onclick="switchTab('register', event)">Register</div>
-      </div>
-
-      <div id="login-form">
-        <input type="email" id="login-email" placeholder="Email">
-        <input type="password" id="login-password" placeholder="Password">
-        <button class="btn-submit" onclick="handleLogin()">Login</button>
-      </div>
-
-      <div id="register-form" style="display:none">
-        <input type="text" id="reg-fullname" placeholder="Full Name">
-        <input type="email" id="reg-email" placeholder="Email">
-        <input type="password" id="reg-password" placeholder="Password">
-        <div class="phone-row">
-          <select id="reg-country">
-            <option value="US">🇺🇸 +1 USA</option>
-            <option value="CN">🇨🇳 +86 China</option>
-            <option value="DE">🇩🇪 +49 Germany</option>
-            <option value="JP">🇯🇵 +81 Japan</option>
-            <option value="IN">🇮🇳 +91 India</option>
-            <option value="GB">🇬🇧 +44 UK</option>
-            <option value="FR">🇫🇷 +33 France</option>
-            <option value="BR">🇧🇷 +55 Brazil</option>
-            <option value="IT">🇮🇹 +39 Italy</option>
-            <option value="CA">🇨🇦 +1 Canada</option>
-            <option value="KR">🇰🇷 +82 Korea</option>
-            <option value="RU">🇷🇺 +7 Russia</option>
-            <option value="AU" selected>🇦🇺 +61 Australia</option>
-            <option value="ES">🇪🇸 +34 Spain</option>
-            <option value="MX">🇲🇽 +52 Mexico</option>
-            <option value="ID">🇮🇩 +62 Indonesia</option>
-            <option value="NL">🇳🇱 +31 Netherlands</option>
-            <option value="SA">🇸🇦 +966 Saudi Arabia</option>
-            <option value="TR">🇹🇷 +90 Turkey</option>
-            <option value="CH">🇨🇭 +41 Switzerland</option>
-          </select>
-          <input type="tel" id="reg-phone" placeholder="Phone number">
-        </div>
-        <button class="btn-submit" onclick="handleRegister()">Create Account</button>
-      </div>
-
-      <div class="message" id="message"></div>
-    </div>
-  </section>
-
-  <footer>
-    <p>Built with ❤️ by Jay Juhoon Choi · Deployed on AWS EC2 · CI/CD via GitHub Actions</p>
-  </footer>
-
+  </div>
   <script>
-    const API = 'https://fitlio-jay.duckdns.org';
-
-    function switchTab(tab, event) {
-      document.querySelectorAll('.auth-tab').forEach(t => t.classList.remove('active'));
-      event.target.classList.add('active');
-      document.getElementById('login-form').style.display = tab === 'login' ? 'block' : 'none';
-      document.getElementById('register-form').style.display = tab === 'register' ? 'block' : 'none';
-      document.getElementById('message').className = 'message';
+    const S = {
+      en: { title: "Fitlio", sub: "Choose how you want to sign in.", m1: "Member", m2: "Book classes, pay, see passes", a1: "Admin", a2: "Dashboard, sales, staff, alerts" },
+      ko: { title: "핏리오", sub: "로그인 유형을 선택하세요.", m1: "회원", m2: "수업 예약, 결제, 이용권 확인", a1: "관리자", a2: "대시보드, 매출, 강사, 알림" }
+    };
+    let lang = localStorage.getItem("fitlio_lang") || "ko";
+    function apply() {
+      const t = S[lang];
+      document.querySelectorAll("[data-i18n]").forEach(el => { const k = el.getAttribute("data-i18n"); if (t[k]) el.textContent = t[k]; });
+      document.getElementById("Lko").classList.toggle("active", lang === "ko");
+      document.getElementById("Len").classList.toggle("active", lang === "en");
     }
-
-    function showMessage(text, type) {
-      const el = document.getElementById('message');
-      el.textContent = text;
-      el.className = `message ${type}`;
-    }
-
-    async function handleLogin() {
-      const email = document.getElementById('login-email').value;
-      const password = document.getElementById('login-password').value;
-      try {
-        const res = await fetch(`${API}/auth/login`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, password })
-        });
-        const data = await res.json();
-        if (res.ok) {
-          localStorage.setItem('fitlio_token', data.access_token);
-          localStorage.setItem('fitlio_member_id', data.member_id);
-          localStorage.setItem('fitlio_full_name', data.full_name);
-          window.location.href = '/dashboard.html';
-        } else {
-          showMessage(`❌ ${data.detail}`, 'error');
-        }
-      } catch (e) {
-        showMessage('❌ Cannot connect to server', 'error');
-      }
-    }
-
-    async function handleRegister() {
-      const full_name = document.getElementById('reg-fullname').value;
-      const email = document.getElementById('reg-email').value;
-      const password = document.getElementById('reg-password').value;
-      const country_code = document.getElementById('reg-country').value;
-      const phone = document.getElementById('reg-phone').value;
-
-      if (!phone) {
-        showMessage('❌ Phone number is required', 'error');
-        return;
-      }
-
-      try {
-        const res = await fetch(`${API}/auth/register`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ full_name, email, password, country_code, phone })
-        });
-        const data = await res.json();
-        if (res.ok) {
-          showMessage('✅ Account created! Please login.', 'success');
-          switchTab('login', { target: document.querySelector('.auth-tab') });
-        } else {
-          showMessage(`❌ ${data.detail}`, 'error');
-        }
-      } catch (e) {
-        showMessage('❌ Cannot connect to server', 'error');
-      }
-    }
+    document.getElementById("Lko").onclick = () => { lang = "ko"; localStorage.setItem("fitlio_lang", lang); apply(); };
+    document.getElementById("Len").onclick = () => { lang = "en"; localStorage.setItem("fitlio_lang", lang); apply(); };
+    apply();
   </script>
-
 </body>
 </html>
