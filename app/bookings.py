@@ -57,6 +57,34 @@ def book_class(
     db.refresh(booking)
     return {"message": "Class booked successfully", "booking_id": booking.id}
 
+
+@router.get("/bookings/{member_id}")
+def get_member_bookings(
+    member_id: int,
+    db: Session = Depends(get_db),
+    user: dict = Depends(get_current_user),
+):
+    if member_id != user["id"]:
+        raise HTTPException(status_code=403, detail="Cannot view another account")
+    rows = (
+        db.query(Booking, FitnessClass)
+        .join(FitnessClass, FitnessClass.id == Booking.class_id)
+        .filter(Booking.member_id == member_id, Booking.status != "cancelled")
+        .order_by(FitnessClass.schedule.asc())
+        .all()
+    )
+    return [
+        {
+            "booking_id": b.id,
+            "class_id": c.id,
+            "name": c.name,
+            "instructor": c.instructor,
+            "schedule": c.schedule,
+            "status": b.status,
+        }
+        for b, c in rows
+    ]
+
 @router.delete("/classes/{class_id}/cancel")
 def cancel_booking(
     class_id: int,

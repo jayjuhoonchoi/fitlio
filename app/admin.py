@@ -10,6 +10,7 @@ from app.database import get_db
 from app.deps import require_admin
 from app.models import (
     Attendance,
+    Booking,
     FitnessClass,
     InstructorProfile,
     Member,
@@ -165,6 +166,28 @@ class InstructorCreate(BaseModel):
     notes: str | None = None
 
 
+class InstructorUpdate(BaseModel):
+    display_name: str | None = Field(default=None, min_length=1)
+    hourly_rate_cents: int | None = Field(default=None, ge=0)
+    pay_per_class_cents: int | None = Field(default=None, ge=0)
+    email: str | None = None
+    notes: str | None = None
+
+
+class ClassCreateAdmin(BaseModel):
+    name: str = Field(..., min_length=1)
+    instructor: str = Field(..., min_length=1)
+    schedule: datetime
+    capacity: int = Field(default=20, ge=1, le=500)
+
+
+class ClassUpdateAdmin(BaseModel):
+    name: str | None = Field(default=None, min_length=1)
+    instructor: str | None = Field(default=None, min_length=1)
+    schedule: datetime | None = None
+    capacity: int | None = Field(default=None, ge=1, le=500)
+
+
 @router.get("/instructors")
 def list_instructors(db: Session = Depends(get_db), _: dict = Depends(require_admin)):
     rows = db.query(InstructorProfile).order_by(InstructorProfile.display_name).all()
@@ -205,6 +228,112 @@ def create_instructor(
     db.commit()
     db.refresh(row)
     return {"id": row.id, "display_name": row.display_name}
+
+
+@router.put("/instructors/{instructor_id}")
+def update_instructor(
+    instructor_id: int,
+    body: InstructorUpdate,
+    db: Session = Depends(get_db),
+    _: dict = Depends(require_admin),
+):
+    row = db.query(InstructorProfile).filter(InstructorProfile.id == instructor_id).first()
+    if not row:
+        raise HTTPException(status_code=404, detail="Instructor not found")
+    if body.display_name is not None:
+        dup = (
+            db.query(InstructorProfile)
+            .filter(
+                InstructorProfile.display_name == body.display_name.strip(),
+                InstructorProfile.id != instructor_id,
+            )
+            .first()
+        )
+        if dup:
+            raise HTTPException(status_code=400, detail="Instructor name already exists")
+        row.display_name = body.display_name.strip()
+    if body.hourly_rate_cents is not None:
+        row.hourly_rate_cents = body.hourly_rate_cents
+    if body.pay_per_class_cents is not None:
+        row.pay_per_class_cents = body.pay_per_class_cents
+    if body.email is not None:
+        row.email = body.email
+    if body.notes is not None:
+        row.notes = body.notes
+    db.commit()
+    db.refresh(row)
+    return {"id": row.id, "display_name": row.display_name}
+
+
+@router.delete("/instructors/{instructor_id}")
+def delete_instructor(
+    instructor_id: int,
+    db: Session = Depends(get_db),
+    _: dict = Depends(require_admin),
+):
+    row = db.query(InstructorProfile).filter(InstructorProfile.id == instructor_id).first()
+    if not row:
+        raise HTTPException(status_code=404, detail="Instructor not found")
+    db.delete(row)
+    db.commit()
+    return {"deleted": True}
+
+
+@router.post("/classes", status_code=201)
+def create_class_admin(
+    body: ClassCreateAdmin,
+    db: Session = Depends(get_db),
+    _: dict = Depends(require_admin),
+):
+    row = FitnessClass(
+        name=body.name.strip(),
+        instructor=body.instructor.strip(),
+        schedule=body.schedule,
+        capacity=body.capacity,
+    )
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+    return {"id": row.id}
+
+
+@router.put("/classes/{class_id}")
+def update_class_admin(
+    class_id: int,
+    body: ClassUpdateAdmin,
+    db: Session = Depends(get_db),
+    _: dict = Depends(require_admin),
+):
+    row = db.query(FitnessClass).filter(FitnessClass.id == class_id).first()
+    if not row:
+        raise HTTPException(status_code=404, detail="Class not found")
+    if body.name is not None:
+        row.name = body.name.strip()
+    if body.instructor is not None:
+        row.instructor = body.instructor.strip()
+    if body.schedule is not None:
+        row.schedule = body.schedule
+    if body.capacity is not None:
+        row.capacity = body.capacity
+        row.current_count = min(row.current_count, row.capacity)
+    db.commit()
+    db.refresh(row)
+    return {"id": row.id, "updated": True}
+
+
+@router.delete("/classes/{class_id}")
+def delete_class_admin(
+    class_id: int,
+    db: Session = Depends(get_db),
+    _: dict = Depends(require_admin),
+):
+    row = db.query(FitnessClass).filter(FitnessClass.id == class_id).first()
+    if not row:
+        raise HTTPException(status_code=404, detail="Class not found")
+    db.query(Booking).filter(Booking.class_id == class_id).delete()
+    db.delete(row)
+    db.commit()
+    return {"deleted": True}
 
 
 @router.get("/instructors/{instructor_id}/payroll")
@@ -255,6 +384,10 @@ class NotificationCreate(BaseModel):
     message: str = Field(..., min_length=1)
 
 
+class NotificationStatusUpdate(BaseModel):
+    status: str = Field(..., pattern="^(pending|sent|failed)$")
+
+
 @router.get("/notifications")
 def list_notifications(
     limit: int = 50,
@@ -293,6 +426,26 @@ def create_notification(
         status="pending",
     )
     db.add(row)
+    db.commit()
+    db.refresh(row)
+    return {"id": row.id, "status": row.status}
+
+
+@router.patch("/notifications/{notification_id}/status")
+def update_notification_status(
+    notification_id: int,
+    body: NotificationStatusUpdate,
+    db: Session = Depends(get_db),
+    _: dict = Depends(require_admin),
+):
+    row = (
+        db.query(NotificationRequest)
+        .filter(NotificationRequest.id == notification_id)
+        .first()
+    )
+    if not row:
+        raise HTTPException(status_code=404, detail="Notification not found")
+    row.status = body.status
     db.commit()
     db.refresh(row)
     return {"id": row.id, "status": row.status}

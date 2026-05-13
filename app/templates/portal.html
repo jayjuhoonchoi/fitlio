@@ -8,23 +8,23 @@
   <title>Fitlio</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: system-ui, sans-serif; min-height: 100vh; background: #0f172a; color: #e2e8f0; display: grid; place-items: center; padding: 1.5rem; }
-    .box { max-width: 520px; width: 100%; }
-    h1 { font-size: 1.75rem; margin-bottom: 0.5rem; }
-    p { color: #94a3b8; margin-bottom: 1.5rem; line-height: 1.5; }
+    body { font-family: Inter, system-ui, sans-serif; min-height: 100vh; background: #f5f3ea; color: #2f3b32; display: grid; place-items: center; padding: 1.5rem; }
+    .box { max-width: 560px; width: 100%; background: #fffdf7; border: 1px solid #d5ddd3; border-radius: 18px; padding: 1.5rem; box-shadow: 0 1px 0 rgba(149,157,165,.15); }
+    h1 { font-size: 1.75rem; margin-bottom: 0.5rem; color: #24503c; }
+    p { color: #617266; margin-bottom: 1.5rem; line-height: 1.5; }
     .row { display: grid; gap: 1rem; }
     @media (min-width: 480px) { .row { grid-template-columns: 1fr 1fr; } }
     a.card {
       display: block; padding: 1.25rem; border-radius: 14px; text-decoration: none; color: inherit;
-      background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.12);
+      background: #eef4ea; border: 1px solid #c8d6c9;
       transition: transform .15s, border-color .15s;
     }
-    a.card:hover { transform: translateY(-2px); border-color: #34d399; }
+    a.card:hover { transform: translateY(-2px); border-color: #2f855a; }
     a.card strong { display: block; font-size: 1.1rem; margin-bottom: .35rem; }
-    a.card span { font-size: .85rem; color: #94a3b8; }
+    a.card span { font-size: .85rem; color: #617266; }
     .lang { margin-top: 1.5rem; display: flex; gap: .5rem; justify-content: center; }
-    .lang button { background: transparent; border: 1px solid #475569; color: #cbd5e1; padding: .35rem .75rem; border-radius: 8px; cursor: pointer; }
-    .lang button.active { border-color: #34d399; color: #34d399; }
+    .lang button { background: #f3f0e7; border: 1px solid #b9c4bb; color: #405247; padding: .35rem .75rem; border-radius: 8px; cursor: pointer; }
+    .lang button.active { border-color: #2f855a; color: #2f855a; }
   </style>
 </head>
 <body>

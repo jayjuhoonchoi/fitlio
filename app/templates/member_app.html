@@ -6,19 +6,23 @@
   <title>Fitlio — Member</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: system-ui, sans-serif; background: #0f172a; color: #e2e8f0; min-height: 100vh; }
-    header { padding: 1rem 1.25rem; border-bottom: 1px solid #334155; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: .5rem; }
-    .lang button { font-size: .72rem; margin-left: .25rem; padding: .2rem .45rem; border-radius: 6px; border: 1px solid #475569; background: transparent; color: #cbd5e1; cursor: pointer; }
-    .lang button.on { border-color: #34d399; color: #34d399; }
-    main { padding: 1.25rem; max-width: 960px; margin: 0 auto; }
-    .grid { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
-    .card { background: rgba(255,255,255,.05); border: 1px solid #334155; border-radius: 14px; padding: 1rem; }
-    .card h3 { font-size: .95rem; margin-bottom: .5rem; color: #94a3b8; }
-    .stat { font-size: 1.35rem; font-weight: 700; color: #34d399; }
-    .btn { padding: .45rem .85rem; border-radius: 8px; border: none; font-weight: 600; cursor: pointer; background: #34d399; color: #042f2e; margin-top: .5rem; margin-right: .35rem; }
-    .btn2 { background: transparent; color: #5eead4; border: 1px solid #475569; }
-    .meta { font-size: .85rem; color: #94a3b8; margin-top: .35rem; }
-    #log { margin-top: 1rem; font-size: .85rem; color: #fca5a5; min-height: 1.2em; }
+    body { font-family: Inter, system-ui, sans-serif; background: #f6f3ea; color: #2f3b32; min-height: 100vh; }
+    header { padding: 1rem 1.25rem; border-bottom: 1px solid #cfd7cd; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: .5rem; background: #eef4ea; }
+    .lang button { font-size: .72rem; margin-left: .25rem; padding: .2rem .45rem; border-radius: 6px; border: 1px solid #9bab9e; background: #fbfaf6; color: #405247; cursor: pointer; }
+    .lang button.on { border-color: #2f855a; color: #2f855a; }
+    main { padding: 1.25rem; max-width: 1100px; margin: 0 auto; }
+    .grid { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); }
+    .card { background: #fffdf7; border: 1px solid #d8dfd6; border-radius: 14px; padding: 1rem; box-shadow: 0 1px 0 rgba(149,157,165,.15); }
+    .card h3 { font-size: .95rem; margin-bottom: .5rem; color: #5d6f63; }
+    .stat { font-size: 1.35rem; font-weight: 700; color: #2f855a; }
+    .btn { padding: .45rem .85rem; border-radius: 8px; border: none; font-weight: 600; cursor: pointer; background: #2f855a; color: #f4f8f1; margin-top: .5rem; margin-right: .35rem; }
+    .btn:hover { background: #276b49; }
+    .btn2 { background: #ece9df; color: #3f4d44; border: 1px solid #b9c1bc; }
+    .meta { font-size: .85rem; color: #6b7a70; margin-top: .35rem; }
+    #log { margin-top: 1rem; font-size: .9rem; color: #9f1239; min-height: 1.2em; }
+    .ok { color: #166534 !important; }
+    .mini { margin-top: 1rem; }
+    .mini h2 { font-size: 1.02rem; margin-bottom: .75rem; color: #3f4d44; }
   </style>
 </head>
 <body>
@@ -40,6 +44,10 @@
     </div>
     <h2 style="font-size:1.05rem;margin-bottom:.75rem" data-i18n="cls">Open classes</h2>
     <div class="grid" id="classes"></div>
+    <div class="mini">
+      <h2 data-i18n="myb">My bookings</h2>
+      <div class="grid" id="mybookings"></div>
+    </div>
     <p id="log"></p>
   </main>
   <script>
@@ -48,12 +56,12 @@
     if (!token || !memberId) location.href = "/login/member";
     const auth = { Authorization: "Bearer " + token };
     const S = {
-      en: { mem:"Member", out:"Sign out", sum:"My summary", pay:"Pay membership", payd:"Demo: creates membership + payment.", m30:"Monthly", y365:"Yearly", cls:"Open classes", visits:"Visits this month", days:"Days left", none:"No active pass", book:"Book", booked:"Booked", fail:"Failed", load:"Loading…" },
-      ko: { mem:"회원", out:"로그아웃", sum:"내 요약", pay:"이용권 결제", payd:"데모: 이용권+결제 기록 생성.", m30:"월간", y365:"연간", cls:"수업 목록", visits:"이번 달 방문", days:"남은 일수", none:"이용권 없음", book:"예약", booked:"예약됨", fail:"실패", load:"불러오는 중…" }
+      en: { mem:"Member", out:"Sign out", sum:"My summary", pay:"Pay membership", payd:"Creates active membership + payment.", m30:"Monthly", y365:"Yearly", cls:"Open classes", visits:"Visits this month", days:"Days left", none:"No active pass", book:"Book", booked:"Booked", fail:"Failed", load:"Loading…", myb:"My bookings", cancel:"Cancel", done:"Completed" },
+      ko: { mem:"회원", out:"로그아웃", sum:"내 요약", pay:"이용권 결제", payd:"결제 시 이용권과 결제 내역이 생성됩니다.", m30:"월간", y365:"연간", cls:"수업 목록", visits:"이번 달 방문", days:"남은 일수", none:"이용권 없음", book:"예약", booked:"예약됨", fail:"실패", load:"불러오는 중…", myb:"내 예약", cancel:"취소", done:"완료" }
     };
     let lang = localStorage.getItem("fitlio_lang")||"ko";
     function t(k){ return S[lang][k]||k; }
-    function apply(){ document.querySelectorAll("[data-i18n]").forEach(el=>{el.textContent=t(el.getAttribute("data-i18n"));}); document.getElementById("ko").classList.toggle("on",lang==="ko"); document.getElementById("en").classList.toggle("on",lang==="en"); loadSummary(); loadClasses(); }
+    function apply(){ document.querySelectorAll("[data-i18n]").forEach(el=>{el.textContent=t(el.getAttribute("data-i18n"));}); document.getElementById("ko").classList.toggle("on",lang==="ko"); document.getElementById("en").classList.toggle("on",lang==="en"); loadSummary(); loadClasses(); loadBookings(); }
     document.getElementById("ko").onclick=()=>{lang="ko";localStorage.setItem("fitlio_lang",lang);apply();};
     document.getElementById("en").onclick=()=>{lang="en";localStorage.setItem("fitlio_lang",lang);apply();};
     document.getElementById("out").onclick=()=>{localStorage.clear();location.href="/login/member";};
@@ -64,7 +72,7 @@
       const d=await r.json();
       const m=d.membership;
       document.getElementById("summary").innerHTML = m
-        ? `<div class="stat">${d.member.full_name}</div><div class="meta">${t("days")}: <b>${m.days_left??"—"}</b></div><div class="meta">${t("visits")}: <b>${m.visits_this_month}</b>${m.monthly_limit!=null?` / ${m.monthly_limit}`:""}</div><div class="meta">plan: ${m.plan} · ends ${new Date(m.end_date).toLocaleString()}</div>`
+        ? `<div class="stat">${d.member.full_name}</div><div class="meta">${t("days")}: <b>${m.days_left??"—"}</b></div><div class="meta">${t("visits")}: <b>${m.visits_this_month}</b>${m.monthly_limit!=null?` / ${m.monthly_limit}`:""}</div><div class="meta">plan: ${escape(m.plan)} · ends ${new Date(m.end_date).toLocaleString()}</div>`
         : `<div class="meta">${t("none")}</div>`;
     }
     async function loadClasses(){
@@ -72,7 +80,7 @@
       const r=await fetch("/classes");
       const list=await r.json();
       if(!list.length){ el.innerHTML='<div class="card">—</div>'; return; }
-      el.innerHTML=list.map(c=>`<div class="card"><strong>${escape(c.name)}</strong><div class="meta">${c.instructor} · ${new Date(c.schedule).toLocaleString()}</div><div class="meta">${c.current_count}/${c.capacity}</div><button class="btn" data-bid="${c.id}">${t("book")}</button></div>`).join("");
+      el.innerHTML=list.map(c=>`<div class="card"><strong>${escape(c.name)}</strong><div class="meta">${escape(c.instructor)} · ${new Date(c.schedule).toLocaleString()}</div><div class="meta">${c.current_count}/${c.capacity}</div><button class="btn" data-bid="${c.id}">${t("book")}</button></div>`).join("");
       el.querySelectorAll("[data-bid]").forEach(b=>b.onclick=()=>book(b.dataset.bid));
     }
     function escape(s){ const d=document.createElement("div"); d.textContent=s; return d.innerHTML; }
@@ -80,8 +88,10 @@
       document.getElementById("log").textContent="";
       const r=await fetch("/classes/"+id+"/book?member_id="+encodeURIComponent(memberId),{method:"POST",headers:auth});
       const d=await r.json().catch(()=>({}));
-      document.getElementById("log").textContent = r.ok ? t("booked")+" #"+(d.booking_id||"") : (d.detail||t("fail"));
-      loadSummary(); loadClasses();
+      const log = document.getElementById("log");
+      log.classList.toggle("ok", !!r.ok);
+      log.textContent = r.ok ? t("booked")+" #"+(d.booking_id||"") : (d.detail||t("fail"));
+      loadSummary(); loadClasses(); loadBookings();
     }
     document.getElementById("pm").onclick=()=>pay("monthly");
     document.getElementById("py").onclick=()=>pay("yearly");
@@ -89,8 +99,28 @@
       document.getElementById("log").textContent="";
       const r=await fetch("/payments/membership?member_id="+encodeURIComponent(memberId),{method:"POST",headers:{...auth,"Content-Type":"application/json"},body:JSON.stringify({plan})});
       const d=await r.json().catch(()=>({}));
-      document.getElementById("log").textContent = r.ok ? "OK · payment #"+(d.payment&&d.payment.id) : (typeof d.detail==="string"?d.detail:t("fail"));
+      const log = document.getElementById("log");
+      log.classList.toggle("ok", !!r.ok);
+      log.textContent = r.ok ? t("done")+" · payment #"+(d.payment&&d.payment.id) : (typeof d.detail==="string"?d.detail:t("fail"));
       loadSummary();
+    }
+    async function loadBookings(){
+      const box=document.getElementById("mybookings");
+      box.innerHTML="";
+      const r=await fetch("/bookings/"+encodeURIComponent(memberId),{headers:auth});
+      if(!r.ok){ box.innerHTML='<div class="card">—</div>'; return; }
+      const list=await r.json().catch(()=>[]);
+      if(!list.length){ box.innerHTML='<div class="card"><div class="meta">—</div></div>'; return; }
+      box.innerHTML=list.map(b=>`<div class="card"><strong>${escape(b.name)}</strong><div class="meta">${escape(b.instructor)} · ${new Date(b.schedule).toLocaleString()}</div><button class="btn btn2" data-cid="${b.class_id}">${t("cancel")}</button></div>`).join("");
+      box.querySelectorAll("[data-cid]").forEach(b=>b.onclick=()=>cancelBooking(b.dataset.cid));
+    }
+    async function cancelBooking(classId){
+      const log = document.getElementById("log");
+      const r=await fetch("/classes/"+classId+"/cancel?member_id="+encodeURIComponent(memberId),{method:"DELETE",headers:auth});
+      const d=await r.json().catch(()=>({}));
+      log.classList.toggle("ok", !!r.ok);
+      log.textContent = r.ok ? t("done") : (d.detail||t("fail"));
+      loadSummary(); loadClasses(); loadBookings();
     }
     apply();
   </script>
