@@ -3,11 +3,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from app import models
 from app.database import SessionLocal
-import hashlib
-
-
-def hash_password(password: str) -> str:
-    return hashlib.sha256(password.encode()).hexdigest()
+from app.auth import hash_password
 
 
 def print_report(members: list, classes: list, memberships: list, db: Session):
