@@ -37,6 +37,15 @@ app = FastAPI(
     version="1.0.0",
 )
 
+
+@app.middleware("http")
+async def fitlio_response_marker(request, call_next):
+    """Helps verify traffic hits this app (see X-Fitlio-App on curl -I)."""
+    response = await call_next(request)
+    response.headers["X-Fitlio-App"] = "portal-v2"
+    return response
+
+
 app.include_router(auth_router)
 app.include_router(booking_router)
 app.include_router(payment_router)
