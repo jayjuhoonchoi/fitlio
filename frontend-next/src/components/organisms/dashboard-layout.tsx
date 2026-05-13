@@ -1,7 +1,20 @@
+"use client";
+
+import { useState } from "react";
+
+import { ActionButton } from "@/components/atoms/action-button";
 import { SectionErrorBoundary } from "@/components/errors/section-error-boundary";
 import { StatCard } from "@/components/atoms/stat-card";
+import { AnalyticsCharts } from "@/components/molecules/analytics-charts";
+import { CheckinSurface } from "@/components/molecules/checkin-surface";
 import { LeftRail } from "@/components/molecules/left-rail";
+import { MemberRiskTable } from "@/components/molecules/member-risk-table";
+import { MemberManagementSurface } from "@/components/molecules/member-management-surface";
+import { QuickReserveModal } from "@/components/molecules/quick-reserve-modal";
 import { SectionShell } from "@/components/molecules/section-shell";
+import { StripePaymentSurface } from "@/components/molecules/stripe-payment-surface";
+import { WeeklyReportEmailPreview } from "@/components/molecules/weekly-report-email-preview";
+import { WhiteLabelCMSSurface } from "@/components/molecules/whitelabel-cms-surface";
 import type { DashboardCard } from "@/types/layout";
 
 const topCards: DashboardCard[] = [
@@ -36,6 +49,8 @@ const topCards: DashboardCard[] = [
 ];
 
 export function DashboardLayout(): JSX.Element {
+  const [quickReserveOpen, setQuickReserveOpen] = useState<boolean>(false);
+
   return (
     <div className="flex min-h-screen bg-bg">
       <LeftRail />
@@ -53,6 +68,11 @@ export function DashboardLayout(): JSX.Element {
           </p>
         </header>
 
+        <QuickReserveModal
+          open={quickReserveOpen}
+          onClose={() => setQuickReserveOpen(false)}
+        />
+
         <SectionErrorBoundary title="KPI Surface">
           <section className="mb-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             {topCards.map((card) => (
@@ -65,33 +85,77 @@ export function DashboardLayout(): JSX.Element {
           <SectionErrorBoundary title="Quick Reserve Surface">
             <SectionShell
               title="Quick Reserve Modal Surface"
-              subtitle="Step 1 scaffold: two-tap reserve interaction zone"
+              subtitle="Zero-friction booking with waitlist-ready UX"
             >
-              <div className="rounded-xl border border-border bg-panelElevated p-4 text-sm text-muted">
-                Quick-Reserve / Waitlist implementation comes in next phase.
-              </div>
+              <p className="mb-3 text-sm text-muted">
+                Reserve in two taps. Full classes route members into waitlist flow.
+              </p>
+              <ActionButton onClick={() => setQuickReserveOpen(true)}>
+                Open Quick Reserve
+              </ActionButton>
             </SectionShell>
           </SectionErrorBoundary>
 
           <SectionErrorBoundary title="Check-in Surface">
             <SectionShell
               title="Check-in Surface"
-              subtitle="Large QR viewport and one-tap attendance zone"
+              subtitle="QR check-in + instructor one-tap attendance"
             >
-              <div className="rounded-xl border border-border bg-panelElevated p-4 text-sm text-muted">
-                QR + attendance gamification implementation follows after approval.
-              </div>
+              <CheckinSurface />
             </SectionShell>
           </SectionErrorBoundary>
 
           <SectionErrorBoundary title="Reporting Surface">
             <SectionShell
               title="Reporting Surface"
-              subtitle="Cohort, MRR, occupancy and risk segmentation shell"
+              subtitle="MRR, cohort, utilization, and retention risk"
             >
-              <div className="rounded-xl border border-border bg-panelElevated p-4 text-sm text-muted">
-                Recharts and retention predictor wiring is phase 2+.
+              <AnalyticsCharts />
+              <div className="mt-4">
+                <MemberRiskTable />
               </div>
+            </SectionShell>
+          </SectionErrorBoundary>
+        </section>
+
+        <section className="mt-4 grid gap-4 xl:grid-cols-2">
+          <SectionErrorBoundary title="Payments Surface">
+            <SectionShell
+              title="Stripe Global Billing"
+              subtitle="Subscription + dunning management scaffold"
+            >
+              <StripePaymentSurface />
+            </SectionShell>
+          </SectionErrorBoundary>
+
+          <SectionErrorBoundary title="White-label Surface">
+            <SectionShell
+              title="White-label CMS"
+              subtitle="Subdomain-ready landing editor scaffold"
+            >
+              <WhiteLabelCMSSurface />
+            </SectionShell>
+          </SectionErrorBoundary>
+        </section>
+
+        <section className="mt-4">
+          <SectionErrorBoundary title="Member Management Surface">
+            <SectionShell
+              title="Member Management Console"
+              subtitle="Admin can set member number, contact, active state, and level"
+            >
+              <MemberManagementSurface />
+            </SectionShell>
+          </SectionErrorBoundary>
+        </section>
+
+        <section className="mt-4">
+          <SectionErrorBoundary title="Email Surface">
+            <SectionShell
+              title="Automated Weekly Report"
+              subtitle="Monday operator digest HTML preview"
+            >
+              <WeeklyReportEmailPreview />
             </SectionShell>
           </SectionErrorBoundary>
         </section>
