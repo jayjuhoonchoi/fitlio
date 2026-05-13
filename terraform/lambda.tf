@@ -130,7 +130,7 @@ resource "aws_lambda_function" "db_backup" {
       DB_HOST     = aws_instance.fitlio_server.public_ip
       DB_NAME     = "fitlio"
       DB_USER     = "fitlio"
-      DB_PASSWORD = "fitlio123"
+      DB_PASSWORD = var.db_password
       S3_BUCKET   = aws_s3_bucket.db_backup.bucket
     }
   }
