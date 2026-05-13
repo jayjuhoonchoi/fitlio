@@ -3,112 +3,602 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Fitlio - Sports Facility Management</title>
+    <title>Fitlio — Classes & bookings</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&display=swap" rel="stylesheet">
     <style>
+        :root {
+            --bg0: #0a0e14;
+            --bg1: #121826;
+            --surface: rgba(255, 255, 255, 0.06);
+            --surface2: rgba(255, 255, 255, 0.09);
+            --border: rgba(255, 255, 255, 0.1);
+            --text: #eef2f7;
+            --muted: #94a3b8;
+            --accent: #34d399;
+            --accent-dim: #059669;
+            --danger: #f87171;
+            --radius: 14px;
+            --shadow: 0 24px 48px rgba(0, 0, 0, 0.45);
+        }
+
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: Arial, sans-serif; background: #f5f5f5; }
-        .navbar { background: #1a1a2e; color: white; padding: 1rem 2rem; display: flex; justify-content: space-between; align-items: center; }
-        .navbar h1 { font-size: 1.5rem; color: #e94560; }
-        .container { max-width: 1200px; margin: 2rem auto; padding: 0 2rem; }
-        .hero { background: #1a1a2e; color: white; padding: 3rem; border-radius: 12px; margin-bottom: 2rem; }
-        .hero h2 { font-size: 2rem; margin-bottom: 1rem; }
-        .hero p { color: #aaa; }
-        .card { background: white; padding: 1.5rem; border-radius: 12px; margin-bottom: 1rem; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
-        .card h3 { margin-bottom: 0.5rem; color: #1a1a2e; }
-        .btn { background: #e94560; color: white; border: none; padding: 0.5rem 1.5rem; border-radius: 6px; cursor: pointer; }
-        .btn:hover { background: #c73652; }
-        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1rem; }
-        input { width: 100%; padding: 0.5rem; margin: 0.3rem 0 0.8rem; border: 1px solid #ddd; border-radius: 6px; }
-        .tag { background: #e94560; color: white; padding: 0.2rem 0.6rem; border-radius: 20px; font-size: 0.8rem; }
+
+        body {
+            font-family: "DM Sans", system-ui, sans-serif;
+            background: radial-gradient(1200px 600px at 10% -10%, rgba(52, 211, 153, 0.12), transparent),
+                        radial-gradient(800px 400px at 90% 0%, rgba(56, 189, 248, 0.08), transparent),
+                        linear-gradient(165deg, var(--bg0), var(--bg1));
+            color: var(--text);
+            min-height: 100vh;
+            line-height: 1.5;
+        }
+
+        .shell {
+            max-width: 1120px;
+            margin: 0 auto;
+            padding: 1.25rem 1.25rem 3rem;
+        }
+
+        header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+            padding: 0.75rem 0 1.75rem;
+            flex-wrap: wrap;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 0.65rem;
+        }
+
+        .brand-mark {
+            width: 38px;
+            height: 38px;
+            border-radius: 10px;
+            background: linear-gradient(135deg, var(--accent), #38bdf8);
+            display: grid;
+            place-items: center;
+            font-weight: 700;
+            font-size: 1rem;
+            color: #042f2e;
+        }
+
+        .brand h1 {
+            font-size: 1.35rem;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+        }
+
+        .brand span {
+            display: block;
+            font-size: 0.75rem;
+            font-weight: 500;
+            color: var(--muted);
+        }
+
+        .hero {
+            margin-bottom: 2rem;
+        }
+
+        .hero h2 {
+            font-size: clamp(1.75rem, 4vw, 2.35rem);
+            font-weight: 700;
+            letter-spacing: -0.03em;
+            line-height: 1.15;
+            max-width: 18ch;
+        }
+
+        .hero h2 em {
+            font-style: normal;
+            background: linear-gradient(90deg, var(--accent), #5eead4);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+        }
+
+        .hero p {
+            margin-top: 0.75rem;
+            color: var(--muted);
+            max-width: 42ch;
+            font-size: 1rem;
+        }
+
+        .layout {
+            display: grid;
+            grid-template-columns: minmax(280px, 340px) 1fr;
+            gap: 1.75rem;
+            align-items: start;
+        }
+
+        @media (max-width: 860px) {
+            .layout { grid-template-columns: 1fr; }
+        }
+
+        .panel {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 1.35rem 1.35rem 1.5rem;
+            box-shadow: var(--shadow);
+            backdrop-filter: blur(12px);
+        }
+
+        .panel h3 {
+            font-size: 0.95rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            color: var(--text);
+        }
+
+        label {
+            display: block;
+            font-size: 0.72rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: var(--muted);
+            margin-bottom: 0.35rem;
+        }
+
+        input, select {
+            width: 100%;
+            padding: 0.65rem 0.85rem;
+            border-radius: 10px;
+            border: 1px solid var(--border);
+            background: rgba(0, 0, 0, 0.25);
+            color: var(--text);
+            font: inherit;
+            margin-bottom: 0.85rem;
+        }
+
+        input::placeholder { color: #64748b; }
+
+        input:focus, select:focus {
+            outline: none;
+            border-color: rgba(52, 211, 153, 0.55);
+            box-shadow: 0 0 0 3px rgba(52, 211, 153, 0.12);
+        }
+
+        .row2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.65rem;
+        }
+
+        .actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-top: 0.25rem;
+        }
+
+        button.btn {
+            font: inherit;
+            font-weight: 600;
+            font-size: 0.9rem;
+            padding: 0.65rem 1.15rem;
+            border-radius: 10px;
+            border: none;
+            cursor: pointer;
+            transition: transform 0.12s ease, background 0.15s ease, opacity 0.15s ease;
+        }
+
+        button.btn:active { transform: scale(0.98); }
+
+        button.btn-primary {
+            background: linear-gradient(135deg, var(--accent), #2dd4bf);
+            color: #042f2e;
+        }
+
+        button.btn-primary:hover { filter: brightness(1.05); }
+
+        button.btn-ghost {
+            background: var(--surface2);
+            color: var(--text);
+            border: 1px solid var(--border);
+        }
+
+        button.btn-ghost:hover { background: rgba(255, 255, 255, 0.12); }
+
+        .user-pill {
+            font-size: 0.8rem;
+            color: var(--muted);
+            padding: 0.35rem 0.65rem;
+            border-radius: 999px;
+            border: 1px solid var(--border);
+            background: rgba(0, 0, 0, 0.2);
+        }
+
+        .user-pill strong { color: var(--accent); font-weight: 600; }
+
+        .section-title {
+            font-size: 1.05rem;
+            font-weight: 700;
+            margin-bottom: 1rem;
+            letter-spacing: -0.02em;
+        }
+
+        .classes-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+            gap: 1rem;
+        }
+
+        .class-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 1.15rem 1.2rem 1.25rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            min-height: 180px;
+        }
+
+        .class-card h4 {
+            font-size: 1.05rem;
+            font-weight: 600;
+            letter-spacing: -0.02em;
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 0.5rem;
+        }
+
+        .badge {
+            flex-shrink: 0;
+            font-size: 0.7rem;
+            font-weight: 700;
+            padding: 0.2rem 0.5rem;
+            border-radius: 999px;
+            background: rgba(52, 211, 153, 0.18);
+            color: #a7f3d0;
+        }
+
+        .class-card .meta {
+            font-size: 0.85rem;
+            color: var(--muted);
+        }
+
+        .class-card .meta strong { color: #cbd5e1; font-weight: 500; }
+
+        .class-card .btn { margin-top: auto; align-self: flex-start; }
+
+        .empty, .loading {
+            color: var(--muted);
+            font-size: 0.95rem;
+            padding: 1.5rem 0;
+        }
+
+        .toast {
+            position: fixed;
+            bottom: 1.25rem;
+            left: 50%;
+            transform: translateX(-50%) translateY(120%);
+            max-width: min(420px, calc(100% - 2rem));
+            padding: 0.85rem 1.1rem;
+            border-radius: 12px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            box-shadow: var(--shadow);
+            z-index: 99999;
+            transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.2s ease;
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .toast.show {
+            transform: translateX(-50%) translateY(0);
+            opacity: 1;
+        }
+
+        .toast.ok { background: #064e3b; color: #d1fae5; border: 1px solid #059669; }
+        .toast.err { background: #450a0a; color: #fecaca; border: 1px solid #991b1b; }
+
+        /* Always-visible feedback (toast can be easy to miss) */
+        #auth-message {
+            min-height: 1.25rem;
+            margin-top: 0.75rem;
+            font-size: 0.85rem;
+            line-height: 1.35;
+            border-radius: 8px;
+            padding: 0.5rem 0.65rem;
+        }
+        #auth-message:empty { display: none; }
+        #auth-message:not(:empty) { display: block; }
+        #auth-message.err {
+            background: rgba(248, 113, 113, 0.12);
+            color: #fecaca;
+            border: 1px solid rgba(248, 113, 113, 0.35);
+        }
+        #auth-message.ok {
+            background: rgba(52, 211, 153, 0.12);
+            color: #a7f3d0;
+            border: 1px solid rgba(52, 211, 153, 0.35);
+        }
+
+        button.btn:disabled {
+            opacity: 0.55;
+            cursor: not-allowed;
+        }
     </style>
 </head>
 <body>
-    <nav class="navbar">
-        <h1>Fitlio</h1>
-        <div id="nav-auth">
-            <button class="btn" onclick="showLogin()">Login</button>
-        </div>
-    </nav>
+    <div class="shell">
+        <header>
+            <div class="brand">
+                <div class="brand-mark">F</div>
+                <div>
+                    <h1>Fitlio</h1>
+                    <span>Classes &amp; members</span>
+                </div>
+            </div>
+            <div id="nav-auth"></div>
+        </header>
 
-    <div class="container">
-        <div class="hero">
-            <h2>Sports Facility Management</h2>
-            <p>Manage your members, classes, and bookings in one place.</p>
-        </div>
+        <section class="hero">
+            <h2>Book a class in <em>seconds</em>, not spreadsheets.</h2>
+            <p>Sign in, pick a session, and you are on the list. Built for small gyms and studios.</p>
+        </section>
 
-        <div class="card">
-            <h3>Login</h3>
-            <input type="email" id="email" placeholder="Email">
-            <input type="password" id="password" placeholder="Password">
-            <button class="btn" onclick="login()">Login</button>
-            <button class="btn" style="background:#444; margin-left:0.5rem" onclick="register()">Register</button>
-        </div>
+        <div class="layout">
+            <aside class="panel">
+                <h3>Account</h3>
+                <label for="email">Email</label>
+                <input type="email" id="email" placeholder="you@example.com" autocomplete="username">
 
-        <h3 style="margin: 1rem 0">Available Classes</h3>
-        <div class="grid" id="classes-list">
-            <p>Loading classes...</p>
+                <label for="password">Password</label>
+                <input type="password" id="password" placeholder="••••••••" autocomplete="current-password">
+
+                <div class="row2">
+                    <div>
+                        <label for="full_name">Full name</label>
+                        <input type="text" id="full_name" placeholder="Alex Kim">
+                    </div>
+                    <div>
+                        <label for="country_code">Country</label>
+                        <select id="country_code"></select>
+                    </div>
+                </div>
+                <label for="phone">Phone (digits)</label>
+                <input type="tel" id="phone" placeholder="1012345678" inputmode="numeric">
+
+                <div class="actions">
+                    <button type="button" id="btn-signin" class="btn btn-primary" onclick="login()">Sign in</button>
+                    <button type="button" id="btn-register" class="btn btn-ghost" onclick="register()">Create account</button>
+                </div>
+                <p id="auth-message" role="alert" aria-live="polite"></p>
+            </aside>
+
+            <main>
+                <h3 class="section-title">Open classes</h3>
+                <div class="classes-grid" id="classes-list">
+                    <p class="loading">Loading classes…</p>
+                </div>
+            </main>
         </div>
     </div>
 
+    <div id="toast" class="toast" role="status"></div>
+
     <script>
-        let token = localStorage.getItem('token');
+        const COUNTRY_CODES = {
+            AU: "+61", KR: "+82", US: "+1", JP: "+81", GB: "+44", DE: "+49",
+            FR: "+33", CA: "+1", CN: "+86", IN: "+91", BR: "+55", ES: "+34"
+        };
+
+        let token = localStorage.getItem("token");
+        let memberId = localStorage.getItem("member_id");
+
+        const sel = document.getElementById("country_code");
+        Object.keys(COUNTRY_CODES).forEach((code) => {
+            const o = document.createElement("option");
+            o.value = code;
+            o.textContent = `${code} (${COUNTRY_CODES[code]})`;
+            if (code === "KR") o.selected = true;
+            sel.appendChild(o);
+        });
+
+        function escapeHtml(s) {
+            if (s == null) return "";
+            const d = document.createElement("div");
+            d.textContent = s;
+            return d.innerHTML;
+        }
+
+        function toast(msg, ok) {
+            const el = document.getElementById("toast");
+            el.textContent = msg;
+            el.className = "toast " + (ok ? "ok" : "err") + " show";
+            clearTimeout(toast._t);
+            toast._t = setTimeout(() => { el.classList.remove("show"); }, 4200);
+        }
+
+        /** FastAPI: detail string | {detail: [...]} validation errors */
+        function formatApiError(data) {
+            if (!data || data.detail == null) return "Request failed. Please try again.";
+            const d = data.detail;
+            if (typeof d === "string") return d;
+            if (Array.isArray(d)) {
+                return d
+                    .map((e) => (e && typeof e.msg === "string" ? e.msg : JSON.stringify(e)))
+                    .join(" ");
+            }
+            return "Request failed. Please try again.";
+        }
+
+        function setAuthMessage(text, ok) {
+            const el = document.getElementById("auth-message");
+            el.textContent = text || "";
+            el.className = text ? (ok ? "ok" : "err") : "";
+        }
+
+        function setAuthLoading(loading) {
+            document.getElementById("btn-signin").disabled = loading;
+            document.getElementById("btn-register").disabled = loading;
+        }
+
+        function updateNav() {
+            const nav = document.getElementById("nav-auth");
+            if (token && memberId) {
+                nav.innerHTML = '<span class="user-pill">Signed in · member <strong>#' + escapeHtml(memberId) + '</strong></span> ' +
+                    '<button type="button" class="btn btn-ghost" onclick="logout()" style="margin-left:0.5rem">Sign out</button>';
+            } else {
+                nav.innerHTML = "";
+            }
+        }
+
+        function logout() {
+            localStorage.removeItem("token");
+            localStorage.removeItem("member_id");
+            token = null;
+            memberId = null;
+            updateNav();
+            toast("Signed out.", true);
+        }
 
         async function login() {
-            const res = await fetch('/auth/login', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({
-                    email: document.getElementById('email').value,
-                    password: document.getElementById('password').value
-                })
-            });
-            const data = await res.json();
-            if (data.access_token) {
-                localStorage.setItem('token', data.access_token);
-                alert('Login successful!');
+            setAuthMessage("", false);
+            const email = document.getElementById("email").value.trim();
+            const password = document.getElementById("password").value;
+            if (!email || !password) {
+                const msg = "Enter email and password.";
+                setAuthMessage(msg, false);
+                toast(msg, false);
+                return;
+            }
+            setAuthLoading(true);
+            let res;
+            let data = {};
+            try {
+                res = await fetch("/auth/login", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ email, password })
+                });
+                try {
+                    data = await res.json();
+                } catch (_) {
+                    data = {};
+                }
+            } catch (e) {
+                const msg = "Cannot reach server. Check network or try again in a moment.";
+                setAuthMessage(msg, false);
+                toast(msg, false);
+                setAuthLoading(false);
+                return;
+            }
+            setAuthLoading(false);
+            if (res.ok && data.access_token) {
+                token = data.access_token;
+                memberId = String(data.member_id);
+                localStorage.setItem("token", token);
+                localStorage.setItem("member_id", memberId);
+                updateNav();
+                const okMsg = "Signed in as " + (data.full_name || email) + ".";
+                setAuthMessage(okMsg, true);
+                toast("Welcome back.", true);
                 loadClasses();
             } else {
-                alert('Login failed: ' + data.detail);
+                const msg = formatApiError(data);
+                setAuthMessage(msg, false);
+                toast(msg, false);
             }
         }
 
         async function register() {
-            const res = await fetch('/auth/register', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({
-                    email: document.getElementById('email').value,
-                    password: document.getElementById('password').value,
-                    full_name: 'New Member'
-                })
-            });
-            const data = await res.json();
-            alert(data.message || data.detail);
+            setAuthMessage("", false);
+            const body = {
+                email: document.getElementById("email").value.trim(),
+                password: document.getElementById("password").value,
+                full_name: document.getElementById("full_name").value.trim() || "Member",
+                phone: document.getElementById("phone").value.trim() || "0000000000",
+                country_code: document.getElementById("country_code").value
+            };
+            setAuthLoading(true);
+            let res;
+            let data = {};
+            try {
+                res = await fetch("/auth/register", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(body)
+                });
+                try {
+                    data = await res.json();
+                } catch (_) {
+                    data = {};
+                }
+            } catch (e) {
+                const msg = "Cannot reach server. Check network and try again.";
+                setAuthMessage(msg, false);
+                toast(msg, false);
+                setAuthLoading(false);
+                return;
+            }
+            setAuthLoading(false);
+            if (res.ok) {
+                const msg = data.message || "Account created. You can sign in now.";
+                setAuthMessage(msg, true);
+                toast(msg, true);
+            } else {
+                const msg = formatApiError(data);
+                setAuthMessage(msg, false);
+                toast(msg, false);
+            }
         }
 
         async function loadClasses() {
-            const res = await fetch('/classes');
-            const classes = await res.json();
-            const list = document.getElementById('classes-list');
-            if (!classes.length) {
-                list.innerHTML = '<p>No classes available yet.</p>';
-                return;
+            const list = document.getElementById("classes-list");
+            list.innerHTML = '<p class="loading">Loading classes…</p>';
+            try {
+                const res = await fetch("/classes");
+                const classes = await res.json();
+                if (!Array.isArray(classes) || !classes.length) {
+                    list.innerHTML = '<p class="empty">No classes scheduled yet. Check back soon.</p>';
+                    return;
+                }
+                list.innerHTML = classes.map((c) => `
+                    <article class="class-card">
+                        <h4>
+                            <span>${escapeHtml(c.name)}</span>
+                            <span class="badge">${c.current_count}/${c.capacity}</span>
+                        </h4>
+                        <p class="meta"><strong>Instructor</strong> ${escapeHtml(c.instructor)}</p>
+                        <p class="meta"><strong>Time</strong> ${escapeHtml(new Date(c.schedule).toLocaleString())}</p>
+                        <button type="button" class="btn btn-primary" onclick="bookClass(${c.id})">Book</button>
+                    </article>
+                `).join("");
+            } catch (e) {
+                list.innerHTML = '<p class="empty">Could not load classes. Try refreshing the page.</p>';
             }
-            list.innerHTML = classes.map(c => `
-                <div class="card">
-                    <h3>${c.name} <span class="tag">${c.current_count}/${c.capacity}</span></h3>
-                    <p>Instructor: ${c.instructor}</p>
-                    <p>Schedule: ${new Date(c.schedule).toLocaleString()}</p>
-                    <button class="btn" style="margin-top:0.8rem" onclick="bookClass(${c.id})">Book Now</button>
-                </div>
-            `).join('');
         }
 
         async function bookClass(classId) {
-            if (!token) { alert('Please login first!'); return; }
-            alert('Booking feature coming soon!');
+            if (!token || !memberId) {
+                toast("Please sign in first.", false);
+                return;
+            }
+            const res = await fetch("/classes/" + classId + "/book?member_id=" + encodeURIComponent(memberId), {
+                method: "POST",
+                headers: { Authorization: "Bearer " + token }
+            });
+            let data;
+            try { data = await res.json(); } catch (_) { data = {}; }
+            if (res.ok) {
+                toast("Booked · #" + (data.booking_id || "?"), true);
+                loadClasses();
+            } else {
+                toast(typeof data.detail === "string" ? data.detail : "Booking failed.", false);
+            }
         }
 
+        updateNav();
         loadClasses();
     </script>
 </body>
