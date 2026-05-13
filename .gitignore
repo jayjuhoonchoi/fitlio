@@ -16,3 +16,5 @@ terraform/terraform.tfstate*.backup
 terraform/*.tfvars
 lambda/backup/handler.zip
 terraform/*.bak
+# Local Promtail Grafana token (copy from promtail-secret.example.yaml)
+k8s/promtail-secret.yaml
