@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from fastapi import FastAPI
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 
 from app.database import engine
 from app import models
@@ -24,7 +24,11 @@ TEMPLATES = Path(__file__).resolve().parent / "templates"
 
 
 def _html(name: str) -> HTMLResponse:
-    return HTMLResponse((TEMPLATES / name).read_text(encoding="utf-8"))
+    body = (TEMPLATES / name).read_text(encoding="utf-8")
+    return HTMLResponse(
+        content=body,
+        headers={"Cache-Control": "no-store, no-cache, must-revalidate, max-age=0"},
+    )
 
 
 app = FastAPI(
@@ -67,10 +71,10 @@ def admin_app_page():
     return _html("admin_app.html")
 
 
-@app.get("/legacy", response_class=HTMLResponse)
+@app.get("/legacy")
 def legacy_home():
-    """Previous single-page home (optional)."""
-    return _html("index.html")
+    """Old single-page URL; send users to the current portal."""
+    return RedirectResponse(url="/", status_code=302)
 
 
 @app.get("/health")
