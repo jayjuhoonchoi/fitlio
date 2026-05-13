@@ -20,33 +20,57 @@ def get_classes(db: Session = Depends(get_db)):
 
 @router.post("/classes/{class_id}/book")
 def book_class(class_id: int, member_id: int, db: Session = Depends(get_db)):
-    fitness_class = db.query(FitnessClass).filter(FitnessClass.id == class_id).first()
+    # Lock the class row so concurrent bookings cannot overshoot capacity (PostgreSQL).
+    fitness_class = (
+        db.query(FitnessClass)
+        .filter(FitnessClass.id == class_id)
+        .with_for_update()
+        .first()
+    )
     if not fitness_class:
         raise HTTPException(status_code=404, detail="Class not found")
     if fitness_class.current_count >= fitness_class.capacity:
         raise HTTPException(status_code=400, detail="Class is fully booked")
-    existing = db.query(Booking).filter(
-        Booking.member_id == member_id,
-        Booking.class_id == class_id
-    ).first()
+    existing = (
+        db.query(Booking)
+        .filter(
+            Booking.member_id == member_id,
+            Booking.class_id == class_id,
+            Booking.status != "cancelled",
+        )
+        .first()
+    )
     if existing:
         raise HTTPException(status_code=400, detail="Already booked")
     booking = Booking(member_id=member_id, class_id=class_id)
     fitness_class.current_count += 1
     db.add(booking)
     db.commit()
+    db.refresh(booking)
     return {"message": "Class booked successfully", "booking_id": booking.id}
 
 @router.delete("/classes/{class_id}/cancel")
 def cancel_booking(class_id: int, member_id: int, db: Session = Depends(get_db)):
-    booking = db.query(Booking).filter(
-        Booking.member_id == member_id,
-        Booking.class_id == class_id
-    ).first()
+    fitness_class = (
+        db.query(FitnessClass)
+        .filter(FitnessClass.id == class_id)
+        .with_for_update()
+        .first()
+    )
+    if not fitness_class:
+        raise HTTPException(status_code=404, detail="Class not found")
+    booking = (
+        db.query(Booking)
+        .filter(
+            Booking.member_id == member_id,
+            Booking.class_id == class_id,
+            Booking.status != "cancelled",
+        )
+        .first()
+    )
     if not booking:
         raise HTTPException(status_code=404, detail="Booking not found")
-    fitness_class = db.query(FitnessClass).filter(FitnessClass.id == class_id).first()
-    fitness_class.current_count -= 1
+    fitness_class.current_count = max(0, fitness_class.current_count - 1)
     booking.status = "cancelled"
     db.commit()
     return {"message": "Booking cancelled successfully"}
