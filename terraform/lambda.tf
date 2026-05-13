@@ -121,7 +121,7 @@ resource "aws_lambda_function" "db_backup" {
   handler          = "handler.lambda_handler"
   runtime          = "python3.11"
   timeout          = 300
-  layers           = ["arn:aws:lambda:ap-southeast-2:238391222114:layer:psycopg2:10"]
+  layers           = [aws_lambda_layer_version.psycopg2.arn]
 
   source_code_hash = data.archive_file.backup_lambda.output_base64sha256
 
