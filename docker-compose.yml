@@ -11,18 +11,27 @@ services:
       - /etc/letsencrypt:/etc/letsencrypt:ro
       - /var/www/certbot:/var/www/certbot
     depends_on:
-      - api
+      api:
+        condition: service_healthy
     restart: unless-stopped
 
   api:
     build: .
     ports:
-      - "8000:8000"
+      - "0.0.0.0:8000:8000"
     environment:
       DATABASE_URL: postgresql://fitlio:fitlio123@db:5432/fitlio
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     restart: unless-stopped
+    healthcheck:
+      test:
+        ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')"]
+      interval: 5s
+      timeout: 5s
+      retries: 18
+      start_period: 25s
 
   db:
     image: postgres:15
@@ -35,6 +44,12 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fitlio -d fitlio"]
+      interval: 3s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
 
   prometheus:
     image: prom/prometheus:latest
