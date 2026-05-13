@@ -11,9 +11,10 @@
     h1 { font-size: 1.35rem; margin-bottom: .25rem; }
     .sub { color: #94a3b8; font-size: .9rem; margin-bottom: 1.25rem; }
     label { display: block; font-size: .72rem; text-transform: uppercase; color: #94a3b8; margin: .5rem 0 .25rem; }
-    input { width: 100%; padding: .65rem .75rem; border-radius: 10px; border: 1px solid #334155; background: #1e293b; color: #fff; }
+    input, select { width: 100%; padding: .65rem .75rem; border-radius: 10px; border: 1px solid #334155; background: #1e293b; color: #fff; }
     .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: .5rem; }
     .btn { width: 100%; margin-top: 1rem; padding: .7rem; border: none; border-radius: 10px; font-weight: 600; cursor: pointer; background: linear-gradient(135deg,#34d399,#2dd4bf); color: #042f2e; }
+    .btn:disabled { opacity: .55; cursor: wait; }
     .btn2 { margin-top: .5rem; background: transparent; color: #cbd5e1; border: 1px solid #475569; }
     .msg { margin-top: .75rem; padding: .5rem .65rem; border-radius: 8px; font-size: .85rem; display: none; }
     .msg.err { display: block; background: rgba(248,113,113,.15); color: #fecaca; border: 1px solid rgba(248,113,113,.35); }
@@ -28,23 +29,23 @@
 <body>
   <div class="wrap">
     <div class="top">
-      <a href="/" data-i18n="back">← Home</a>
+      <a href="/"><span data-i18n="back">← Home</span></a>
       <div class="lang"><button type="button" id="ko">KO</button><button type="button" id="en">EN</button></div>
     </div>
-    <h1 data-i18n="h1">Member sign in</h1>
-    <p class="sub" data-i18n="sub">Use your member account (not admin).</p>
-    <label data-i18n="em">Email</label>
+    <h1><span data-i18n="h1">Member sign in</span></h1>
+    <p class="sub"><span data-i18n="sub">Use your member account (not admin).</span></p>
+    <label><span data-i18n="em">Email</span></label>
     <input type="email" id="email" autocomplete="username">
-    <label data-i18n="pw">Password</label>
+    <label><span data-i18n="pw">Password</span></label>
     <input type="password" id="password" autocomplete="current-password">
-    <label data-i18n="fn">Full name (register)</label>
+    <label><span data-i18n="fn">Full name (register)</span></label>
     <input type="text" id="full_name">
     <div class="row2">
-      <div><label data-i18n="cc">Country</label><select id="country_code"></select></div>
-      <div><label data-i18n="ph">Phone digits</label><input type="tel" id="phone" inputmode="numeric"></div>
+      <div><label><span data-i18n="cc">Country</span></label><select id="country_code"></select></div>
+      <div><label><span data-i18n="ph">Phone digits</span></label><input type="tel" id="phone" inputmode="numeric"></div>
     </div>
-    <button class="btn" type="button" id="go" data-i18n="go">Sign in</button>
-    <button class="btn btn2" type="button" id="reg" data-i18n="reg">Create account</button>
+    <button class="btn" type="button" id="go"><span data-i18n="go">Sign in</span></button>
+    <button class="btn btn2" type="button" id="reg"><span data-i18n="reg">Create account</span></button>
     <div id="msg" class="msg"></div>
   </div>
   <script>
@@ -52,33 +53,64 @@
     const sel = document.getElementById("country_code");
     Object.keys(CC).forEach(c => { const o=document.createElement("option"); o.value=c; o.textContent=c; if(c==="KR")o.selected=true; sel.appendChild(o); });
     const S = {
-      en: { back:"← Home", h1:"Member sign in", sub:"Use your member account (not admin).", em:"Email", pw:"Password", fn:"Full name (register)", cc:"Country", ph:"Phone digits", go:"Sign in", reg:"Create account", badAdmin:"This account is admin. Use the admin login page.", need:"Enter email and password." },
-      ko: { back:"← 처음", h1:"회원 로그인", sub:"일반 회원 계정으로 로그인하세요.", em:"이메일", pw:"비밀번호", fn:"이름 (가입 시)", cc:"국가", ph:"전화(숫자)", go:"로그인", reg:"회원가입", badAdmin:"관리자 계정입니다. 관리자 로그인 페이지를 이용하세요.", need:"이메일과 비밀번호를 입력하세요." }
+      en: { back:"← Home", h1:"Member sign in", sub:"Use your member account (not admin).", em:"Email", pw:"Password", fn:"Full name (register)", cc:"Country", ph:"Phone digits", go:"Sign in", reg:"Create account", badAdmin:"This account is admin. Use the admin login page.", need:"Enter email and password.", net:"Cannot reach server.", bad:"Login failed.", working:"…" },
+      ko: { back:"← 처음", h1:"회원 로그인", sub:"일반 회원 계정으로 로그인하세요.", em:"이메일", pw:"비밀번호", fn:"이름 (가입 시)", cc:"국가", ph:"전화(숫자)", go:"로그인", reg:"회원가입", badAdmin:"관리자 계정입니다. 관리자 로그인을 이용하세요.", need:"이메일과 비밀번호를 입력하세요.", net:"서버에 연결할 수 없습니다.", bad:"로그인 실패.", working:"처리 중…" }
     };
     let lang = localStorage.getItem("fitlio_lang")||"ko";
     function t(k){ return (S[lang]&&S[lang][k])||k; }
-    function apply(){ document.querySelectorAll("[data-i18n]").forEach(el=>{const k=el.getAttribute("data-i18n");el.textContent=t(k);}); document.getElementById("ko").classList.toggle("on",lang==="ko"); document.getElementById("en").classList.toggle("on",lang==="en"); }
-    document.getElementById("ko").onclick=()=>{lang="ko";localStorage.setItem("fitlio_lang",lang);apply();};
-    document.getElementById("en").onclick=()=>{lang="en";localStorage.setItem("fitlio_lang",lang);apply();};
-    apply();
-    function show(ok, text){ const m=document.getElementById("msg"); m.className="msg "+(ok?"ok":"err"); m.textContent=text; m.style.display="block"; }
+    function apply(){
+      document.querySelectorAll("[data-i18n]").forEach(el=>{ const k=el.getAttribute("data-i18n"); el.textContent=t(k); });
+      document.getElementById("ko").classList.toggle("on",lang==="ko");
+      document.getElementById("en").classList.toggle("on",lang==="en");
+    }
+    function show(ok, text){
+      const m=document.getElementById("msg");
+      m.className="msg "+(ok?"ok":"err");
+      m.textContent=text;
+      m.style.display="block";
+    }
+    function errDetail(data){
+      if(!data||data.detail==null) return t("bad");
+      const d=data.detail;
+      if(typeof d==="string") return d;
+      if(Array.isArray(d)) return d.map(e=>(e&&e.msg)||"").filter(Boolean).join(" ")||t("bad");
+      return t("bad");
+    }
+    document.getElementById("ko").onclick=()=>{ lang="ko"; localStorage.setItem("fitlio_lang",lang); apply(); };
+    document.getElementById("en").onclick=()=>{ lang="en"; localStorage.setItem("fitlio_lang",lang); apply(); };
     document.getElementById("go").onclick=async()=>{
       const email=document.getElementById("email").value.trim(), password=document.getElementById("password").value;
+      const goBtn=document.getElementById("go");
       if(!email||!password){ show(false,t("need")); return; }
-      const res=await fetch("/auth/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email,password})});
-      const data=await res.json().catch(()=>({}));
-      if(!res.ok){ show(false, typeof data.detail==="string"?data.detail:"Login failed"); return; }
-      if(data.role==="admin"){ show(false,t("badAdmin")); return; }
-      localStorage.setItem("token",data.access_token); localStorage.setItem("member_id",String(data.member_id)); localStorage.setItem("user_role",data.role||"member");
-      location.href="/app/member";
+      goBtn.disabled=true;
+      const old=goBtn.querySelector('[data-i18n="go"]'); if(old) old.textContent=t("working");
+      try {
+        const res=await fetch("/auth/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email,password})});
+        const data=await res.json().catch(()=>({}));
+        if(!res.ok){ show(false, errDetail(data)); return; }
+        if(!data.access_token){ show(false,t("bad")); return; }
+        if(data.role==="admin"){ show(false,t("badAdmin")); return; }
+        localStorage.setItem("token",data.access_token);
+        localStorage.setItem("member_id",String(data.member_id));
+        localStorage.setItem("user_role",data.role||"member");
+        location.href="/app/member";
+      } catch(e) {
+        show(false,t("net"));
+      } finally {
+        goBtn.disabled=false;
+        apply();
+      }
     };
     document.getElementById("reg").onclick=async()=>{
       const body={ email:document.getElementById("email").value.trim(), password:document.getElementById("password").value,
         full_name:document.getElementById("full_name").value.trim()||"Member", phone:document.getElementById("phone").value.trim()||"01000000000", country_code:document.getElementById("country_code").value };
-      const res=await fetch("/auth/register",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
-      const data=await res.json().catch(()=>({}));
-      show(res.ok, res.ok?(data.message||"OK"):(typeof data.detail==="string"?data.detail:"Failed"));
+      try {
+        const res=await fetch("/auth/register",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+        const data=await res.json().catch(()=>({}));
+        show(res.ok, res.ok?(data.message||"OK"):errDetail(data));
+      } catch(e) { show(false,t("net")); }
     };
+    apply();
   </script>
 </body>
 </html>
