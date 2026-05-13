@@ -153,6 +153,134 @@ def sales_trend(
     return {"months": months, "points": points}
 
 
+@router.get("/reports/member-growth")
+def member_growth_report(
+    months: int = 12,
+    db: Session = Depends(get_db),
+    _: dict = Depends(require_admin),
+):
+    if months < 1 or months > 36:
+        raise HTTPException(status_code=400, detail="Months must be between 1 and 36")
+    now = datetime.utcnow()
+    y = now.year
+    m = now.month
+    points = []
+    for _ in range(months):
+        last = monthrange(y, m)[1]
+        start = datetime(y, m, 1)
+        end = datetime(y, m, last, 23, 59, 59)
+        new_members = (
+            db.query(Member)
+            .filter(Member.created_at >= start, Member.created_at <= end)
+            .count()
+        )
+        total_members = db.query(Member).filter(Member.created_at <= end).count()
+        points.append(
+            {
+                "year": y,
+                "month": m,
+                "label": f"{y}-{m:02d}",
+                "new_members": new_members,
+                "total_members": total_members,
+            }
+        )
+        m -= 1
+        if m == 0:
+            m = 12
+            y -= 1
+    points.reverse()
+    return {"months": months, "points": points}
+
+
+@router.get("/reports/retention")
+def retention_report(
+    months: int = 12,
+    db: Session = Depends(get_db),
+    _: dict = Depends(require_admin),
+):
+    if months < 1 or months > 36:
+        raise HTTPException(status_code=400, detail="Months must be between 1 and 36")
+    now = datetime.utcnow()
+    y = now.year
+    m = now.month
+    points = []
+    for _ in range(months):
+        last = monthrange(y, m)[1]
+        end = datetime(y, m, last, 23, 59, 59)
+        member_base = db.query(Member).filter(Member.created_at <= end).count()
+        active_members = (
+            db.query(func.count(func.distinct(Membership.member_id)))
+            .filter(
+                Membership.status == "active",
+                Membership.start_date <= end,
+                Membership.end_date >= end,
+            )
+            .scalar()
+        ) or 0
+        rate = (active_members / member_base * 100.0) if member_base else 0.0
+        points.append(
+            {
+                "year": y,
+                "month": m,
+                "label": f"{y}-{m:02d}",
+                "member_base": member_base,
+                "active_members": active_members,
+                "retention_rate": round(rate, 2),
+            }
+        )
+        m -= 1
+        if m == 0:
+            m = 12
+            y -= 1
+    points.reverse()
+    return {"months": months, "points": points}
+
+
+@router.get("/reports/class-utilization")
+def class_utilization_report(
+    days: int = 30,
+    db: Session = Depends(get_db),
+    _: dict = Depends(require_admin),
+):
+    if days < 1 or days > 180:
+        raise HTTPException(status_code=400, detail="Days must be between 1 and 180")
+    start = datetime.utcnow() - timedelta(days=days)
+    classes = (
+        db.query(FitnessClass)
+        .filter(FitnessClass.schedule >= start)
+        .order_by(FitnessClass.schedule.desc())
+        .all()
+    )
+    rows = []
+    total_fill = 0.0
+    for c in classes:
+        booked = (
+            db.query(Booking)
+            .filter(Booking.class_id == c.id, Booking.status != "cancelled")
+            .count()
+        )
+        fill = (booked / c.capacity * 100.0) if c.capacity else 0.0
+        total_fill += fill
+        rows.append(
+            {
+                "class_id": c.id,
+                "name": c.name,
+                "instructor": c.instructor,
+                "schedule": c.schedule,
+                "capacity": c.capacity,
+                "booked_count": booked,
+                "fill_rate": round(fill, 2),
+            }
+        )
+    avg_fill = round(total_fill / len(rows), 2) if rows else 0.0
+    return {
+        "days": days,
+        "average_fill_rate": avg_fill,
+        "classes_count": len(rows),
+        "rows": rows,
+    }
+
+
 @router.get("/attendances/recent")
 def get_recent_attendances(db: Session = Depends(get_db), _: dict = Depends(require_admin)):
     attendances = (

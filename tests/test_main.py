@@ -15,3 +15,15 @@ def test_health_check():
 def test_root():
     response = client.get("/")
     assert response.status_code == 200
+
+
+def test_member_login_page():
+    response = client.get("/login/member")
+    assert response.status_code == 200
+    assert "Fitlio" in response.text
+
+
+def test_admin_login_page():
+    response = client.get("/admin-login")
+    assert response.status_code == 200
+    assert "Admin" in response.text
