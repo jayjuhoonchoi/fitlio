@@ -17,6 +17,7 @@ with patch("app.database.engine") as mock_engine, \
     from app.deps import require_admin
     from app import models
     from app.reminders import queue_membership_expiry_reminders
+    from app.notification_dispatch import process_pending_notifications
 
 client = TestClient(app)
 
@@ -296,3 +297,66 @@ def test_run_membership_reminders_admin_endpoint(db_session):
     payload = response.json()
     assert payload["status"] == "queued"
     assert payload["created"] >= 1
+
+
+def test_process_pending_notifications_marks_sent(db_session):
+    member = models.Member(
+        email="dispatch.member@fitlio.com",
+        hashed_password="x",
+        full_name="Dispatch Member",
+        role="member",
+    )
+    db_session.add(member)
+    db_session.flush()
+    db_session.add(
+        models.NotificationRequest(
+            member_id=member.id,
+            topic="membership_expiry_d1",
+            message="test dispatch",
+            status="pending",
+        )
+    )
+    db_session.commit()
+
+    result = process_pending_notifications(db_session, limit=20)
+    assert result["processed"] == 1
+    assert result["sent"] == 1
+    row = db_session.query(models.NotificationRequest).first()
+    assert row.status == "sent"
+
+
+def test_run_notification_dispatch_admin_endpoint(db_session):
+    admin = models.Member(
+        email="admin.dispatch@fitlio.com",
+        hashed_password="x",
+        full_name="Admin Dispatch",
+        role="admin",
+    )
+    member = models.Member(
+        email="member.dispatch@fitlio.com",
+        hashed_password="x",
+        full_name="Member Dispatch",
+        role="member",
+    )
+    db_session.add(admin)
+    db_session.add(member)
+    db_session.flush()
+    db_session.add(
+        models.NotificationRequest(
+            member_id=member.id,
+            topic="membership_expiry_d3",
+            message="dispatch me",
+            status="pending",
+        )
+    )
+    db_session.commit()
+
+    app.dependency_overrides[get_db] = _override_db(db_session)
+    app.dependency_overrides[require_admin] = lambda: {"id": admin.id, "role": "admin"}
+    response = client.post("/admin/notifications/dispatch/run")
+    app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == "processed"
+    assert payload["processed"] >= 1

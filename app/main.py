@@ -14,6 +14,7 @@ from app.admin import router as admin_router
 from app.me import router as me_router
 from app.messages import router as message_router
 from app.reminders import maybe_queue_membership_expiry_reminders
+from app.notification_dispatch import maybe_process_pending_notifications
 
 models.Base.metadata.create_all(bind=engine)
 ensure_columns(engine)
@@ -44,6 +45,7 @@ app = FastAPI(
 async def fitlio_response_marker(request, call_next):
     """Helps verify traffic hits this app (see X-Fitlio-App on curl -I)."""
     maybe_queue_membership_expiry_reminders()
+    maybe_process_pending_notifications()
     response = await call_next(request)
     response.headers["X-Fitlio-App"] = "portal-v2"
     return response
