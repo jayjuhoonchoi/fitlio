@@ -12,6 +12,7 @@ from app.payments import router as payment_router
 from app.attendance import router as attendance_router
 from app.admin import router as admin_router
 from app.me import router as me_router
+from app.messages import router as message_router
 
 models.Base.metadata.create_all(bind=engine)
 ensure_columns(engine)
@@ -52,6 +53,7 @@ app.include_router(payment_router)
 app.include_router(attendance_router)
 app.include_router(admin_router)
 app.include_router(me_router)
+app.include_router(message_router)
 
 
 @app.get("/", response_class=HTMLResponse)

@@ -169,3 +169,49 @@ def test_admin_member_risk_response_shape(db_session):
         "at_risk",
     ):
         assert key in row
+
+
+def test_messages_send_and_thread_flow(db_session):
+    admin = models.Member(
+        email="admin-msg@fitlio.com",
+        hashed_password="x",
+        full_name="Admin Msg",
+        role="admin",
+    )
+    member = models.Member(
+        email="member-msg@fitlio.com",
+        hashed_password="x",
+        full_name="Member Msg",
+        role="member",
+    )
+    db_session.add(admin)
+    db_session.add(member)
+    db_session.commit()
+
+    app.dependency_overrides[get_db] = _override_db(db_session)
+    app.dependency_overrides[require_admin] = lambda: {"id": admin.id, "role": "admin"}
+    from app.deps import get_current_user
+
+    app.dependency_overrides[get_current_user] = lambda: {"id": member.id, "role": "member"}
+    send = client.post(
+        "/messages",
+        json={"recipient_id": admin.id, "content": "hello admin"},
+    )
+    assert send.status_code == 201
+
+    app.dependency_overrides[get_current_user] = lambda: {"id": admin.id, "role": "admin"}
+    thread = client.get(f"/messages/thread/{member.id}")
+    assert thread.status_code == 200
+    rows = thread.json()
+    assert len(rows) == 1
+    assert rows[0]["content"] == "hello admin"
+
+    members = client.get("/messages/admin/members")
+    assert members.status_code == 200
+    assert any(r["id"] == member.id for r in members.json())
+
+    app.dependency_overrides[get_current_user] = lambda: {"id": member.id, "role": "member"}
+    contact = client.get("/messages/admin-contact")
+    assert contact.status_code == 200
+    assert contact.json()["id"] == admin.id
+    app.dependency_overrides.clear()

@@ -96,3 +96,14 @@ class NotificationRequest(Base):
     message = Column(String(512), nullable=False)
     status = Column(String(32), nullable=False, default="pending")  # pending | sent | failed
     created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class DirectMessage(Base):
+    __tablename__ = "direct_messages"
+
+    id = Column(Integer, primary_key=True, index=True)
+    sender_id = Column(Integer, nullable=False, index=True)
+    recipient_id = Column(Integer, nullable=False, index=True)
+    content = Column(String(2000), nullable=False)
+    is_read = Column(Boolean, nullable=False, default=False)
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
