@@ -163,6 +163,7 @@ def test_admin_member_risk_response_shape(db_session):
     for key in (
         "member_id",
         "full_name",
+        "booked_count",
         "attendance_count",
         "attendance_rate",
         "at_risk",

@@ -258,12 +258,13 @@ def occupancy_trend_report(
             .all()
         )
         capacity_total = sum(c.capacity for c in classes)
+        class_ids = [c.id for c in classes]
         booked_total = 0
-        for c in classes:
-            booked_total += (
+        if class_ids:
+            booked_total = (
                 db.query(Booking)
                 .filter(
-                    Booking.class_id == c.id,
+                    Booking.class_id.in_(class_ids),
                     Booking.status == "confirmed",
                 )
                 .count()
@@ -304,19 +305,37 @@ def member_risk_report(
     )
     denominator = max(classes_count, 1)
     members = db.query(Member).all()
+    attendance_rows = (
+        db.query(Attendance.member_id, func.count(Attendance.id))
+        .filter(Attendance.checked_in_at >= since)
+        .group_by(Attendance.member_id)
+        .all()
+    )
+    attendance_by_member = {member_id: count for member_id, count in attendance_rows}
+    booking_rows = (
+        db.query(Booking.member_id, func.count(Booking.id))
+        .join(FitnessClass, FitnessClass.id == Booking.class_id)
+        .filter(
+            Booking.status == "confirmed",
+            FitnessClass.schedule >= since,
+            FitnessClass.schedule <= datetime.utcnow(),
+        )
+        .group_by(Booking.member_id)
+        .all()
+    )
+    booked_by_member = {member_id: count for member_id, count in booking_rows}
     rows = []
     for m in members:
-        attendance_count = (
-            db.query(Attendance)
-            .filter(Attendance.member_id == m.id, Attendance.checked_in_at >= since)
-            .count()
-        )
-        attendance_rate = round((attendance_count / denominator) * 100.0, 2)
+        attendance_count = attendance_by_member.get(m.id, 0)
+        booked_count = booked_by_member.get(m.id, 0)
+        member_denominator = max(booked_count, denominator)
+        attendance_rate = round((attendance_count / member_denominator) * 100.0, 2)
         rows.append(
             {
                 "member_id": m.id,
                 "member_no": getattr(m, "member_no", None),
                 "full_name": m.full_name,
+                "booked_count": booked_count,
                 "attendance_count": attendance_count,
                 "attendance_rate": attendance_rate,
                 "at_risk": attendance_rate <= 50.0,
