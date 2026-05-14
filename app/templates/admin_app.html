@@ -15,6 +15,7 @@
       --accent-2:#58b485;
       --muted:#627267;
       --text:#2f3b32;
+      --glass:0 0 0 1px rgba(255,255,255,.72) inset, 0 0 0 1px rgba(174,196,181,.4);
     }
     @keyframes riseIn {
       from { opacity: 0; transform: translateY(6px); }
@@ -37,6 +38,7 @@
       padding: 1rem .75rem;
       flex-shrink: 0;
       box-shadow: 8px 0 20px rgba(33,49,39,.05);
+      backdrop-filter: blur(9px);
     }
     nav button {
       display: block;
@@ -73,7 +75,7 @@
       color: #f2f7f2;
       font-weight: 650;
       cursor: pointer;
-      box-shadow: 0 8px 14px rgba(47,133,90,.24);
+      box-shadow: 0 8px 14px rgba(47,133,90,.24), 0 1px 0 rgba(255,255,255,.33) inset;
       transition: transform .14s ease, box-shadow .14s ease, filter .14s ease;
     }
     .btn:hover { transform: translateY(-1px); box-shadow: 0 12px 18px rgba(47,133,90,.29); filter: saturate(1.06); }
@@ -98,7 +100,8 @@
     .chip.cancelled { background:#eceff3; border-color:#c3ccd6; color:#5e6b78; }
     .chip.error { background:#fde8ed; border-color:#f2a2b7; color:#9f1239; }
     .stats { display: grid; gap: .75rem; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); margin-bottom: 1rem; }
-    .kpi { background: linear-gradient(160deg, #fffefb, #fffdf7); border: 1px solid #d1d9d0; border-radius: 12px; padding: .75rem; box-shadow: 0 10px 20px rgba(31,46,37,.08); animation: riseIn .24s ease both; }
+    .kpi { background: linear-gradient(160deg, #fffefb, #fffdf7); border: 1px solid #d1d9d0; border-radius: 12px; padding: .75rem; box-shadow: 0 10px 20px rgba(31,46,37,.08); animation: riseIn .24s ease both; position: relative; overflow: hidden; }
+    .kpi::after{ content:""; position:absolute; inset:0; pointer-events:none; box-shadow: var(--glass); border-radius:12px; }
     .kpi b { display: block; font-size: 1.25rem; color: #276b49; margin-top: .2rem; }
     .hint { font-size: .8rem; color: #627267; margin-bottom: .5rem; }
     .bar-wrap { display: grid; gap: .4rem; margin-top: .75rem; }
@@ -116,6 +119,7 @@
       background: linear-gradient(135deg,#f9fcf7,#f3f8f1);
       color: #557061;
       font-size: .84rem;
+      box-shadow: 0 10px 16px rgba(32,46,38,.06);
     }
   </style>
 </head>
