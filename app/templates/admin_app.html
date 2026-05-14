@@ -6,18 +6,74 @@
   <title>Fitlio — Admin</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: Inter, system-ui, sans-serif; background: #f5f3ea; color: #2f3b32; display: flex; min-height: 100vh; }
-    nav { width: 220px; background: #eef4ea; border-right: 1px solid #cdd7ca; padding: 1rem .75rem; flex-shrink: 0; }
-    nav button { display: block; width: 100%; text-align: left; padding: .55rem .65rem; margin-bottom: .3rem; border: 1px solid transparent; border-radius: 8px; background: transparent; color: #435649; cursor: pointer; font-size: .85rem; }
-    nav button.on, nav button:hover { background: #dfead9; border-color: #9fbaa5; color: #24503c; }
+    :root{
+      --bg:#f5f3ea;
+      --panel:#fffdf7;
+      --line:#d1d9d0;
+      --line-strong:#9fbaa5;
+      --accent:#2f855a;
+      --accent-2:#58b485;
+      --muted:#627267;
+      --text:#2f3b32;
+    }
+    body {
+      font-family: Inter, system-ui, sans-serif;
+      background:
+        radial-gradient(circle at 0% 15%, rgba(88,180,133,.14), transparent 30%),
+        radial-gradient(circle at 100% 0%, rgba(205,214,225,.28), transparent 28%),
+        var(--bg);
+      color: var(--text);
+      display: flex;
+      min-height: 100vh;
+    }
+    nav {
+      width: 220px;
+      background: linear-gradient(180deg, #eef4ea, #edf3e7);
+      border-right: 1px solid #cdd7ca;
+      padding: 1rem .75rem;
+      flex-shrink: 0;
+      box-shadow: 8px 0 20px rgba(33,49,39,.05);
+    }
+    nav button {
+      display: block;
+      width: 100%;
+      text-align: left;
+      padding: .58rem .7rem;
+      margin-bottom: .3rem;
+      border: 1px solid transparent;
+      border-radius: 10px;
+      background: transparent;
+      color: #435649;
+      cursor: pointer;
+      font-size: .85rem;
+      transition: all .16s ease;
+    }
+    nav button.on, nav button:hover {
+      background: linear-gradient(135deg, #dfead9, #e9f1e4);
+      border-color: var(--line-strong);
+      color: #24503c;
+      transform: translateY(-1px);
+      box-shadow: 0 8px 14px rgba(58,86,68,.14);
+    }
     main { flex: 1; padding: 1rem 1.25rem; overflow: auto; }
     h1 { font-size: 1.15rem; margin-bottom: 1rem; color: #24503c; }
-    pre, .box { background: #fffdf7; border: 1px solid #d1d9d0; border-radius: 10px; padding: .75rem; font-size: .78rem; overflow: auto; max-height: 70vh; white-space: pre-wrap; word-break: break-word; }
+    pre, .box { background: #fffdf7; border: 1px solid #d1d9d0; border-radius: 12px; padding: .75rem; font-size: .78rem; overflow: auto; max-height: 70vh; white-space: pre-wrap; word-break: break-word; box-shadow: 0 12px 26px rgba(30,45,36,.08); }
     .row { display: flex; gap: .5rem; flex-wrap: wrap; margin-bottom: .75rem; align-items: center; }
     input, select, textarea { padding: .45rem .55rem; border-radius: 8px; border: 1px solid #b9c5bc; background: #fffdf7; color: #2f3b32; }
-    .btn { padding: .45rem .75rem; border-radius: 8px; border: none; background: #2f855a; color: #f2f7f2; font-weight: 600; cursor: pointer; }
-    .btn:hover { background: #276b49; }
-    .btnWarn { background: #9f1239; }
+    .btn {
+      padding: .48rem .82rem;
+      border-radius: 10px;
+      border: 1px solid rgba(47,133,90,.5);
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      color: #f2f7f2;
+      font-weight: 650;
+      cursor: pointer;
+      box-shadow: 0 8px 14px rgba(47,133,90,.24);
+      transition: transform .14s ease, box-shadow .14s ease, filter .14s ease;
+    }
+    .btn:hover { transform: translateY(-1px); box-shadow: 0 12px 18px rgba(47,133,90,.29); filter: saturate(1.06); }
+    .btn:active { transform: translateY(1px) scale(.985); box-shadow: 0 6px 12px rgba(47,133,90,.2); filter: brightness(.94); }
+    .btnWarn { background: linear-gradient(135deg,#9f1239,#c01f4f); border-color:#9f1239; }
     .lang { margin-bottom: 1rem; }
     .lang button { font-size: .7rem; padding: .15rem .4rem; margin-right: .25rem; border-radius: 6px; border: 1px solid #b9c5bc; background: #fffdf7; color: #435649; cursor: pointer; }
     .lang button.on { border-color: #2f855a; color: #2f855a; }
