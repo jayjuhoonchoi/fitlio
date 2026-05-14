@@ -789,15 +789,17 @@ class MemberAdminUpdate(BaseModel):
 @router.get("/notifications")
 def list_notifications(
     limit: int = 50,
+    status: str | None = None,
+    channel: str | None = None,
     db: Session = Depends(get_db),
     _: dict = Depends(require_admin),
 ):
-    rows = (
-        db.query(NotificationRequest)
-        .order_by(NotificationRequest.created_at.desc())
-        .limit(min(limit, 200))
-        .all()
-    )
+    q = db.query(NotificationRequest)
+    if status in {"pending", "sent", "failed"}:
+        q = q.filter(NotificationRequest.status == status)
+    if channel in {"email", "sms", "inapp"}:
+        q = q.filter(NotificationRequest.channel == channel)
+    rows = q.order_by(NotificationRequest.created_at.desc()).limit(min(limit, 200)).all()
     return [
         {
             "id": r.id,

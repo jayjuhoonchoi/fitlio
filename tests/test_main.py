@@ -534,3 +534,51 @@ def test_admin_notification_attempts_endpoint(db_session):
     payload = response.json()
     assert len(payload) == 1
     assert payload[0]["status"] == "failed"
+
+
+def test_list_notifications_filter_by_status_and_channel(db_session):
+    admin = models.Member(
+        email="admin.filter@fitlio.com",
+        hashed_password="x",
+        full_name="Filter Admin",
+        role="admin",
+    )
+    member = models.Member(
+        email="member.filter@fitlio.com",
+        hashed_password="x",
+        full_name="Filter Member",
+        role="member",
+    )
+    db_session.add(admin)
+    db_session.add(member)
+    db_session.flush()
+    db_session.add(
+        models.NotificationRequest(
+            member_id=member.id,
+            topic="n1",
+            message="pending email",
+            channel="email",
+            status="pending",
+        )
+    )
+    db_session.add(
+        models.NotificationRequest(
+            member_id=member.id,
+            topic="n2",
+            message="failed sms",
+            channel="sms",
+            status="failed",
+        )
+    )
+    db_session.commit()
+
+    app.dependency_overrides[get_db] = _override_db(db_session)
+    app.dependency_overrides[require_admin] = lambda: {"id": admin.id, "role": "admin"}
+    response = client.get("/admin/notifications?status=failed&channel=sms")
+    app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    rows = response.json()
+    assert len(rows) == 1
+    assert rows[0]["status"] == "failed"
+    assert rows[0]["channel"] == "sms"

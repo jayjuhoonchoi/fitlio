@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+import os
 
 
 @dataclass
@@ -17,10 +18,18 @@ def deliver_inapp(*, recipient_id: int | None, message: str) -> DispatchResult:
 def deliver_email(*, to_email: str | None, message: str) -> DispatchResult:
     if not to_email:
         return DispatchResult(delivered=False, error="email address missing")
+    if os.getenv("NOTIFICATION_REAL_RUN", "0") != "1":
+        return DispatchResult(delivered=True, provider_message_id=f"dryrun-email-{to_email}")
+    if not os.getenv("SENDGRID_API_KEY"):
+        return DispatchResult(delivered=False, error="SENDGRID_API_KEY missing")
     return DispatchResult(delivered=True, provider_message_id=f"email-{to_email}")
 
 
 def deliver_sms(*, to_phone: str | None, message: str) -> DispatchResult:
     if not to_phone:
         return DispatchResult(delivered=False, error="phone number missing")
+    if os.getenv("NOTIFICATION_REAL_RUN", "0") != "1":
+        return DispatchResult(delivered=True, provider_message_id=f"dryrun-sms-{to_phone[-4:]}")
+    if not (os.getenv("TWILIO_ACCOUNT_SID") and os.getenv("TWILIO_AUTH_TOKEN")):
+        return DispatchResult(delivered=False, error="Twilio credentials missing")
     return DispatchResult(delivered=True, provider_message_id=f"sms-{to_phone[-4:]}")
