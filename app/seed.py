@@ -42,11 +42,41 @@ def print_report(members: list, classes: list, memberships: list, db: Session):
 
 def seed_members(db: Session) -> list:
     members_data = [
-        {"email": "jay.choi@fitlio.com", "full_name": "Jay Choi", "phone": "+82-10-1234-5678"},
-        {"email": "minjun.kim@fitlio.com", "full_name": "Minjun Kim", "phone": "+82-10-2345-6789"},
-        {"email": "soyeon.park@fitlio.com", "full_name": "Soyeon Park", "phone": "+82-10-3456-7890"},
-        {"email": "hyunwoo.lee@fitlio.com", "full_name": "Hyunwoo Lee", "phone": "+82-10-4567-8901"},
-        {"email": "jiyeon.choi@fitlio.com", "full_name": "Jiyeon Choi", "phone": "+82-10-5678-9012"},
+        {
+            "email": "jay.choi@fitlio.com",
+            "full_name": "Jay Choi",
+            "phone": "+82-10-1234-5678",
+            "member_no": "FT-1001",
+            "member_level": "vip",
+        },
+        {
+            "email": "minjun.kim@fitlio.com",
+            "full_name": "Minjun Kim",
+            "phone": "+82-10-2345-6789",
+            "member_no": "FT-1002",
+            "member_level": "core",
+        },
+        {
+            "email": "soyeon.park@fitlio.com",
+            "full_name": "Soyeon Park",
+            "phone": "+82-10-3456-7890",
+            "member_no": "FT-1003",
+            "member_level": "starter",
+        },
+        {
+            "email": "hyunwoo.lee@fitlio.com",
+            "full_name": "Hyunwoo Lee",
+            "phone": "+82-10-4567-8901",
+            "member_no": "FT-1004",
+            "member_level": "elite",
+        },
+        {
+            "email": "jiyeon.choi@fitlio.com",
+            "full_name": "Jiyeon Choi",
+            "phone": "+82-10-5678-9012",
+            "member_no": "FT-1005",
+            "member_level": "core",
+        },
     ]
     members = []
     for data in members_data:
@@ -57,6 +87,8 @@ def seed_members(db: Session) -> list:
                 hashed_password=hash_password("fitlio1234!"),
                 full_name=data["full_name"],
                 phone=data["phone"],
+                member_no=data["member_no"],
+                member_level=data["member_level"],
                 role="member",
                 is_active=True,
                 created_at=datetime.now() - timedelta(days=90)
@@ -127,6 +159,8 @@ def ensure_admin_user(db: Session) -> None:
             hashed_password=hash_password("AdminFitlio1!"),
             full_name="Site Admin",
             phone="+82-10-0000-0001",
+            member_no="ADMIN-1",
+            member_level="vip",
             role="admin",
             is_active=True,
         )
@@ -152,6 +186,10 @@ def ensure_instructor_profiles(db: Session) -> None:
 def seed_database():
     db: Session = SessionLocal()
     try:
+        db.query(models.Member).filter(
+            models.Member.member_level.is_(None) | (models.Member.member_level == "")
+        ).update({"member_level": "starter"}, synchronize_session=False)
+        db.commit()
         ensure_admin_user(db)
         ensure_instructor_profiles(db)
 

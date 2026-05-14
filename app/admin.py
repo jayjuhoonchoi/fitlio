@@ -312,6 +312,8 @@ def get_members(db: Session = Depends(get_db), _: dict = Depends(require_admin))
             "full_name": m.full_name,
             "email": m.email,
             "phone": m.phone,
+            "member_no": getattr(m, "member_no", None),
+            "member_level": getattr(m, "member_level", "starter"),
             "is_active": m.is_active,
             "role": getattr(m, "role", "member"),
             "created_at": m.created_at,
@@ -644,6 +646,15 @@ class NotificationStatusUpdate(BaseModel):
     status: str = Field(..., pattern="^(pending|sent|failed)$")
 
 
+class MemberAdminUpdate(BaseModel):
+    full_name: str | None = Field(default=None, min_length=1)
+    phone: str | None = None
+    member_no: str | None = None
+    member_level: str | None = Field(default=None, pattern="^(starter|core|elite|vip)$")
+    is_active: bool | None = None
+    role: str | None = Field(default=None, pattern="^(member|admin)$")
+
+
 @router.get("/notifications")
 def list_notifications(
     limit: int = 50,
@@ -705,3 +716,49 @@ def update_notification_status(
     db.commit()
     db.refresh(row)
     return {"id": row.id, "status": row.status}
+
+
+@router.put("/members/{member_id}")
+def update_member_admin(
+    member_id: int,
+    body: MemberAdminUpdate,
+    db: Session = Depends(get_db),
+    _: dict = Depends(require_admin),
+):
+    row = db.query(Member).filter(Member.id == member_id).first()
+    if not row:
+        raise HTTPException(status_code=404, detail="Member not found")
+    if body.full_name is not None:
+        row.full_name = body.full_name.strip()
+    if body.phone is not None:
+        row.phone = body.phone.strip()
+    if body.member_level is not None:
+        row.member_level = body.member_level
+    if body.is_active is not None:
+        row.is_active = body.is_active
+    if body.role is not None:
+        row.role = body.role
+    if body.member_no is not None:
+        normalized = body.member_no.strip()
+        if normalized:
+            dup = (
+                db.query(Member)
+                .filter(Member.member_no == normalized, Member.id != member_id)
+                .first()
+            )
+            if dup:
+                raise HTTPException(status_code=400, detail="Member number already exists")
+            row.member_no = normalized
+        else:
+            row.member_no = None
+    db.commit()
+    db.refresh(row)
+    return {
+        "id": row.id,
+        "full_name": row.full_name,
+        "phone": row.phone,
+        "member_no": row.member_no,
+        "member_level": getattr(row, "member_level", "starter"),
+        "is_active": row.is_active,
+        "role": row.role,
+    }

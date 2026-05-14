@@ -12,6 +12,8 @@ class Member(Base):
     hashed_password = Column(String, nullable=False)
     full_name = Column(String, nullable=False)
     phone = Column(String)
+    member_no = Column(String, unique=True, index=True, nullable=True)
+    member_level = Column(String(32), nullable=False, default="starter")
     is_active = Column(Boolean, default=True)
     language = Column(String, default="en")
     role = Column(String(32), nullable=False, default="member")  # member | admin
