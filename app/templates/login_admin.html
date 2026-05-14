@@ -6,21 +6,148 @@
   <title>Fitlio — Admin</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: Inter, system-ui, sans-serif; background: #f5f3ea; color: #2f3b32; min-height: 100vh; padding: 1.5rem; }
-    .wrap { max-width: 420px; margin: 0 auto; background: #fffdf7; border: 1px solid #d4ddd4; border-radius: 14px; padding: 1.1rem; }
-    h1 { font-size: 1.35rem; margin-bottom: .25rem; color: #24503c; }
-    .sub { color: #627267; font-size: .9rem; margin-bottom: 1.25rem; }
-    label { display: block; font-size: .72rem; text-transform: uppercase; color: #627267; margin: .5rem 0 .25rem; }
-    input { width: 100%; padding: .65rem .75rem; border-radius: 10px; border: 1px solid #bcc8bc; background: #fffdf7; color: #2f3b32; }
-    .btn { width: 100%; margin-top: 1rem; padding: .7rem; border: none; border-radius: 10px; font-weight: 600; cursor: pointer; background: linear-gradient(135deg,#2f855a,#3d9b6d); color: #f3f8f2; }
-    .btn:disabled { opacity: .55; cursor: wait; }
-    .msg { margin-top: .75rem; padding: .5rem .65rem; border-radius: 8px; font-size: .85rem; display: none; }
-    .msg.err { display: block; background: rgba(0,0,0,.35); color: #fecaca; border: 1px solid #7f1d1d; }
-    .top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
-    a { color: #2f855a; font-size: .85rem; }
-    .lang { display: flex; gap: .35rem; }
-    .lang button { font-size: .75rem; padding: .2rem .5rem; border-radius: 6px; border: 1px solid #b5c1b8; background: #f4f0e7; color: #4a5c52; cursor: pointer; }
-    .lang button.on { border-color: #2f855a; color: #2f855a; }
+    :root {
+      --font-sans: Inter, "SF Pro Text", "Segoe UI", Roboto, "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", -apple-system, system-ui, sans-serif;
+      --bg: #f4f2e9;
+      --panel: #fffdf8;
+      --line: #d2dbd1;
+      --line-strong: #b6c8ba;
+      --text: #223127;
+      --muted: #5f7164;
+      --heading: #1d4a36;
+      --accent: #2f855a;
+      --accent-2: #3f9b6b;
+      --focus-ring: 0 0 0 3px rgba(47, 133, 90, 0.18);
+      --radius-sm: 10px;
+      --radius-md: 14px;
+      --radius-lg: 18px;
+      --shadow-soft: 0 14px 30px rgba(30, 50, 39, 0.1);
+    }
+    body {
+      font-family: var(--font-sans);
+      font-size: 15px;
+      line-height: 1.55;
+      letter-spacing: 0.005em;
+      background:
+        radial-gradient(circle at 16% 10%, rgba(73, 123, 97, 0.1), transparent 34%),
+        radial-gradient(circle at 88% 0%, rgba(103, 126, 158, 0.12), transparent 28%),
+        var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      padding: 24px;
+      display: grid;
+      place-items: center;
+    }
+    .wrap {
+      width: 100%;
+      max-width: 444px;
+      margin: 0 auto;
+      background: linear-gradient(165deg, #fffefb, var(--panel));
+      border: 1px solid var(--line);
+      border-radius: var(--radius-lg);
+      padding: 24px;
+      box-shadow: var(--shadow-soft);
+    }
+    h1 {
+      font-size: 1.52rem;
+      line-height: 1.25;
+      letter-spacing: -0.01em;
+      font-weight: 700;
+      margin-bottom: 6px;
+      color: var(--heading);
+    }
+    .sub {
+      color: var(--muted);
+      font-size: 0.92rem;
+      line-height: 1.55;
+      margin-bottom: 20px;
+      max-width: 35ch;
+    }
+    label {
+      display: block;
+      font-size: 0.71rem;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      font-weight: 620;
+      color: #5f7064;
+      margin: 12px 0 6px;
+    }
+    input {
+      width: 100%;
+      padding: 10px 12px;
+      border-radius: var(--radius-sm);
+      border: 1px solid #b8c5bc;
+      background: #fffdf8;
+      color: var(--text);
+      font-family: inherit;
+      font-size: 0.92rem;
+      line-height: 1.4;
+      transition: border-color 0.14s ease, box-shadow 0.14s ease, transform 0.14s ease;
+    }
+    input:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: var(--focus-ring);
+      transform: translateY(-1px);
+    }
+    .btn {
+      width: 100%;
+      margin-top: 16px;
+      padding: 11px;
+      border: 1px solid rgba(47, 133, 90, 0.48);
+      border-radius: var(--radius-sm);
+      font-size: 0.9rem;
+      line-height: 1.25;
+      font-weight: 650;
+      letter-spacing: 0.01em;
+      cursor: pointer;
+      background: linear-gradient(140deg, var(--accent), var(--accent-2));
+      color: #f2f7f3;
+      box-shadow: 0 8px 14px rgba(47, 133, 90, 0.21);
+      transition: transform 0.14s ease, box-shadow 0.14s ease, filter 0.14s ease;
+    }
+    .btn:hover { transform: translateY(-1px); box-shadow: 0 12px 18px rgba(47, 133, 90, 0.26); }
+    .btn:disabled { opacity: 0.55; cursor: wait; }
+    .msg {
+      margin-top: 12px;
+      padding: 8px 10px;
+      border-radius: 9px;
+      font-size: 0.84rem;
+      line-height: 1.45;
+      display: none;
+    }
+    .msg.err { display: block; background: #fff2f4; color: #9f1239; border: 1px solid #efb0c1; }
+    .top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 14px;
+      gap: 8px;
+    }
+    a {
+      color: var(--accent);
+      font-size: 0.84rem;
+      font-weight: 560;
+      text-decoration: none;
+    }
+    a:hover { text-decoration: underline; }
+    .lang { display: flex; gap: 6px; }
+    .lang button {
+      font-size: 0.73rem;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      padding: 4px 10px;
+      border-radius: 999px;
+      border: 1px solid #b5c1b8;
+      background: #f4f0e7;
+      color: #4a5c52;
+      cursor: pointer;
+    }
+    .lang button.on { border-color: var(--accent); color: var(--accent); box-shadow: 0 0 0 2px rgba(47, 133, 90, 0.14); }
+    @media (max-width: 520px) {
+      body { padding: 16px; }
+      .wrap { padding: 16px; }
+    }
   </style>
 </head>
 <body>
