@@ -819,6 +819,41 @@ def list_notifications(
     ]
 
 
+@router.get("/notifications/summary")
+def notifications_summary(
+    db: Session = Depends(get_db),
+    _: dict = Depends(require_admin),
+):
+    queued = db.query(NotificationRequest).filter(NotificationRequest.status == "pending").count()
+    sent = db.query(NotificationRequest).filter(NotificationRequest.status == "sent").count()
+    failed = db.query(NotificationRequest).filter(NotificationRequest.status == "failed").count()
+    retrying = (
+        db.query(NotificationRequest)
+        .filter(
+            NotificationRequest.status == "pending",
+            NotificationRequest.retry_count > 0,
+        )
+        .count()
+    )
+    by_channel_rows = (
+        db.query(NotificationRequest.channel, func.count(NotificationRequest.id))
+        .group_by(NotificationRequest.channel)
+        .all()
+    )
+    by_channel = {channel or "email": count for channel, count in by_channel_rows}
+    return {
+        "queued": queued,
+        "sent": sent,
+        "failed": failed,
+        "retrying": retrying,
+        "by_channel": {
+            "email": by_channel.get("email", 0),
+            "sms": by_channel.get("sms", 0),
+            "inapp": by_channel.get("inapp", 0),
+        },
+    }
+
+
 @router.post("/notifications", status_code=201)
 def create_notification(
     body: NotificationCreate,

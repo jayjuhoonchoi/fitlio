@@ -51,3 +51,19 @@ From `terraform/`:
 - **Print example SSH:** `terraform output -raw ssh_example`
 - **HTTPS health (after DNS points at the EIP):** `curl -fsS -o /dev/null -w "%{http_code}\n" https://fitlio-jay.duckdns.org/health`
 - **Check public DNS (bypass local cache):** `dig +short fitlio-jay.duckdns.org A @8.8.8.8`
+
+## Notification Dispatch Modes
+
+Fitlio notifications support safe dry-run and real-run provider mode.
+
+- `NOTIFICATION_REAL_RUN=0` (default): delivery adapters simulate success with `dryrun-*` IDs.
+- `NOTIFICATION_REAL_RUN=1`: provider keys are required.
+  - Email: `SENDGRID_API_KEY`
+  - SMS: `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`
+
+Admin notification operations:
+
+- `POST /admin/notifications/membership-reminders/run` queue D-3 / D-1 reminders
+- `POST /admin/notifications/dispatch/run` process pending notifications
+- `GET /admin/notifications?status=&channel=` filter queue
+- `GET /admin/notifications/summary` queue KPI snapshot

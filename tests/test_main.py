@@ -582,3 +582,66 @@ def test_list_notifications_filter_by_status_and_channel(db_session):
     assert len(rows) == 1
     assert rows[0]["status"] == "failed"
     assert rows[0]["channel"] == "sms"
+
+
+def test_notifications_summary_counts(db_session):
+    admin = models.Member(
+        email="admin.summary@fitlio.com",
+        hashed_password="x",
+        full_name="Summary Admin",
+        role="admin",
+    )
+    member = models.Member(
+        email="member.summary@fitlio.com",
+        hashed_password="x",
+        full_name="Summary Member",
+        role="member",
+        phone="+82-10-0000-1111",
+    )
+    db_session.add(admin)
+    db_session.add(member)
+    db_session.flush()
+    db_session.add(
+        models.NotificationRequest(
+            member_id=member.id,
+            topic="s1",
+            message="p email",
+            channel="email",
+            status="pending",
+            retry_count=1,
+        )
+    )
+    db_session.add(
+        models.NotificationRequest(
+            member_id=member.id,
+            topic="s2",
+            message="ok sms",
+            channel="sms",
+            status="sent",
+        )
+    )
+    db_session.add(
+        models.NotificationRequest(
+            member_id=member.id,
+            topic="s3",
+            message="bad inapp",
+            channel="inapp",
+            status="failed",
+        )
+    )
+    db_session.commit()
+
+    app.dependency_overrides[get_db] = _override_db(db_session)
+    app.dependency_overrides[require_admin] = lambda: {"id": admin.id, "role": "admin"}
+    response = client.get("/admin/notifications/summary")
+    app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["queued"] >= 1
+    assert payload["sent"] >= 1
+    assert payload["failed"] >= 1
+    assert payload["retrying"] >= 1
+    assert payload["by_channel"]["email"] >= 1
+    assert payload["by_channel"]["sms"] >= 1
+    assert payload["by_channel"]["inapp"] >= 1
