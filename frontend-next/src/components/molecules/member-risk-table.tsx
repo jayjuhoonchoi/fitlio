@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 
 import { Badge } from "@/components/atoms/badge";
+import { InlineStatus } from "@/components/atoms/inline-status";
 import { apiFetch } from "@/lib/api";
 import { members as fallbackMembers } from "@/lib/mock-data";
 
@@ -13,11 +14,14 @@ type RiskMember = {
   member_no?: string | null;
   member_level?: string;
   is_active: boolean;
+  booked_count: number;
   attendance_rate: number;
 };
 
 export function MemberRiskTable(): JSX.Element {
   const [rows, setRows] = useState<RiskMember[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -41,16 +45,24 @@ export function MemberRiskTable(): JSX.Element {
     ])
       .then(([members, risk]) => {
         if (!mounted) return;
-        const byMember = new Map<number, number>();
-        risk.forEach((row) => byMember.set(row.member_id, row.attendance_rate));
+        const byMember = new Map<number, { attendance_rate: number; booked_count: number }>();
+        risk.forEach((row) =>
+          byMember.set(row.member_id, {
+            attendance_rate: row.attendance_rate,
+            booked_count: row.booked_count ?? 0
+          })
+        );
         setRows(
           members.map((member) => ({
             ...member,
-            attendance_rate: byMember.get(member.id) ?? 0
+            attendance_rate: byMember.get(member.id)?.attendance_rate ?? 0,
+            booked_count: byMember.get(member.id)?.booked_count ?? 0
           }))
         );
+        setError(null);
       })
       .catch(() => {
+        setError("Live risk data unavailable. Showing demo values.");
         setRows(
           fallbackMembers.map((member) => ({
             id: Number(member.id.replace("m-", "")) || 0,
@@ -59,9 +71,15 @@ export function MemberRiskTable(): JSX.Element {
             member_no: member.memberNo,
             member_level: member.level,
             is_active: member.active,
+            booked_count: Math.max(1, Math.floor(member.attendanceRate / 15)),
             attendance_rate: member.attendanceRate
           }))
         );
+      })
+      .finally(() => {
+        if (mounted) {
+          setLoading(false);
+        }
       });
     return () => {
       mounted = false;
@@ -78,6 +96,7 @@ export function MemberRiskTable(): JSX.Element {
             <th className="px-3 py-2 text-left font-medium">Email</th>
             <th className="px-3 py-2 text-left font-medium">Level</th>
             <th className="px-3 py-2 text-left font-medium">Active</th>
+            <th className="px-3 py-2 text-left font-medium">Booked</th>
             <th className="px-3 py-2 text-left font-medium">Attendance</th>
             <th className="px-3 py-2 text-left font-medium">Risk</th>
           </tr>
@@ -98,6 +117,7 @@ export function MemberRiskTable(): JSX.Element {
                     {member.is_active ? "ACTIVE" : "PAUSED"}
                   </Badge>
                 </td>
+                <td className="px-3 py-2">{member.booked_count}</td>
                 <td className="px-3 py-2">{member.attendance_rate}%</td>
                 <td className="px-3 py-2">
                   {atRisk ? (
@@ -111,6 +131,14 @@ export function MemberRiskTable(): JSX.Element {
           })}
         </tbody>
       </table>
+      <div className="border-t border-border bg-panel px-3 py-2">
+        <InlineStatus
+          loading={loading}
+          error={error}
+          empty={!loading && rows.length === 0}
+          emptyLabel="No members in current risk window."
+        />
+      </div>
     </div>
   );
 }

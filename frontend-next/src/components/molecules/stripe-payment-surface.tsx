@@ -6,6 +6,7 @@ import { loadStripe } from "@stripe/stripe-js";
 
 import { ActionButton } from "@/components/atoms/action-button";
 import { Badge } from "@/components/atoms/badge";
+import { InlineStatus } from "@/components/atoms/inline-status";
 import { apiFetch } from "@/lib/api";
 
 const stripePromise = loadStripe("pk_test_fitlio_placeholder_public_key");
@@ -16,17 +17,29 @@ export function StripePaymentSurface(): JSX.Element {
     Array<{ id: number; amount: number; currency: string; status: string; created_at: string }>
   >([]);
   const [flash, setFlash] = useState<string>("");
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
     const id = window.localStorage.getItem("member_id") ?? "";
     setMemberId(id);
-    if (!id) return;
+    if (!id) {
+      setLoading(false);
+      return;
+    }
     apiFetch<Array<{ id: number; amount: number; currency: string; status: string; created_at: string }>>(
       `/payments/history/${id}`
     )
-      .then((rows) => setHistory(rows))
-      .catch(() => setHistory([]));
+      .then((rows) => {
+        setHistory(rows);
+        setError(null);
+      })
+      .catch(() => {
+        setHistory([]);
+        setError("Payment history unavailable.");
+      })
+      .finally(() => setLoading(false));
   }, []);
 
   async function purchase(plan: "monthly" | "yearly"): Promise<void> {
@@ -35,6 +48,7 @@ export function StripePaymentSurface(): JSX.Element {
       return;
     }
     try {
+      setLoading(true);
       await apiFetch(`/payments/membership?member_id=${memberId}`, {
         method: "POST",
         body: JSON.stringify({ plan })
@@ -44,8 +58,12 @@ export function StripePaymentSurface(): JSX.Element {
         Array<{ id: number; amount: number; currency: string; status: string; created_at: string }>
       >(`/payments/history/${memberId}`);
       setHistory(rows);
+      setError(null);
     } catch (error) {
       setFlash(error instanceof Error ? error.message : "Payment failed");
+      setError("Unable to refresh payment history.");
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -80,6 +98,14 @@ export function StripePaymentSurface(): JSX.Element {
             ))}
             {history.length === 0 ? <li>No payments yet.</li> : null}
           </ul>
+          <div className="mt-2">
+            <InlineStatus
+              loading={loading}
+              error={error}
+              empty={!loading && history.length === 0}
+              emptyLabel="No successful payments yet."
+            />
+          </div>
         </div>
       </div>
     </Elements>

@@ -14,6 +14,7 @@ import {
   Bar
 } from "recharts";
 
+import { InlineStatus } from "@/components/atoms/inline-status";
 import { apiFetch } from "@/lib/api";
 import { cohortData, revenueTrend } from "@/lib/mock-data";
 
@@ -45,6 +46,8 @@ export function AnalyticsCharts(): JSX.Element {
     Array<{ month: string; mrr: number; retention: number; occupancy: number }>
   >([]);
   const [cohorts, setCohorts] = useState<CohortBarPoint[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -66,9 +69,11 @@ export function AnalyticsCharts(): JSX.Element {
           };
         });
         setData(rows);
+        setError(null);
       })
       .catch(() => {
         setData(revenueTrend);
+        setError("Live analytics unavailable. Showing fallback trends.");
       });
     apiFetch<{ points: RetentionPoint[] }>("/admin/reports/retention?months=6")
       .then((retention) => {
@@ -87,6 +92,11 @@ export function AnalyticsCharts(): JSX.Element {
       })
       .catch(() => {
         setCohorts(cohortData);
+      })
+      .finally(() => {
+        if (mounted) {
+          setLoading(false);
+        }
       });
     return () => {
       mounted = false;
@@ -131,6 +141,14 @@ export function AnalyticsCharts(): JSX.Element {
               />
             </LineChart>
           </ResponsiveContainer>
+        </div>
+        <div className="mt-2">
+          <InlineStatus
+            loading={loading}
+            error={error}
+            empty={!loading && chartRows.length === 0}
+            emptyLabel="No analytics points available."
+          />
         </div>
       </div>
 
