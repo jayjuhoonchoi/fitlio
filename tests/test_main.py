@@ -323,6 +323,7 @@ def test_process_pending_notifications_marks_sent(db_session):
     assert result["sent"] == 1
     row = db_session.query(models.NotificationRequest).first()
     assert row.status == "sent"
+    assert row.sent_at is not None
 
 
 def test_run_notification_dispatch_admin_endpoint(db_session):
@@ -360,3 +361,77 @@ def test_run_notification_dispatch_admin_endpoint(db_session):
     payload = response.json()
     assert payload["status"] == "processed"
     assert payload["processed"] >= 1
+
+
+def test_process_pending_notifications_retries_then_fails(db_session):
+    member = models.Member(
+        email="",
+        hashed_password="x",
+        full_name="No Contact Member",
+        role="member",
+    )
+    db_session.add(member)
+    db_session.flush()
+    row = models.NotificationRequest(
+        member_id=member.id,
+        topic="membership_expiry_d1",
+        message="cannot deliver",
+        channel="sms",
+        status="pending",
+        retry_count=0,
+        max_retries=2,
+    )
+    db_session.add(row)
+    db_session.commit()
+
+    first = process_pending_notifications(db_session, limit=10)
+    assert first["queued_retry"] == 1
+    db_session.refresh(row)
+    assert row.status == "pending"
+    assert row.retry_count == 1
+    row.next_attempt_at = datetime.utcnow() - timedelta(minutes=1)
+    db_session.commit()
+
+    second = process_pending_notifications(db_session, limit=10)
+    assert second["failed"] == 1
+    db_session.refresh(row)
+    assert row.status == "failed"
+    assert row.retry_count == 2
+
+
+def test_retry_notification_endpoint_moves_failed_to_pending(db_session):
+    admin = models.Member(
+        email="admin.retry@fitlio.com",
+        hashed_password="x",
+        full_name="Retry Admin",
+        role="admin",
+    )
+    member = models.Member(
+        email="member.retry@fitlio.com",
+        hashed_password="x",
+        full_name="Retry Member",
+        role="member",
+    )
+    db_session.add(admin)
+    db_session.add(member)
+    db_session.flush()
+    note = models.NotificationRequest(
+        member_id=member.id,
+        topic="membership_expiry_d3",
+        message="retry test",
+        status="failed",
+        last_error="temporary error",
+        retry_count=2,
+    )
+    db_session.add(note)
+    db_session.commit()
+
+    app.dependency_overrides[get_db] = _override_db(db_session)
+    app.dependency_overrides[require_admin] = lambda: {"id": admin.id, "role": "admin"}
+    response = client.post(f"/admin/notifications/{note.id}/retry")
+    app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    db_session.refresh(note)
+    assert note.status == "pending"
+    assert note.last_error is None

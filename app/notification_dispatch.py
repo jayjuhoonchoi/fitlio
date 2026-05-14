@@ -1,7 +1,8 @@
 import os
 import threading
-from datetime import datetime
+from datetime import datetime, timedelta
 
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.database import SessionLocal
@@ -12,32 +13,69 @@ _last_run_at: datetime | None = None
 _MIN_RUN_INTERVAL_SECONDS = 300
 
 
+def _backoff_delay_minutes(retry_count: int) -> int:
+    if retry_count <= 0:
+        return 5
+    if retry_count == 1:
+        return 15
+    if retry_count == 2:
+        return 60
+    return 180
+
+
 def process_pending_notifications(db: Session, limit: int = 100) -> dict:
+    now = datetime.utcnow()
     rows = (
         db.query(NotificationRequest)
-        .filter(NotificationRequest.status == "pending")
+        .filter(
+            NotificationRequest.status == "pending",
+            or_(
+                NotificationRequest.next_attempt_at.is_(None),
+                NotificationRequest.next_attempt_at <= now,
+            ),
+        )
         .order_by(NotificationRequest.created_at.asc(), NotificationRequest.id.asc())
         .limit(min(max(limit, 1), 500))
         .all()
     )
     sent = 0
     failed = 0
+    queued_retry = 0
     for row in rows:
         member = None
         if row.member_id is not None:
             member = db.query(Member).filter(Member.id == row.member_id).first()
         has_contact = True
         if member is not None:
-            has_contact = bool(member.email or member.phone)
+            if row.channel == "sms":
+                has_contact = bool(member.phone)
+            else:
+                has_contact = bool(member.email or member.phone)
         if has_contact:
             row.status = "sent"
+            row.sent_at = now
+            row.last_error = None
             sent += 1
         else:
-            row.status = "failed"
-            failed += 1
-    if sent or failed:
+            next_retry_count = (row.retry_count or 0) + 1
+            row.retry_count = next_retry_count
+            row.last_error = f"No deliverable contact for channel={row.channel}"
+            if next_retry_count >= (row.max_retries or 3):
+                row.status = "failed"
+                failed += 1
+            else:
+                row.next_attempt_at = now + timedelta(
+                    minutes=_backoff_delay_minutes(next_retry_count)
+                )
+                queued_retry += 1
+    if sent or failed or queued_retry:
         db.commit()
-    return {"processed": len(rows), "sent": sent, "failed": failed}
+    return {
+        "processed": len(rows),
+        "sent": sent,
+        "failed": failed,
+        "queued_retry": queued_retry,
+    }
 
 
 def maybe_process_pending_notifications() -> dict:

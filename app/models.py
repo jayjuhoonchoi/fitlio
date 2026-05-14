@@ -94,7 +94,13 @@ class NotificationRequest(Base):
     member_id = Column(Integer, nullable=True)
     topic = Column(String(64), nullable=False)
     message = Column(String(512), nullable=False)
+    channel = Column(String(16), nullable=False, default="email")  # email | sms | inapp
     status = Column(String(32), nullable=False, default="pending")  # pending | sent | failed
+    retry_count = Column(Integer, nullable=False, default=0)
+    max_retries = Column(Integer, nullable=False, default=3)
+    next_attempt_at = Column(DateTime, nullable=True)
+    last_error = Column(String(512), nullable=True)
+    sent_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
 

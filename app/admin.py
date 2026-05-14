@@ -769,6 +769,7 @@ class NotificationCreate(BaseModel):
     member_id: int | None = None
     topic: str = Field(..., min_length=1)
     message: str = Field(..., min_length=1)
+    channel: str = Field(default="email", pattern="^(email|sms|inapp)$")
 
 
 class NotificationStatusUpdate(BaseModel):
@@ -802,7 +803,13 @@ def list_notifications(
             "member_id": r.member_id,
             "topic": r.topic,
             "message": r.message,
+            "channel": getattr(r, "channel", "email"),
             "status": r.status,
+            "retry_count": getattr(r, "retry_count", 0),
+            "max_retries": getattr(r, "max_retries", 3),
+            "next_attempt_at": getattr(r, "next_attempt_at", None),
+            "last_error": getattr(r, "last_error", None),
+            "sent_at": getattr(r, "sent_at", None),
             "created_at": r.created_at,
         }
         for r in rows
@@ -819,7 +826,10 @@ def create_notification(
         member_id=body.member_id,
         topic=body.topic.strip(),
         message=body.message.strip(),
+        channel=body.channel,
         status="pending",
+        retry_count=0,
+        max_retries=3,
     )
     db.add(row)
     db.commit()
@@ -842,6 +852,27 @@ def update_notification_status(
     if not row:
         raise HTTPException(status_code=404, detail="Notification not found")
     row.status = body.status
+    db.commit()
+    db.refresh(row)
+    return {"id": row.id, "status": row.status}
+
+
+@router.post("/notifications/{notification_id}/retry")
+def retry_notification(
+    notification_id: int,
+    db: Session = Depends(get_db),
+    _: dict = Depends(require_admin),
+):
+    row = (
+        db.query(NotificationRequest)
+        .filter(NotificationRequest.id == notification_id)
+        .first()
+    )
+    if not row:
+        raise HTTPException(status_code=404, detail="Notification not found")
+    row.status = "pending"
+    row.next_attempt_at = None
+    row.last_error = None
     db.commit()
     db.refresh(row)
     return {"id": row.id, "status": row.status}

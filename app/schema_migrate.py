@@ -34,5 +34,59 @@ def ensure_columns(engine) -> None:
                     "WHERE member_level IS NULL OR member_level = ''"
                 )
             )
+            if insp.has_table("notification_requests"):
+                ncols = {c["name"] for c in insp.get_columns("notification_requests")}
+                if "channel" not in ncols:
+                    conn.execute(
+                        text(
+                            "ALTER TABLE notification_requests ADD COLUMN channel VARCHAR(16) DEFAULT 'email'"
+                        )
+                    )
+                if "retry_count" not in ncols:
+                    conn.execute(
+                        text(
+                            "ALTER TABLE notification_requests ADD COLUMN retry_count INTEGER DEFAULT 0"
+                        )
+                    )
+                if "max_retries" not in ncols:
+                    conn.execute(
+                        text(
+                            "ALTER TABLE notification_requests ADD COLUMN max_retries INTEGER DEFAULT 3"
+                        )
+                    )
+                if "next_attempt_at" not in ncols:
+                    conn.execute(
+                        text(
+                            "ALTER TABLE notification_requests ADD COLUMN next_attempt_at TIMESTAMP"
+                        )
+                    )
+                if "last_error" not in ncols:
+                    conn.execute(
+                        text(
+                            "ALTER TABLE notification_requests ADD COLUMN last_error VARCHAR(512)"
+                        )
+                    )
+                if "sent_at" not in ncols:
+                    conn.execute(
+                        text(
+                            "ALTER TABLE notification_requests ADD COLUMN sent_at TIMESTAMP"
+                        )
+                    )
+                conn.execute(
+                    text(
+                        "UPDATE notification_requests SET channel='email' "
+                        "WHERE channel IS NULL OR channel=''"
+                    )
+                )
+                conn.execute(
+                    text(
+                        "UPDATE notification_requests SET retry_count=0 WHERE retry_count IS NULL"
+                    )
+                )
+                conn.execute(
+                    text(
+                        "UPDATE notification_requests SET max_retries=3 WHERE max_retries IS NULL"
+                    )
+                )
     except Exception:
         pass
