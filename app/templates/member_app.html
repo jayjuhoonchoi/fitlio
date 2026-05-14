@@ -25,6 +25,10 @@
       from { opacity: 0; transform: translateY(6px); }
       to { opacity: 1; transform: translateY(0); }
     }
+    @keyframes softReveal {
+      from { opacity: 0; transform: translateY(8px) scale(.988); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
     @keyframes pulseGlow {
       0% { box-shadow: 0 0 0 rgba(47,133,90,0); }
       50% { box-shadow: 0 0 0 8px rgba(47,133,90,.12); }
@@ -126,6 +130,15 @@
     .ok { color: #166534 !important; }
     .mini { margin-top: 1rem; }
     .mini h2 { font-size: 1.02rem; margin-bottom: .75rem; color: #3f4d44; }
+    .stagger > * { animation: softReveal .34s cubic-bezier(.22,.61,.36,1) both; }
+    .stagger > *:nth-child(2) { animation-delay: .03s; }
+    .stagger > *:nth-child(3) { animation-delay: .06s; }
+    .stagger > *:nth-child(4) { animation-delay: .09s; }
+    .stagger > *:nth-child(5) { animation-delay: .12s; }
+    .stagger > *:nth-child(6) { animation-delay: .15s; }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
+    }
     .msg-list { max-height: 260px; overflow: auto; border: 1px solid #d8dfd6; border-radius: 10px; padding: .65rem; background: #fffdf7; }
     .warn-card { border:1px solid #f2a2b7; background:linear-gradient(135deg,#fff1f4,#fdf7f8); }
     .warn-card h3{ color:#8b2245; }
@@ -346,22 +359,26 @@
     async function loadCenterClasses(){
       const centerId = (document.getElementById("centerPick")||{}).value || "";
       const box=document.getElementById("centerClasses");
+      box.classList.remove("stagger");
       let url="/member/classes";
       if(centerId) url += "?center_id="+encodeURIComponent(centerId);
       const r=await fetch(url,{headers:auth});
       if(!r.ok){ box.innerHTML='<div class="card">—</div>'; return; }
       const list=await r.json().catch(()=>[]);
       if(!list.length){ box.innerHTML='<div class="card"><div class="empty-state">해당 조건 수업이 없습니다.</div></div>'; return; }
+      box.classList.add("stagger");
       box.innerHTML=list.map(c=>`<div class="card"><strong>${escape(c.name)}</strong><div class="meta">${escape(c.instructor)}</div><div class="meta">level: ${escape(c.level_required||"starter")}</div><div class="meta">${new Date(c.schedule).toLocaleString()}</div><button class="btn" data-bid="${c.id}">${t("book")}</button></div>`).join("");
       box.querySelectorAll("[data-bid]").forEach(b=>b.onclick=()=>book(b.dataset.bid));
     }
     document.getElementById("refreshCenterClass").onclick=loadCenterClasses;
     async function loadInstructorFeed(){
       const box=document.getElementById("instructorFeed");
+      box.classList.remove("stagger");
       const r=await fetch("/member/instructors",{headers:auth});
       if(!r.ok){ box.innerHTML='<div class="card">—</div>'; return; }
       const list=await r.json().catch(()=>[]);
       if(!list.length){ box.innerHTML='<div class="card"><div class="empty-state">강사 프로필이 아직 없습니다.</div></div>'; return; }
+      box.classList.add("stagger");
       box.innerHTML=list.map(i=>`<div class="card feed-card">
         <div style="display:flex;align-items:center;margin-bottom:.3rem">
           <span class="avatar">${avatarMarkup(i.avatar_url, i.display_name)}</span>
@@ -388,10 +405,12 @@
     };
     async function loadCommunityFeed(){
       const box=document.getElementById("communityFeed");
+      box.classList.remove("stagger");
       const r=await fetch("/member/community/posts",{headers:auth});
       if(!r.ok){ box.innerHTML='<div class="card">—</div>'; return; }
       const list=await r.json().catch(()=>[]);
       if(!list.length){ box.innerHTML='<div class="card"><div class="empty-state">커뮤니티 첫 글을 남겨보세요.</div></div>'; return; }
+      box.classList.add("stagger");
       box.innerHTML=list.map(p=>`<div class="card feed-card"><strong>${escape(p.author_name||"Member")}</strong><div class="meta">${new Date(p.created_at).toLocaleString()}</div><div style="margin:.45rem 0">${escape(p.content||"")}</div>${mediaTag(p.media_url, p.media_type)}<div class="meta">❤️ ${p.likes}</div><div class="row"><button class="btn btn2" data-plk="${p.id}">Like</button><input id="pcom_${p.id}" placeholder="댓글"><button class="btn" data-pcm="${p.id}">Comment</button></div><div class="meta">${(p.comments||[]).slice(-3).map(c=>`• ${escape(c.content||"")}`).join("<br>") || "No comments yet."}</div></div>`).join("");
       box.querySelectorAll("[data-plk]").forEach(b=>b.onclick=async()=>{ await fetch("/member/community/posts/"+b.dataset.plk+"/like",{method:"POST",headers:auth}); loadCommunityFeed(); });
       box.querySelectorAll("[data-pcm]").forEach(b=>b.onclick=async()=>{ const id=b.dataset.pcm; const text=(document.getElementById("pcom_"+id)||{}).value||""; if(!text.trim()) return; await fetch("/member/community/comments",{method:"POST",headers:{...auth,"Content-Type":"application/json"},body:JSON.stringify({post_id:+id,content:text})}); loadCommunityFeed(); });
@@ -408,10 +427,12 @@
     };
     async function loadClasses(){
       const el=document.getElementById("classes"); el.innerHTML="";
+      el.classList.remove("stagger");
       const r=await fetch("/classes");
       if(!r.ok){ el.innerHTML='<div class="card">—</div>'; return; }
       const list=await r.json().catch(()=>[]);
       if(!list.length){ el.innerHTML='<div class="card"><div class="empty-state">No open classes right now. Fresh schedule will appear soon.</div></div>'; return; }
+      el.classList.add("stagger");
       el.innerHTML=list.map(c=>`<div class="card"><strong>${escape(c.name)}</strong><div class="meta">${escape(c.instructor)} · ${new Date(c.schedule).toLocaleString()}</div><div class="meta">${c.current_count}/${c.capacity}</div><button class="btn" data-bid="${c.id}">${t("book")}</button></div>`).join("");
       el.querySelectorAll("[data-bid]").forEach(b=>b.onclick=()=>book(b.dataset.bid));
     }
@@ -462,19 +483,23 @@
     async function loadPaymentHistory(){
       const box=document.getElementById("payments");
       box.innerHTML="";
+      box.classList.remove("stagger");
       const r=await fetch("/payments/history/"+encodeURIComponent(memberId),{headers:auth});
       if(!r.ok){ box.innerHTML='<div class="card">—</div>'; return; }
       const list=await r.json().catch(()=>[]);
       if(!list.length){ box.innerHTML='<div class="card"><div class="empty-state">No payment history yet.</div></div>'; return; }
+      box.classList.add("stagger");
       box.innerHTML=list.map(p=>`<div class="card"><strong>${p.amount} ${escape(p.currency||"aud")}</strong><div class="meta">status: ${escape(p.status||"completed")}</div><div class="meta">source: ${escape(p.source||"online")}</div><div class="meta">${new Date(p.created_at).toLocaleString()}</div>${p.memo?`<div class="meta">memo: ${escape(p.memo)}</div>`:""}</div>`).join("");
     }
     async function loadBookings(){
       const box=document.getElementById("mybookings");
       box.innerHTML="";
+      box.classList.remove("stagger");
       const r=await fetch("/bookings/"+encodeURIComponent(memberId),{headers:auth});
       if(!r.ok){ box.innerHTML='<div class="card">—</div>'; return; }
       const list=await r.json().catch(()=>[]);
       if(!list.length){ box.innerHTML='<div class="card"><div class="empty-state">No active bookings. Reserve a class to get started.</div></div>'; return; }
+      box.classList.add("stagger");
       box.innerHTML=list.map(b=>`<div class="card"><strong>${escape(b.name)}</strong><div class="meta">${escape(b.instructor)} · ${new Date(b.schedule).toLocaleString()}</div><button class="btn btn2" data-cid="${b.class_id}">${t("cancel")}</button></div>`).join("");
       box.querySelectorAll("[data-cid]").forEach(b=>b.onclick=()=>cancelBooking(b.dataset.cid));
     }
