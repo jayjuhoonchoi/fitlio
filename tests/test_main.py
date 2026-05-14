@@ -463,3 +463,74 @@ def test_process_pending_notifications_inapp_channel_sends(db_session):
     assert result["sent"] == 1
     db_session.refresh(note)
     assert note.status == "sent"
+
+
+def test_dispatch_creates_delivery_attempt_log(db_session):
+    member = models.Member(
+        email="attempt.member@fitlio.com",
+        hashed_password="x",
+        full_name="Attempt Member",
+        role="member",
+    )
+    db_session.add(member)
+    db_session.flush()
+    note = models.NotificationRequest(
+        member_id=member.id,
+        topic="attempt_topic",
+        message="attempt message",
+        channel="email",
+        status="pending",
+    )
+    db_session.add(note)
+    db_session.commit()
+
+    process_pending_notifications(db_session, limit=10)
+    rows = db_session.query(models.NotificationDeliveryAttempt).all()
+    assert len(rows) == 1
+    assert rows[0].notification_id == note.id
+    assert rows[0].status == "sent"
+
+
+def test_admin_notification_attempts_endpoint(db_session):
+    admin = models.Member(
+        email="admin.attempts@fitlio.com",
+        hashed_password="x",
+        full_name="Attempts Admin",
+        role="admin",
+    )
+    member = models.Member(
+        email="member.attempts@fitlio.com",
+        hashed_password="x",
+        full_name="Attempts Member",
+        role="member",
+    )
+    db_session.add(admin)
+    db_session.add(member)
+    db_session.flush()
+    note = models.NotificationRequest(
+        member_id=member.id,
+        topic="attempts",
+        message="attempts message",
+        status="pending",
+    )
+    db_session.add(note)
+    db_session.flush()
+    db_session.add(
+        models.NotificationDeliveryAttempt(
+            notification_id=note.id,
+            channel="email",
+            status="failed",
+            error_message="provider timeout",
+        )
+    )
+    db_session.commit()
+
+    app.dependency_overrides[get_db] = _override_db(db_session)
+    app.dependency_overrides[require_admin] = lambda: {"id": admin.id, "role": "admin"}
+    response = client.get(f"/admin/notifications/{note.id}/attempts")
+    app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert len(payload) == 1
+    assert payload[0]["status"] == "failed"

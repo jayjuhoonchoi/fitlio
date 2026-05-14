@@ -113,3 +113,15 @@ class DirectMessage(Base):
     content = Column(String(2000), nullable=False)
     is_read = Column(Boolean, nullable=False, default=False)
     created_at = Column(DateTime, default=datetime.utcnow, index=True)
+
+
+class NotificationDeliveryAttempt(Base):
+    __tablename__ = "notification_delivery_attempts"
+
+    id = Column(Integer, primary_key=True, index=True)
+    notification_id = Column(Integer, nullable=False, index=True)
+    channel = Column(String(16), nullable=False)
+    status = Column(String(32), nullable=False)  # sent | failed
+    provider_message_id = Column(String(128), nullable=True)
+    error_message = Column(String(512), nullable=True)
+    attempted_at = Column(DateTime, default=datetime.utcnow, index=True)

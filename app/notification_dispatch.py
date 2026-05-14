@@ -6,7 +6,7 @@ from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.database import SessionLocal
-from app.models import Member, NotificationRequest
+from app.models import Member, NotificationDeliveryAttempt, NotificationRequest
 from app.notification_channels import (
     DispatchResult,
     deliver_email,
@@ -63,6 +63,15 @@ def process_pending_notifications(db: Session, limit: int = 100) -> dict:
         if row.member_id is not None:
             member = db.query(Member).filter(Member.id == row.member_id).first()
         result = _dispatch_row(row, member)
+        db.add(
+            NotificationDeliveryAttempt(
+                notification_id=row.id,
+                channel=getattr(row, "channel", "email"),
+                status="sent" if result.delivered else "failed",
+                provider_message_id=result.provider_message_id,
+                error_message=result.error,
+            )
+        )
         if result.delivered:
             row.status = "sent"
             row.sent_at = now

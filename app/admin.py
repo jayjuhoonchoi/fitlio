@@ -15,6 +15,7 @@ from app.models import (
     InstructorProfile,
     Member,
     Membership,
+    NotificationDeliveryAttempt,
     NotificationRequest,
     Payment,
 )
@@ -876,6 +877,34 @@ def retry_notification(
     db.commit()
     db.refresh(row)
     return {"id": row.id, "status": row.status}
+
+
+@router.get("/notifications/{notification_id}/attempts")
+def notification_attempts(
+    notification_id: int,
+    limit: int = 30,
+    db: Session = Depends(get_db),
+    _: dict = Depends(require_admin),
+):
+    rows = (
+        db.query(NotificationDeliveryAttempt)
+        .filter(NotificationDeliveryAttempt.notification_id == notification_id)
+        .order_by(NotificationDeliveryAttempt.attempted_at.desc())
+        .limit(min(max(limit, 1), 200))
+        .all()
+    )
+    return [
+        {
+            "id": r.id,
+            "notification_id": r.notification_id,
+            "channel": r.channel,
+            "status": r.status,
+            "provider_message_id": r.provider_message_id,
+            "error_message": r.error_message,
+            "attempted_at": r.attempted_at,
+        }
+        for r in rows
+    ]
 
 
 @router.put("/members/{member_id}")

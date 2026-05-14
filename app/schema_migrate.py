@@ -88,5 +88,21 @@ def ensure_columns(engine) -> None:
                         "UPDATE notification_requests SET max_retries=3 WHERE max_retries IS NULL"
                     )
                 )
+            if not insp.has_table("notification_delivery_attempts"):
+                conn.execute(
+                    text(
+                        """
+                        CREATE TABLE notification_delivery_attempts (
+                            id INTEGER PRIMARY KEY,
+                            notification_id INTEGER NOT NULL,
+                            channel VARCHAR(16) NOT NULL,
+                            status VARCHAR(32) NOT NULL,
+                            provider_message_id VARCHAR(128),
+                            error_message VARCHAR(512),
+                            attempted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                        )
+                        """
+                    )
+                )
     except Exception:
         pass
