@@ -52,6 +52,22 @@ From `terraform/`:
 - **HTTPS health (after DNS points at the EIP):** `curl -fsS -o /dev/null -w "%{http_code}\n" https://fitlio-jay.duckdns.org/health`
 - **Check public DNS (bypass local cache):** `dig +short fitlio-jay.duckdns.org A @8.8.8.8`
 
+## HTTPS one-shot fix
+
+When HTTPS is flaky, use the one-shot script to enforce a stable sequence:
+
+1. Validate DNS A record matches current public IP.
+2. Bring stack up in HTTP fallback mode (service stays available).
+3. Request/renew certificate through webroot challenge.
+4. Restart nginx so HTTPS template is auto-selected.
+5. Verify `https://<domain>/health`.
+
+Run:
+
+`./scripts/fix_https.sh fitlio-jay.duckdns.org jayjuhoonchoi@gmail.com ~/fitlio`
+
+If DNS is wrong, the script exits early with the exact expected IP.
+
 ## Notification Dispatch Modes
 
 Fitlio notifications support safe dry-run and real-run provider mode.
