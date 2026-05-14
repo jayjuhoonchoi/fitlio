@@ -108,6 +108,8 @@ def ensure_columns(engine) -> None:
                     conn.execute(
                         text("ALTER TABLE payments ADD COLUMN payment_method VARCHAR(32) DEFAULT 'card'")
                     )
+                if "external_ref" not in pcols:
+                    conn.execute(text("ALTER TABLE payments ADD COLUMN external_ref VARCHAR(128)"))
                 conn.execute(
                     text("UPDATE payments SET source='online' WHERE source IS NULL OR source=''")
                 )
@@ -241,6 +243,66 @@ def ensure_columns(engine) -> None:
                             member_id INTEGER NOT NULL,
                             type VARCHAR(16) DEFAULT 'like',
                             content VARCHAR(1000),
+                            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                        )
+                        """
+                    )
+                )
+            if insp.has_table("centers"):
+                ccols = {c["name"] for c in insp.get_columns("centers")}
+                if "tablet_accent_color" not in ccols:
+                    conn.execute(
+                        text("ALTER TABLE centers ADD COLUMN tablet_accent_color VARCHAR(32) DEFAULT '#2f855a'")
+                    )
+                if "tablet_background_url" not in ccols:
+                    conn.execute(text("ALTER TABLE centers ADD COLUMN tablet_background_url VARCHAR(1024)"))
+                conn.execute(
+                    text(
+                        "UPDATE centers SET tablet_accent_color='#2f855a' "
+                        "WHERE tablet_accent_color IS NULL OR tablet_accent_color=''"
+                    )
+                )
+            if insp.has_table("community_posts"):
+                cpcols = {c["name"] for c in insp.get_columns("community_posts")}
+                if "is_hidden" not in cpcols:
+                    conn.execute(
+                        text("ALTER TABLE community_posts ADD COLUMN is_hidden BOOLEAN DEFAULT FALSE")
+                    )
+                if "hidden_reason" not in cpcols:
+                    conn.execute(text("ALTER TABLE community_posts ADD COLUMN hidden_reason VARCHAR(255)"))
+            if insp.has_table("community_reactions"):
+                crcols = {c["name"] for c in insp.get_columns("community_reactions")}
+                if "is_hidden" not in crcols:
+                    conn.execute(
+                        text("ALTER TABLE community_reactions ADD COLUMN is_hidden BOOLEAN DEFAULT FALSE")
+                    )
+            if not insp.has_table("content_reports"):
+                conn.execute(
+                    text(
+                        """
+                        CREATE TABLE content_reports (
+                            id INTEGER PRIMARY KEY,
+                            reporter_member_id INTEGER NOT NULL,
+                            target_type VARCHAR(32) NOT NULL,
+                            target_id INTEGER NOT NULL,
+                            reason VARCHAR(255) NOT NULL,
+                            status VARCHAR(32) DEFAULT 'open',
+                            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                        )
+                        """
+                    )
+                )
+            if not insp.has_table("payment_webhook_events"):
+                conn.execute(
+                    text(
+                        """
+                        CREATE TABLE payment_webhook_events (
+                            id INTEGER PRIMARY KEY,
+                            provider VARCHAR(32) NOT NULL,
+                            event_type VARCHAR(64) NOT NULL,
+                            external_ref VARCHAR(128),
+                            payload VARCHAR(4000),
+                            processed BOOLEAN DEFAULT FALSE,
                             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                         )
                         """

@@ -72,6 +72,8 @@ class TabletThemeBody(BaseModel):
     tablet_welcome_text: str | None = Field(default=None, max_length=256)
     tablet_theme: str | None = Field(default=None, max_length=64)
     tablet_logo_url: str | None = Field(default=None, max_length=512)
+    tablet_accent_color: str | None = Field(default=None, max_length=32)
+    tablet_background_url: str | None = Field(default=None, max_length=1024)
 
 
 class OnsitePaymentBody(BaseModel):
@@ -296,6 +298,25 @@ def center_members(
     return out
 
 
+@router.get("/{center_id}")
+def center_detail(
+    center_id: int,
+    db: Session = Depends(get_db),
+    user: dict = Depends(get_current_user),
+):
+    _assert_center_admin(db, center_id, user["id"])
+    center = db.query(Center).filter(Center.id == center_id).first()
+    if not center:
+        raise HTTPException(status_code=404, detail="Center not found")
+    return {
+        "id": center.id,
+        "name": center.name,
+        "slug": center.slug,
+        "tablet_theme": center.tablet_theme,
+        "tablet_welcome_text": center.tablet_welcome_text,
+    }
+
+
 @router.post("/{center_id}/tablet-theme")
 def update_tablet_theme(
     center_id: int,
@@ -313,6 +334,12 @@ def update_tablet_theme(
         center.tablet_theme = body.tablet_theme.strip()
     if body.tablet_logo_url is not None:
         center.tablet_logo_url = body.tablet_logo_url.strip() if body.tablet_logo_url else None
+    if body.tablet_accent_color is not None:
+        center.tablet_accent_color = body.tablet_accent_color.strip() or "#2f855a"
+    if body.tablet_background_url is not None:
+        center.tablet_background_url = (
+            body.tablet_background_url.strip() if body.tablet_background_url else None
+        )
     db.commit()
     db.refresh(center)
     return {
@@ -320,6 +347,8 @@ def update_tablet_theme(
         "tablet_welcome_text": center.tablet_welcome_text,
         "tablet_theme": center.tablet_theme,
         "tablet_logo_url": center.tablet_logo_url,
+        "tablet_accent_color": getattr(center, "tablet_accent_color", "#2f855a"),
+        "tablet_background_url": getattr(center, "tablet_background_url", None),
     }
 
 
@@ -338,6 +367,8 @@ def tablet_config(
         "tablet_welcome_text": center.tablet_welcome_text,
         "tablet_theme": center.tablet_theme,
         "tablet_logo_url": center.tablet_logo_url,
+        "tablet_accent_color": getattr(center, "tablet_accent_color", "#2f855a"),
+        "tablet_background_url": getattr(center, "tablet_background_url", None),
     }
 
 

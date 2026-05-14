@@ -90,6 +90,11 @@ def admin_app_page():
     return _html("admin_app.html")
 
 
+@app.get("/app/tablet/{center_slug}", response_class=HTMLResponse)
+def tablet_kiosk_page(center_slug: str):
+    return _html("tablet_kiosk.html")
+
+
 @app.get("/legacy")
 def legacy_home():
     """Old single-page URL; send users to the current portal."""

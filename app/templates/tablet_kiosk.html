@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Fitlio Tablet Check-in</title>
+  <style>
+    :root{ --accent:#2f855a; }
+    *{ box-sizing:border-box; margin:0; padding:0; }
+    body{
+      font-family: Inter, system-ui, sans-serif;
+      min-height:100vh;
+      color:#f8fffa;
+      background: radial-gradient(circle at 10% 20%, rgba(255,255,255,.2), transparent 28%), linear-gradient(135deg,#214f3b,#1b2e27);
+      display:flex; align-items:center; justify-content:center; padding:20px;
+    }
+    .wrap{
+      width:min(880px,100%);
+      border:1px solid rgba(255,255,255,.28);
+      border-radius:24px;
+      background: rgba(9,21,17,.56);
+      backdrop-filter: blur(14px);
+      box-shadow: 0 24px 40px rgba(0,0,0,.35);
+      padding:28px;
+    }
+    .brand{ display:flex; gap:14px; align-items:center; margin-bottom:20px; }
+    .logo{
+      width:54px; height:54px; border-radius:14px; background:rgba(255,255,255,.14);
+      border:1px solid rgba(255,255,255,.28); display:flex; align-items:center; justify-content:center; font-weight:800;
+    }
+    h1{ font-size:1.35rem; margin-bottom:6px; }
+    .sub{ opacity:.88; }
+    .pad{
+      margin-top:20px; display:grid; grid-template-columns:repeat(3,1fr); gap:10px;
+    }
+    .btn{
+      border:1px solid rgba(255,255,255,.24);
+      border-radius:16px;
+      background: rgba(255,255,255,.12);
+      color:#fff;
+      font-size:1.28rem;
+      padding:14px;
+      cursor:pointer;
+    }
+    .btn:hover{ background: rgba(255,255,255,.2); }
+    .display{
+      margin-top:16px;
+      border-radius:16px;
+      border:1px solid rgba(255,255,255,.24);
+      background: rgba(255,255,255,.1);
+      padding:14px;
+      font-size:1.08rem;
+      min-height:58px;
+    }
+    .cta{ margin-top:14px; display:flex; gap:10px; }
+    .go{
+      border:none;
+      border-radius:14px;
+      background: var(--accent);
+      color:#fff;
+      font-weight:700;
+      padding:12px 18px;
+      cursor:pointer;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="brand">
+      <div class="logo" id="logo">F</div>
+      <div>
+        <h1 id="title">Fitlio Check-in</h1>
+        <div class="sub" id="subtitle">휴대폰 뒷자리 4자리를 입력하세요</div>
+      </div>
+    </div>
+    <div class="display" id="display">----</div>
+    <div class="pad" id="pad"></div>
+    <div class="cta">
+      <button class="go" id="submitBtn">Check-in</button>
+      <button class="go" id="clearBtn" style="background:#4c5b53">Clear</button>
+    </div>
+    <div class="display" id="result" style="margin-top:12px"></div>
+  </div>
+  <script>
+    const slug = location.pathname.split("/").pop();
+    let pin = "";
+    async function loadCfg(){
+      const r = await fetch("/centers/tablet/"+encodeURIComponent(slug));
+      if(!r.ok) return;
+      const c = await r.json();
+      document.getElementById("title").textContent = c.center_name || "Fitlio Check-in";
+      document.getElementById("subtitle").textContent = c.tablet_welcome_text || "휴대폰 뒷자리 4자리를 입력하세요";
+      const accent = (c.tablet_accent_color || "#2f855a").trim();
+      document.documentElement.style.setProperty("--accent", accent);
+      if(c.tablet_background_url){
+        document.body.style.background = `linear-gradient(rgba(13,24,20,.45), rgba(12,22,18,.68)), url('${c.tablet_background_url}') center/cover no-repeat`;
+      }
+      if(c.tablet_logo_url){
+        document.getElementById("logo").innerHTML = `<img src="${c.tablet_logo_url}" alt="logo" style="width:100%;height:100%;object-fit:cover;border-radius:12px">`;
+      }
+    }
+    function renderPad(){
+      const pad = document.getElementById("pad");
+      pad.innerHTML = [..."123456789", "0"].map(n=>`<button class="btn" data-n="${n}">${n}</button>`).join("");
+      pad.querySelectorAll("[data-n]").forEach(b=>b.onclick=()=>{
+        if(pin.length>=4) return;
+        pin += b.dataset.n;
+        document.getElementById("display").textContent = pin.padEnd(4,"-");
+      });
+    }
+    document.getElementById("clearBtn").onclick=()=>{ pin=""; document.getElementById("display").textContent="----"; };
+    document.getElementById("submitBtn").onclick=async()=>{
+      if(pin.length!==4) return;
+      const r = await fetch("/centers/tablet/check-in",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({center_slug:slug,phone_last4:pin})});
+      const d = await r.json().catch(()=>({}));
+      document.getElementById("result").textContent = r.ok ? (d.message || "Check-in done") : (d.detail || "Failed");
+      if(r.ok) pin="";
+      document.getElementById("display").textContent = "----";
+    };
+    renderPad();
+    loadCfg();
+  </script>
+</body>
+</html>

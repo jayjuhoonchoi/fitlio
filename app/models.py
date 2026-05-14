@@ -69,6 +69,7 @@ class Payment(Base):
     recorded_by_member_id = Column(Integer, nullable=True)
     status = Column(String, default="pending")  # pending, completed, failed
     stripe_payment_intent_id = Column(String)  # Stripe 연동용
+    external_ref = Column(String(128), nullable=True, index=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
 class Attendance(Base):
@@ -125,6 +126,8 @@ class Center(Base):
     tablet_welcome_text = Column(String(256), nullable=False, default="Welcome to Fitlio.")
     tablet_theme = Column(String(64), nullable=False, default="premium-green")
     tablet_logo_url = Column(String(512), nullable=True)
+    tablet_accent_color = Column(String(32), nullable=False, default="#2f855a")
+    tablet_background_url = Column(String(1024), nullable=True)
     created_by_member_id = Column(Integer, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
@@ -199,6 +202,8 @@ class CommunityPost(Base):
     content = Column(String(2000), nullable=True)
     media_url = Column(String(1024), nullable=True)
     media_type = Column(String(16), nullable=False, default="image")  # image | video
+    is_hidden = Column(Boolean, nullable=False, default=False)
+    hidden_reason = Column(String(255), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
 
@@ -210,4 +215,29 @@ class CommunityReaction(Base):
     member_id = Column(Integer, nullable=False, index=True)
     type = Column(String(16), nullable=False, default="like")  # like | comment
     content = Column(String(1000), nullable=True)
+    is_hidden = Column(Boolean, nullable=False, default=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class ContentReport(Base):
+    __tablename__ = "content_reports"
+
+    id = Column(Integer, primary_key=True, index=True)
+    reporter_member_id = Column(Integer, nullable=False, index=True)
+    target_type = Column(String(32), nullable=False)  # community_post | community_comment
+    target_id = Column(Integer, nullable=False, index=True)
+    reason = Column(String(255), nullable=False)
+    status = Column(String(32), nullable=False, default="open")
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class PaymentWebhookEvent(Base):
+    __tablename__ = "payment_webhook_events"
+
+    id = Column(Integer, primary_key=True, index=True)
+    provider = Column(String(32), nullable=False)
+    event_type = Column(String(64), nullable=False)
+    external_ref = Column(String(128), nullable=True, index=True)
+    payload = Column(String(4000), nullable=True)
+    processed = Column(Boolean, nullable=False, default=False)
     created_at = Column(DateTime, default=datetime.utcnow)

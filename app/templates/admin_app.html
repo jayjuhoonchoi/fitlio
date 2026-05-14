@@ -456,22 +456,34 @@
             <button class="btn" id="pRun">Record payment</button>
           </div>
         </div>
-        <div class="box">
+        <div class="box" style="margin-bottom:.7rem">
           <div class="hint">Tablet brand customization</div>
           <div class="row">
             <input id="tCenterId" type="number" placeholder="center_id">
             <input id="tTheme" placeholder="theme ex) premium-green">
             <input id="tWelcome" placeholder="welcome text">
+            <input id="tAccent" placeholder="accent color ex) #2f855a">
             <input id="tLogo" placeholder="logo URL (optional)">
+            <input id="tBg" placeholder="background image URL (optional)">
             <button class="btn" id="tRun">Save theme</button>
+            <button class="btn btn2" id="tOpen">Open tablet</button>
           </div>
+        </div>
+        <div class="box">
+          <div class="hint">Community moderation queue</div>
+          <div class="row">
+            <button class="btn" id="mRefresh">Refresh reports</button>
+          </div>
+          <div id="mQueue" class="hint">No reports loaded.</div>
         </div>`;
         document.getElementById("cCreate").onclick=async()=>{ try{ const d=await apiJson("/centers",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name:val("cName"),slug:val("cSlug")})}); flash(`center #${d.id} created`,true);}catch(e){ flash(e.message||t("err")); } };
         document.getElementById("gAdmin").onclick=async()=>{ try{ await apiJson("/centers/grant-admin",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({center_id:+val("gCenterId"),member_email:val("gEmail")})}); flash("center admin granted",true);}catch(e){ flash(e.message||t("err")); } };
         document.getElementById("jDirect").onclick=async()=>{ try{ await apiJson("/centers/join-by-email",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({center_slug:val("jSlug"),member_email:val("jEmail")})}); flash("member attached",true);}catch(e){ flash(e.message||t("err")); } };
         document.getElementById("aRun").onclick=async()=>{ try{ await apiJson("/centers/join-approval",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({center_id:+val("aCenterId"),member_id:+val("aMemberId"),approve:val("aApprove")==="true"})}); flash("approval updated",true);}catch(e){ flash(e.message||t("err")); } };
         document.getElementById("pRun").onclick=async()=>{ try{ await apiJson("/centers/onsite-payment",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({center_id:+val("pCenterId"),member_id:+val("pMemberId"),amount:+val("pAmount"),memo:val("pMemo")||null})}); flash("on-site payment recorded",true);}catch(e){ flash(e.message||t("err")); } };
-        document.getElementById("tRun").onclick=async()=>{ try{ await apiJson("/centers/"+encodeURIComponent(val("tCenterId"))+"/tablet-theme",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({tablet_theme:val("tTheme"),tablet_welcome_text:val("tWelcome"),tablet_logo_url:val("tLogo")||null})}); flash("tablet branding saved",true);}catch(e){ flash(e.message||t("err")); } };
+        document.getElementById("tRun").onclick=async()=>{ try{ await apiJson("/centers/"+encodeURIComponent(val("tCenterId"))+"/tablet-theme",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({tablet_theme:val("tTheme"),tablet_welcome_text:val("tWelcome"),tablet_logo_url:val("tLogo")||null,tablet_accent_color:val("tAccent")||null,tablet_background_url:val("tBg")||null})}); flash("tablet branding saved",true);}catch(e){ flash(e.message||t("err")); } };
+        document.getElementById("tOpen").onclick=async()=>{ try{ const centerId=+val("tCenterId"); const center = await apiJson("/centers/"+centerId); window.open("/app/tablet/"+encodeURIComponent(center.slug), "_blank"); }catch(e){ flash(e.message||t("err")); } };
+        document.getElementById("mRefresh").onclick=async()=>{ try{ const rows=await apiJson("/member/moderation/reports"); const box=document.getElementById("mQueue"); box.innerHTML = rows.length ? rows.slice(0,40).map(r=>`<div style="margin-bottom:.45rem;padding:.5rem;border:1px solid #d1d9d0;border-radius:8px"><b>#${r.id}</b> ${esc(r.target_type)}:${r.target_id} · ${esc(r.reason)}<div style="margin-top:.35rem"><button class="btn btnWarn" data-hide="${r.target_type}:${r.target_id}">Hide</button></div></div>`).join("") : "No open reports."; box.querySelectorAll("[data-hide]").forEach(b=>b.onclick=async()=>{ const [target_type,target_id]=b.dataset.hide.split(":"); await apiJson("/member/moderation/hide",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({target_type,target_id:+target_id,hide:true,reason:"reported"})}); flash("content hidden",true); document.getElementById("mRefresh").click(); }); }catch(e){ flash(e.message||t("err")); } };
         return;
       }
     }

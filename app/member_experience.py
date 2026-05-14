@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta
 
+import json
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy import func
@@ -19,7 +20,10 @@ from app.models import (
     Membership,
     Payment,
     Suggestion,
+    ContentReport,
+    PaymentWebhookEvent,
 )
+from app.payment_gateway import create_payment_intent
 
 router = APIRouter(prefix="/member", tags=["member-experience"])
 
@@ -53,6 +57,27 @@ class CommunityCommentBody(BaseModel):
     content: str = Field(..., min_length=1, max_length=1000)
 
 
+class ReportBody(BaseModel):
+    target_type: str = Field(..., pattern="^(community_post|community_comment)$")
+    target_id: int
+    reason: str = Field(..., min_length=1, max_length=255)
+
+
+class ModeratorHideBody(BaseModel):
+    target_type: str = Field(..., pattern="^(community_post|community_comment)$")
+    target_id: int
+    hide: bool = True
+    reason: str | None = Field(default=None, max_length=255)
+
+
+class PaymentWebhookBody(BaseModel):
+    provider: str
+    event_type: str
+    external_ref: str | None = None
+    status: str | None = None
+    payload: dict | None = None
+
+
 def _member_center_ids(db: Session, member_id: int):
     rows = (
         db.query(CenterMembership.center_id)
@@ -60,6 +85,22 @@ def _member_center_ids(db: Session, member_id: int):
         .all()
     )
     return [r[0] for r in rows]
+
+
+def _is_admin_or_staff(db: Session, member_id: int) -> bool:
+    member = db.query(Member).filter(Member.id == member_id).first()
+    if member and getattr(member, "role", "member") == "admin":
+        return True
+    row = (
+        db.query(CenterMembership)
+        .filter(
+            CenterMembership.member_id == member_id,
+            CenterMembership.status == "active",
+            CenterMembership.role.in_(["admin", "staff"]),
+        )
+        .first()
+    )
+    return bool(row)
 
 
 @router.get("/home")
@@ -260,10 +301,11 @@ def purchase_membership(
     else:
         end_date = now + timedelta(days=365)
         amount = 50000
+    intent = create_payment_intent(body.payment_method, amount, "aud")
     membership = Membership(
         member_id=user["id"],
         plan=body.plan,
-        status="active",
+        status="active" if body.payment_method == "bank_transfer" else "pending",
         end_date=end_date,
         auto_renew=True,
     )
@@ -279,11 +321,22 @@ def purchase_membership(
         source="online",
         payment_method=body.payment_method,
         stripe_payment_intent_id=f"sim_{body.payment_method}_{membership.id}",
+        external_ref=intent.external_ref,
     )
     db.add(payment)
     db.commit()
     db.refresh(payment)
-    return {"membership_id": membership.id, "payment_id": payment.id, "payment_method": body.payment_method}
+    if body.payment_method != "bank_transfer":
+        payment.status = "pending"
+        db.commit()
+    return {
+        "membership_id": membership.id,
+        "payment_id": payment.id,
+        "payment_method": body.payment_method,
+        "payment_status": payment.status,
+        "checkout_url": intent.checkout_url,
+        "external_ref": intent.external_ref,
+    }
 
 
 @router.post("/suggestions")
@@ -312,7 +365,7 @@ def community_posts(db: Session = Depends(get_db), user: dict = Depends(get_curr
     q = db.query(CommunityPost)
     if center_ids:
         q = q.filter((CommunityPost.center_id == None) | (CommunityPost.center_id.in_(center_ids)))
-    rows = q.order_by(CommunityPost.created_at.desc()).limit(80).all()
+    rows = q.filter(CommunityPost.is_hidden == False).order_by(CommunityPost.created_at.desc()).limit(80).all()
     out = []
     for p in rows:
         author = db.query(Member).filter(Member.id == p.author_member_id).first()
@@ -323,7 +376,11 @@ def community_posts(db: Session = Depends(get_db), user: dict = Depends(get_curr
         )
         comments = (
             db.query(CommunityReaction)
-            .filter(CommunityReaction.post_id == p.id, CommunityReaction.type == "comment")
+            .filter(
+                CommunityReaction.post_id == p.id,
+                CommunityReaction.type == "comment",
+                CommunityReaction.is_hidden == False,
+            )
             .order_by(CommunityReaction.created_at.asc())
             .limit(50)
             .all()
@@ -407,3 +464,94 @@ def comment_post(
     )
     db.commit()
     return {"ok": True}
+
+
+@router.post("/community/reports")
+def report_content(
+    body: ReportBody,
+    db: Session = Depends(get_db),
+    user: dict = Depends(get_current_user),
+):
+    row = ContentReport(
+        reporter_member_id=user["id"],
+        target_type=body.target_type,
+        target_id=body.target_id,
+        reason=body.reason.strip(),
+        status="open",
+    )
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+    return {"id": row.id, "status": row.status}
+
+
+@router.get("/moderation/reports")
+def moderation_reports(
+    db: Session = Depends(get_db),
+    user: dict = Depends(get_current_user),
+):
+    if not _is_admin_or_staff(db, user["id"]):
+        raise HTTPException(status_code=403, detail="Moderator access required")
+    rows = db.query(ContentReport).order_by(ContentReport.created_at.desc()).limit(200).all()
+    return [
+        {
+            "id": r.id,
+            "target_type": r.target_type,
+            "target_id": r.target_id,
+            "reason": r.reason,
+            "status": r.status,
+            "created_at": r.created_at,
+        }
+        for r in rows
+    ]
+
+
+@router.post("/moderation/hide")
+def moderation_hide(
+    body: ModeratorHideBody,
+    db: Session = Depends(get_db),
+    user: dict = Depends(get_current_user),
+):
+    if not _is_admin_or_staff(db, user["id"]):
+        raise HTTPException(status_code=403, detail="Moderator access required")
+    if body.target_type == "community_post":
+        row = db.query(CommunityPost).filter(CommunityPost.id == body.target_id).first()
+        if not row:
+            raise HTTPException(status_code=404, detail="Post not found")
+        row.is_hidden = body.hide
+        row.hidden_reason = (body.reason or "").strip() or None
+    else:
+        row = db.query(CommunityReaction).filter(CommunityReaction.id == body.target_id).first()
+        if not row:
+            raise HTTPException(status_code=404, detail="Comment not found")
+        row.is_hidden = body.hide
+    db.commit()
+    return {"ok": True, "hidden": body.hide}
+
+
+@router.post("/payments/webhook")
+def payment_webhook(
+    body: PaymentWebhookBody,
+    db: Session = Depends(get_db),
+):
+    event = PaymentWebhookEvent(
+        provider=body.provider,
+        event_type=body.event_type,
+        external_ref=body.external_ref,
+        payload=json.dumps(body.payload or {}, ensure_ascii=True)[:3800],
+        processed=False,
+    )
+    db.add(event)
+    if body.external_ref:
+        payment = db.query(Payment).filter(Payment.external_ref == body.external_ref).first()
+        if payment and body.status in {"completed", "failed", "cancelled", "pending"}:
+            payment.status = body.status
+            membership = db.query(Membership).filter(Membership.id == payment.membership_id).first()
+            if membership:
+                if body.status == "completed":
+                    membership.status = "active"
+                elif body.status in {"failed", "cancelled"}:
+                    membership.status = "cancelled"
+            event.processed = True
+    db.commit()
+    return {"ok": True, "processed": event.processed}
