@@ -3,17 +3,20 @@ from unittest.mock import patch
 
 import pytest
 from datetime import datetime
+from datetime import timedelta
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 with patch("app.database.engine") as mock_engine, \
      patch("app.models.Base.metadata.create_all"), \
-     patch("app.seed.seed_database"):
+     patch("app.seed.seed_database"), \
+     patch("app.main.maybe_queue_membership_expiry_reminders"):
     from app.main import app
     from app.database import get_db
     from app.deps import require_admin
     from app import models
+    from app.reminders import queue_membership_expiry_reminders
 
 client = TestClient(app)
 
@@ -215,3 +218,81 @@ def test_messages_send_and_thread_flow(db_session):
     assert contact.status_code == 200
     assert contact.json()["id"] == admin.id
     app.dependency_overrides.clear()
+
+
+def test_queue_membership_expiry_reminders_creates_day_3_and_day_1(db_session):
+    member = models.Member(
+        email="reminder.member@fitlio.com",
+        hashed_password="x",
+        full_name="Reminder Member",
+        role="member",
+    )
+    db_session.add(member)
+    db_session.flush()
+
+    now = datetime.utcnow()
+    db_session.add(
+        models.Membership(
+            member_id=member.id,
+            plan="monthly",
+            status="active",
+            start_date=now - timedelta(days=27),
+            end_date=now + timedelta(days=3),
+        )
+    )
+    db_session.add(
+        models.Membership(
+            member_id=member.id,
+            plan="yearly",
+            status="active",
+            start_date=now - timedelta(days=364),
+            end_date=now + timedelta(days=1),
+        )
+    )
+    db_session.commit()
+
+    result = queue_membership_expiry_reminders(db_session, reference_time=now)
+    assert result["created"] == 2
+    rows = db_session.query(models.NotificationRequest).all()
+    assert len(rows) == 2
+    assert any(r.topic == "membership_expiry_d3" for r in rows)
+    assert any(r.topic == "membership_expiry_d1" for r in rows)
+    assert all("Dear Reminder Member" in r.message for r in rows)
+
+
+def test_run_membership_reminders_admin_endpoint(db_session):
+    admin = models.Member(
+        email="admin.reminder@fitlio.com",
+        hashed_password="x",
+        full_name="Reminder Admin",
+        role="admin",
+    )
+    member = models.Member(
+        email="member.reminder@fitlio.com",
+        hashed_password="x",
+        full_name="Reminder User",
+        role="member",
+    )
+    db_session.add(admin)
+    db_session.add(member)
+    db_session.flush()
+    db_session.add(
+        models.Membership(
+            member_id=member.id,
+            plan="monthly",
+            status="active",
+            start_date=datetime.utcnow() - timedelta(days=27),
+            end_date=datetime.utcnow() + timedelta(days=3),
+        )
+    )
+    db_session.commit()
+
+    app.dependency_overrides[get_db] = _override_db(db_session)
+    app.dependency_overrides[require_admin] = lambda: {"id": admin.id, "role": "admin"}
+    response = client.post("/admin/notifications/membership-reminders/run")
+    app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == "queued"
+    assert payload["created"] >= 1

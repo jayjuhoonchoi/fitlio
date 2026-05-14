@@ -18,6 +18,7 @@ from app.models import (
     NotificationRequest,
     Payment,
 )
+from app.reminders import queue_membership_expiry_reminders
 
 router = APIRouter(prefix="/admin")
 
@@ -388,6 +389,15 @@ def class_utilization_report(
         "classes_count": len(rows),
         "rows": rows,
     }
+
+
+@router.post("/notifications/membership-reminders/run")
+def run_membership_reminders(
+    db: Session = Depends(get_db),
+    _: dict = Depends(require_admin),
+):
+    result = queue_membership_expiry_reminders(db)
+    return {"status": "queued", **result}
 
 
 @router.get("/attendances/recent")

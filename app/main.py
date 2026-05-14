@@ -13,6 +13,7 @@ from app.attendance import router as attendance_router
 from app.admin import router as admin_router
 from app.me import router as me_router
 from app.messages import router as message_router
+from app.reminders import maybe_queue_membership_expiry_reminders
 
 models.Base.metadata.create_all(bind=engine)
 ensure_columns(engine)
@@ -42,6 +43,7 @@ app = FastAPI(
 @app.middleware("http")
 async def fitlio_response_marker(request, call_next):
     """Helps verify traffic hits this app (see X-Fitlio-App on curl -I)."""
+    maybe_queue_membership_expiry_reminders()
     response = await call_next(request)
     response.headers["X-Fitlio-App"] = "portal-v2"
     return response
