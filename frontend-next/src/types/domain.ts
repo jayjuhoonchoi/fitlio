@@ -22,6 +22,20 @@ export type ClassSlot = {
   waitlist: number;
 };
 
+export type LiveClassSlot = {
+  id: number;
+  title?: string;
+  name?: string;
+  coach?: string;
+  instructor?: string;
+  startsAt?: string;
+  schedule: string;
+  capacity: number;
+  booked?: number;
+  current_count?: number;
+  waitlist?: number;
+};
+
 export type WaitlistEntry = {
   id: string;
   memberNo: string;

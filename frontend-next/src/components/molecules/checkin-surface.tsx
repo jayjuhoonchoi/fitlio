@@ -1,14 +1,46 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { QrCode } from "lucide-react";
 
 import { ActionButton } from "@/components/atoms/action-button";
 import { Badge } from "@/components/atoms/badge";
 import { members } from "@/lib/mock-data";
+import { apiFetch } from "@/lib/api";
 
 export function CheckinSurface(): JSX.Element {
   const [checkedIds, setCheckedIds] = useState<string[]>([]);
+  const [memberId, setMemberId] = useState<string>("");
+  const [nearestClass, setNearestClass] = useState<{ id: number; name: string } | null>(null);
+  const [flash, setFlash] = useState<string>("");
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    setMemberId(window.localStorage.getItem("member_id") ?? "");
+    apiFetch<{ id: number; name: string }>("/classes/nearest")
+      .then((row) => setNearestClass({ id: row.id, name: row.name }))
+      .catch(() => setNearestClass(null));
+  }, []);
+
+  async function checkInCurrentMember(uiMemberId: string): Promise<void> {
+    if (!memberId || !nearestClass) {
+      setCheckedIds((prev) =>
+        prev.includes(uiMemberId) ? prev.filter((id) => id !== uiMemberId) : [...prev, uiMemberId]
+      );
+      setFlash("Demo mode: connect account token for live check-in.");
+      return;
+    }
+    try {
+      const result = await apiFetch<{ message: string }>(
+        `/classes/${nearestClass.id}/check-in`,
+        { method: "POST" }
+      );
+      setCheckedIds((prev) => (prev.includes(uiMemberId) ? prev : [...prev, uiMemberId]));
+      setFlash(result.message);
+    } catch (error) {
+      setFlash(error instanceof Error ? error.message : "Check-in failed");
+    }
+  }
 
   const streakMessage = useMemo(() => {
     if (checkedIds.length >= 3) return "Perfect Streak! +Retention XP";
@@ -29,7 +61,11 @@ export function CheckinSurface(): JSX.Element {
             <p className="mt-3 text-xs text-silver">fitlio://checkin/cbd-flagship</p>
           </div>
         </div>
+        <p className="mt-2 text-xs text-muted">
+          {nearestClass ? `Nearest: ${nearestClass.name}` : "No upcoming class"}
+        </p>
         <p className="mt-4 text-sm font-medium text-accent">{streakMessage}</p>
+        {flash ? <p className="mt-2 text-xs text-silver">{flash}</p> : null}
       </div>
 
       <div className="rounded-xl border border-border bg-panelElevated p-4">
@@ -53,13 +89,7 @@ export function CheckinSurface(): JSX.Element {
                   {atRisk ? <Badge tone="danger">At-Risk</Badge> : null}
                   <ActionButton
                     tone={checked ? "ghost" : "primary"}
-                    onClick={() =>
-                      setCheckedIds((prev) =>
-                        prev.includes(member.id)
-                          ? prev.filter((id) => id !== member.id)
-                          : [...prev, member.id]
-                      )
-                    }
+                    onClick={() => checkInCurrentMember(member.id)}
                   >
                     {checked ? "Checked" : "Check-in"}
                   </ActionButton>

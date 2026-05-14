@@ -1,9 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.database import get_db
-from app.models import Attendance, Member, FitnessClass, Membership
+from app.models import Attendance, Member, FitnessClass, Membership, Booking
 from pydantic import BaseModel
 from datetime import datetime, timedelta
+from app.deps import get_current_user
 
 router = APIRouter()
 
@@ -124,3 +125,67 @@ def check_in(request: CheckInRequest, db: Session = Depends(get_db)):
 def get_attendances(db: Session = Depends(get_db)):
     attendances = db.query(Attendance).all()
     return attendances
+
+
+@router.post("/classes/{class_id}/check-in")
+def class_check_in_for_member(
+    class_id: int,
+    db: Session = Depends(get_db),
+    user: dict = Depends(get_current_user),
+):
+    member_id = user["id"]
+    member = (
+        db.query(Member)
+        .filter(Member.id == member_id, Member.is_active == True)
+        .first()
+    )
+    if not member:
+        raise HTTPException(status_code=404, detail="Member not found")
+    fitness_class = db.query(FitnessClass).filter(FitnessClass.id == class_id).first()
+    if not fitness_class:
+        raise HTTPException(status_code=404, detail="Class not found")
+    booking = (
+        db.query(Booking)
+        .filter(
+            Booking.member_id == member_id,
+            Booking.class_id == class_id,
+            Booking.status == "confirmed",
+        )
+        .first()
+    )
+    if not booking:
+        raise HTTPException(status_code=400, detail="Confirmed booking required before check-in")
+    today = datetime.utcnow().date()
+    existing = (
+        db.query(Attendance)
+        .filter(
+            Attendance.member_id == member_id,
+            Attendance.class_id == class_id,
+            Attendance.checked_in_at >= datetime(today.year, today.month, today.day),
+        )
+        .first()
+    )
+    if existing:
+        raise HTTPException(status_code=400, detail="Already checked in today")
+    membership = (
+        db.query(Membership)
+        .filter(Membership.member_id == member_id, Membership.status == "active")
+        .first()
+    )
+    if membership and membership.monthly_limit:
+        used = get_this_month_usage(db, member_id)
+        if used >= membership.monthly_limit:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Monthly limit reached ({used}/{membership.monthly_limit})",
+            )
+    attendance = Attendance(member_id=member_id, class_id=class_id, status="present")
+    db.add(attendance)
+    db.commit()
+    db.refresh(attendance)
+    return {
+        "message": f"✅ {member.full_name} checked in successfully!",
+        "member_name": member.full_name,
+        "class_name": fitness_class.name,
+        "checked_in_at": attendance.checked_in_at,
+    }
