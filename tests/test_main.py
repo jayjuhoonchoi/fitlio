@@ -313,6 +313,7 @@ def test_process_pending_notifications_marks_sent(db_session):
             member_id=member.id,
             topic="membership_expiry_d1",
             message="test dispatch",
+            channel="email",
             status="pending",
         )
     )
@@ -347,6 +348,7 @@ def test_run_notification_dispatch_admin_endpoint(db_session):
             member_id=member.id,
             topic="membership_expiry_d3",
             message="dispatch me",
+            channel="email",
             status="pending",
         )
     )
@@ -397,6 +399,7 @@ def test_process_pending_notifications_retries_then_fails(db_session):
     db_session.refresh(row)
     assert row.status == "failed"
     assert row.retry_count == 2
+    assert "phone number missing" in (row.last_error or "")
 
 
 def test_retry_notification_endpoint_moves_failed_to_pending(db_session):
@@ -435,3 +438,28 @@ def test_retry_notification_endpoint_moves_failed_to_pending(db_session):
     db_session.refresh(note)
     assert note.status == "pending"
     assert note.last_error is None
+
+
+def test_process_pending_notifications_inapp_channel_sends(db_session):
+    member = models.Member(
+        email="inapp.member@fitlio.com",
+        hashed_password="x",
+        full_name="Inapp Member",
+        role="member",
+    )
+    db_session.add(member)
+    db_session.flush()
+    note = models.NotificationRequest(
+        member_id=member.id,
+        topic="inapp_notice",
+        message="inapp hello",
+        channel="inapp",
+        status="pending",
+    )
+    db_session.add(note)
+    db_session.commit()
+
+    result = process_pending_notifications(db_session, limit=10)
+    assert result["sent"] == 1
+    db_session.refresh(note)
+    assert note.status == "sent"

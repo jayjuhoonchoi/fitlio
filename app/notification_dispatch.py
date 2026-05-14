@@ -7,6 +7,12 @@ from sqlalchemy.orm import Session
 
 from app.database import SessionLocal
 from app.models import Member, NotificationRequest
+from app.notification_channels import (
+    DispatchResult,
+    deliver_email,
+    deliver_inapp,
+    deliver_sms,
+)
 
 _lock = threading.Lock()
 _last_run_at: datetime | None = None
@@ -21,6 +27,17 @@ def _backoff_delay_minutes(retry_count: int) -> int:
     if retry_count == 2:
         return 60
     return 180
+
+
+def _dispatch_row(row: NotificationRequest, member: Member | None) -> DispatchResult:
+    channel = getattr(row, "channel", "email")
+    if channel == "inapp":
+        return deliver_inapp(recipient_id=row.member_id, message=row.message)
+    if channel == "sms":
+        phone = member.phone if member else None
+        return deliver_sms(to_phone=phone, message=row.message)
+    email = member.email if member else None
+    return deliver_email(to_email=email, message=row.message)
 
 
 def process_pending_notifications(db: Session, limit: int = 100) -> dict:
@@ -45,13 +62,8 @@ def process_pending_notifications(db: Session, limit: int = 100) -> dict:
         member = None
         if row.member_id is not None:
             member = db.query(Member).filter(Member.id == row.member_id).first()
-        has_contact = True
-        if member is not None:
-            if row.channel == "sms":
-                has_contact = bool(member.phone)
-            else:
-                has_contact = bool(member.email or member.phone)
-        if has_contact:
+        result = _dispatch_row(row, member)
+        if result.delivered:
             row.status = "sent"
             row.sent_at = now
             row.last_error = None
@@ -59,7 +71,7 @@ def process_pending_notifications(db: Session, limit: int = 100) -> dict:
         else:
             next_retry_count = (row.retry_count or 0) + 1
             row.retry_count = next_retry_count
-            row.last_error = f"No deliverable contact for channel={row.channel}"
+            row.last_error = result.error or f"Dispatch failed channel={row.channel}"
             if next_retry_count >= (row.max_retries or 3):
                 row.status = "failed"
                 failed += 1
