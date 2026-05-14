@@ -20,6 +20,10 @@
       --shadow-soft:0 10px 32px rgba(28,44,34,.08);
       --shadow-press:0 6px 14px rgba(30,56,43,.15);
     }
+    @keyframes riseIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
     body {
       font-family: Inter, system-ui, sans-serif;
       background:
@@ -66,6 +70,7 @@
       padding: 1rem;
       box-shadow: var(--shadow-soft);
       transition: transform .22s ease, box-shadow .22s ease, border-color .22s ease;
+      animation: riseIn .22s ease both;
     }
     .card:hover {
       transform: translateY(-2px);
@@ -89,6 +94,7 @@
     }
     .btn:hover { transform: translateY(-1px); box-shadow: 0 12px 18px rgba(47,133,90,.3); filter: saturate(1.08); }
     .btn:active { transform: translateY(1px) scale(.985); box-shadow: var(--shadow-press); filter: brightness(.93); }
+    .btn.is-press { transform: translateY(1px) scale(.985); box-shadow: var(--shadow-press); filter: brightness(.93); }
     .btn2 {
       background: linear-gradient(135deg, #f7f5ed, #ece9df);
       color: #3f4d44;
@@ -97,12 +103,15 @@
     }
     .btn2:hover { box-shadow: 0 10px 14px rgba(43,58,49,.16); }
     .meta { font-size: .85rem; color: var(--muted); margin-top: .35rem; }
+    input, textarea, select { transition: border-color .14s ease, box-shadow .14s ease, transform .14s ease; border: 1px solid #b9c5bc; border-radius: 8px; padding: .45rem .55rem; background: #fffdf7; color: #2f3b32; }
+    input:focus, textarea:focus, select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(47,133,90,.15); transform: translateY(-1px); }
     #log { margin-top: 1rem; font-size: .9rem; color: #9f1239; min-height: 1.2em; font-weight:500; }
     .ok { color: #166534 !important; }
     .mini { margin-top: 1rem; }
     .mini h2 { font-size: 1.02rem; margin-bottom: .75rem; color: #3f4d44; }
     .msg-list { max-height: 260px; overflow: auto; border: 1px solid #d8dfd6; border-radius: 10px; padding: .65rem; background: #fffdf7; }
-    .msg-item { padding: .45rem .55rem; border-radius: 8px; margin-bottom: .4rem; font-size: .82rem; border: 1px solid #d8dfd6; }
+    .msg-item { padding: .45rem .55rem; border-radius: 8px; margin-bottom: .4rem; font-size: .82rem; border: 1px solid #d8dfd6; transition: transform .14s ease, box-shadow .14s ease; }
+    .msg-item:hover { transform: translateY(-1px); box-shadow: 0 8px 12px rgba(34,54,43,.1); }
     .msg-item.me { background: #e7f3ea; border-color: #b6d5c0; }
     .msg-item.other { background: #f6f3ea; border-color: #d9d1be; }
     .msg-meta { font-size: .72rem; color: #6b7a70; margin-bottom: .15rem; }
@@ -278,6 +287,12 @@
       }
     };
     setInterval(()=>{ loadMemberChat(); }, 12000);
+    document.addEventListener("pointerdown",(e)=>{
+      const b = e.target.closest(".btn");
+      if(!b) return;
+      b.classList.add("is-press");
+      setTimeout(()=>b.classList.remove("is-press"),140);
+    });
     apply();
   </script>
 </body>

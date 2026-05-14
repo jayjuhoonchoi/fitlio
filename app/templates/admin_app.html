@@ -16,6 +16,10 @@
       --muted:#627267;
       --text:#2f3b32;
     }
+    @keyframes riseIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
     body {
       font-family: Inter, system-ui, sans-serif;
       background:
@@ -57,9 +61,10 @@
     }
     main { flex: 1; padding: 1rem 1.25rem; overflow: auto; }
     h1 { font-size: 1.15rem; margin-bottom: 1rem; color: #24503c; }
-    pre, .box { background: #fffdf7; border: 1px solid #d1d9d0; border-radius: 12px; padding: .75rem; font-size: .78rem; overflow: auto; max-height: 70vh; white-space: pre-wrap; word-break: break-word; box-shadow: 0 12px 26px rgba(30,45,36,.08); }
+    pre, .box { background: #fffdf7; border: 1px solid #d1d9d0; border-radius: 12px; padding: .75rem; font-size: .78rem; overflow: auto; max-height: 70vh; white-space: pre-wrap; word-break: break-word; box-shadow: 0 12px 26px rgba(30,45,36,.08); animation: riseIn .24s ease both; }
     .row { display: flex; gap: .5rem; flex-wrap: wrap; margin-bottom: .75rem; align-items: center; }
-    input, select, textarea { padding: .45rem .55rem; border-radius: 8px; border: 1px solid #b9c5bc; background: #fffdf7; color: #2f3b32; }
+    input, select, textarea { padding: .45rem .55rem; border-radius: 8px; border: 1px solid #b9c5bc; background: #fffdf7; color: #2f3b32; transition: border-color .14s ease, box-shadow .14s ease, transform .14s ease; }
+    input:focus, select:focus, textarea:focus { outline: none; border-color: #2f855a; box-shadow: 0 0 0 3px rgba(47,133,90,.15); transform: translateY(-1px); }
     .btn {
       padding: .48rem .82rem;
       border-radius: 10px;
@@ -73,6 +78,7 @@
     }
     .btn:hover { transform: translateY(-1px); box-shadow: 0 12px 18px rgba(47,133,90,.29); filter: saturate(1.06); }
     .btn:active { transform: translateY(1px) scale(.985); box-shadow: 0 6px 12px rgba(47,133,90,.2); filter: brightness(.94); }
+    .btn.is-press { transform: translateY(1px) scale(.985); box-shadow: 0 6px 12px rgba(47,133,90,.2); filter: brightness(.94); }
     .btnWarn { background: linear-gradient(135deg,#9f1239,#c01f4f); border-color:#9f1239; }
     .lang { margin-bottom: 1rem; }
     .lang button { font-size: .7rem; padding: .15rem .4rem; margin-right: .25rem; border-radius: 6px; border: 1px solid #b9c5bc; background: #fffdf7; color: #435649; cursor: pointer; }
@@ -81,9 +87,11 @@
     .table { width: 100%; border-collapse: collapse; background: #fffdf7; border: 1px solid #d1d9d0; border-radius: 10px; overflow: hidden; }
     .table th, .table td { text-align: left; padding: .55rem; border-bottom: 1px solid #e5ebe2; font-size: .82rem; }
     .table th { background: #eef4ea; color: #3d5145; }
+    .table tbody tr { transition: background-color .14s ease; }
+    .table tbody tr:hover { background: #f3f8f2; }
     .chip { padding: .15rem .5rem; border-radius: 999px; font-size: .72rem; border: 1px solid #b8c5bb; background: #f3f6f2; }
     .stats { display: grid; gap: .75rem; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); margin-bottom: 1rem; }
-    .kpi { background: #fffdf7; border: 1px solid #d1d9d0; border-radius: 10px; padding: .75rem; }
+    .kpi { background: linear-gradient(160deg, #fffefb, #fffdf7); border: 1px solid #d1d9d0; border-radius: 12px; padding: .75rem; box-shadow: 0 10px 20px rgba(31,46,37,.08); animation: riseIn .24s ease both; }
     .kpi b { display: block; font-size: 1.25rem; color: #276b49; margin-top: .2rem; }
     .hint { font-size: .8rem; color: #627267; margin-bottom: .5rem; }
     .bar-wrap { display: grid; gap: .4rem; margin-top: .75rem; }
@@ -92,6 +100,7 @@
     .bar > i { display: block; height: 100%; background: linear-gradient(90deg,#2f855a,#58b485); }
     .flash { margin-bottom: .7rem; font-size: .85rem; color: #9f1239; min-height: 1.2em; }
     .flash.ok { color: #166534; }
+    #panel .row, #panel .table, #panel .box { animation: riseIn .22s ease both; }
   </style>
 </head>
 <body>
@@ -330,6 +339,12 @@
     }
     function esc(s){ const d=document.createElement("div"); d.textContent=(s==null?"":String(s)); return d.innerHTML; }
     function val(id){ const el=document.getElementById(id); return el ? el.value.trim() : ""; }
+    document.addEventListener("pointerdown",(e)=>{
+      const b = e.target.closest(".btn");
+      if(!b) return;
+      b.classList.add("is-press");
+      setTimeout(()=>b.classList.remove("is-press"),140);
+    });
     applyNav(); render("dash");
   </script>
 </body>
