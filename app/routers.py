@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+from datetime import date
 from pydantic import BaseModel
 from app.database import get_db
 from app.models import Member
@@ -21,6 +22,7 @@ class RegisterRequest(BaseModel):
     full_name: str
     phone: str
     country_code: str = "AU"
+    birth_date: date | None = None
 
 class LoginRequest(BaseModel):
     email: str
@@ -45,6 +47,7 @@ def register(req: RegisterRequest, db: Session = Depends(get_db)):
         hashed_password=hash_password(req.password),
         full_name=req.full_name,
         phone=full_phone,
+        birth_date=req.birth_date,
         role="member",
     )
     db.add(member)

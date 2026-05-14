@@ -1,5 +1,5 @@
 from calendar import monthrange
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
@@ -442,6 +442,7 @@ def get_members(db: Session = Depends(get_db), _: dict = Depends(require_admin))
             "full_name": m.full_name,
             "email": m.email,
             "phone": m.phone,
+            "birth_date": getattr(m, "birth_date", None),
             "member_no": getattr(m, "member_no", None),
             "member_level": getattr(m, "member_level", "starter"),
             "is_active": m.is_active,
@@ -469,6 +470,9 @@ def list_payments(
             "amount": p.amount / 100.0,
             "currency": p.currency,
             "status": p.status,
+            "source": getattr(p, "source", "online"),
+            "center_id": getattr(p, "center_id", None),
+            "memo": getattr(p, "memo", None),
             "created_at": p.created_at,
         }
         for p in rows
@@ -496,6 +500,9 @@ class InstructorCreate(BaseModel):
     hourly_rate_cents: int = Field(50_000, ge=0)
     pay_per_class_cents: int = Field(80_000, ge=0)
     email: str | None = None
+    avatar_url: str | None = None
+    bio: str | None = None
+    specialties: str | None = None
     notes: str | None = None
 
 
@@ -504,6 +511,9 @@ class InstructorUpdate(BaseModel):
     hourly_rate_cents: int | None = Field(default=None, ge=0)
     pay_per_class_cents: int | None = Field(default=None, ge=0)
     email: str | None = None
+    avatar_url: str | None = None
+    bio: str | None = None
+    specialties: str | None = None
     notes: str | None = None
 
 
@@ -531,6 +541,9 @@ def list_instructors(db: Session = Depends(get_db), _: dict = Depends(require_ad
             "hourly_rate_cents": r.hourly_rate_cents,
             "pay_per_class_cents": r.pay_per_class_cents,
             "email": r.email,
+            "avatar_url": getattr(r, "avatar_url", None),
+            "bio": getattr(r, "bio", None),
+            "specialties": getattr(r, "specialties", None),
             "notes": r.notes,
         }
         for r in rows
@@ -555,6 +568,9 @@ def create_instructor(
         hourly_rate_cents=body.hourly_rate_cents,
         pay_per_class_cents=body.pay_per_class_cents,
         email=body.email,
+        avatar_url=body.avatar_url,
+        bio=body.bio,
+        specialties=body.specialties,
         notes=body.notes,
     )
     db.add(row)
@@ -597,6 +613,12 @@ def update_instructor(
         row.pay_per_class_cents = body.pay_per_class_cents
     if body.email is not None:
         row.email = body.email
+    if body.avatar_url is not None:
+        row.avatar_url = body.avatar_url
+    if body.bio is not None:
+        row.bio = body.bio
+    if body.specialties is not None:
+        row.specialties = body.specialties
     if body.notes is not None:
         row.notes = body.notes
     db.commit()
@@ -780,6 +802,7 @@ class NotificationStatusUpdate(BaseModel):
 class MemberAdminUpdate(BaseModel):
     full_name: str | None = Field(default=None, min_length=1)
     phone: str | None = None
+    birth_date: date | None = None
     member_no: str | None = None
     member_level: str | None = Field(default=None, pattern="^(starter|core|elite|vip)$")
     is_active: bool | None = None
@@ -958,6 +981,8 @@ def update_member_admin(
         row.full_name = body.full_name.strip()
     if body.phone is not None:
         row.phone = body.phone.strip()
+    if body.birth_date is not None:
+        row.birth_date = body.birth_date
     if body.member_level is not None:
         row.member_level = body.member_level
     if body.is_active is not None:
@@ -983,6 +1008,7 @@ def update_member_admin(
         "id": row.id,
         "full_name": row.full_name,
         "phone": row.phone,
+        "birth_date": getattr(row, "birth_date", None),
         "member_no": row.member_no,
         "member_level": getattr(row, "member_level", "starter"),
         "is_active": row.is_active,

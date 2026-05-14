@@ -12,6 +12,7 @@ router = APIRouter(prefix="/payments", tags=["payments"])
 
 class MembershipCreate(BaseModel):
     plan: str  # monthly, yearly
+    payment_method: str = "card"  # paypal | naverpay | kakaopay | payco | bank_transfer | card
 
 class PaymentCreate(BaseModel):
     membership_id: int
@@ -56,6 +57,8 @@ def create_membership(
         amount=amount,
         currency="aud",
         status="completed",  # 실제론 Stripe 응답으로 업데이트
+        source="online",
+        payment_method=getattr(data, "payment_method", "card"),
         stripe_payment_intent_id="test_" + str(membership.id)  # Test Mode
     )
     db.add(payment)
@@ -75,6 +78,7 @@ def create_membership(
             "amount": payment.amount / 100,  # cents → dollars
             "currency": payment.currency,
             "status": payment.status,
+            "payment_method": getattr(payment, "payment_method", "card"),
             "stripe_payment_intent_id": payment.stripe_payment_intent_id
         }
     }
@@ -121,6 +125,10 @@ def get_payment_history(
             "amount": p.amount / 100,
             "currency": p.currency,
             "status": p.status,
+            "source": getattr(p, "source", "online"),
+            "payment_method": getattr(p, "payment_method", "card"),
+            "center_id": getattr(p, "center_id", None),
+            "memo": getattr(p, "memo", None),
             "created_at": p.created_at
         }
         for p in payments

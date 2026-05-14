@@ -34,6 +34,8 @@ def ensure_columns(engine) -> None:
                     "WHERE member_level IS NULL OR member_level = ''"
                 )
             )
+            if "birth_date" not in col_names:
+                conn.execute(text("ALTER TABLE members ADD COLUMN birth_date DATE"))
             if insp.has_table("notification_requests"):
                 ncols = {c["name"] for c in insp.get_columns("notification_requests")}
                 if "channel" not in ncols:
@@ -88,6 +90,49 @@ def ensure_columns(engine) -> None:
                         "UPDATE notification_requests SET max_retries=3 WHERE max_retries IS NULL"
                     )
                 )
+            if insp.has_table("payments"):
+                pcols = {c["name"] for c in insp.get_columns("payments")}
+                if "center_id" not in pcols:
+                    conn.execute(text("ALTER TABLE payments ADD COLUMN center_id INTEGER"))
+                if "source" not in pcols:
+                    conn.execute(
+                        text("ALTER TABLE payments ADD COLUMN source VARCHAR(32) DEFAULT 'online'")
+                    )
+                if "memo" not in pcols:
+                    conn.execute(text("ALTER TABLE payments ADD COLUMN memo VARCHAR(512)"))
+                if "recorded_by_member_id" not in pcols:
+                    conn.execute(
+                        text("ALTER TABLE payments ADD COLUMN recorded_by_member_id INTEGER")
+                    )
+                if "payment_method" not in pcols:
+                    conn.execute(
+                        text("ALTER TABLE payments ADD COLUMN payment_method VARCHAR(32) DEFAULT 'card'")
+                    )
+                conn.execute(
+                    text("UPDATE payments SET source='online' WHERE source IS NULL OR source=''")
+                )
+                conn.execute(
+                    text("UPDATE payments SET payment_method='card' WHERE payment_method IS NULL OR payment_method=''")
+                )
+            if insp.has_table("fitness_classes"):
+                fcols = {c["name"] for c in insp.get_columns("fitness_classes")}
+                if "center_id" not in fcols:
+                    conn.execute(text("ALTER TABLE fitness_classes ADD COLUMN center_id INTEGER"))
+                if "level_required" not in fcols:
+                    conn.execute(
+                        text("ALTER TABLE fitness_classes ADD COLUMN level_required VARCHAR(32) DEFAULT 'starter'")
+                    )
+                conn.execute(
+                    text("UPDATE fitness_classes SET level_required='starter' WHERE level_required IS NULL OR level_required=''")
+                )
+            if insp.has_table("instructor_profiles"):
+                icols = {c["name"] for c in insp.get_columns("instructor_profiles")}
+                if "avatar_url" not in icols:
+                    conn.execute(text("ALTER TABLE instructor_profiles ADD COLUMN avatar_url VARCHAR(512)"))
+                if "bio" not in icols:
+                    conn.execute(text("ALTER TABLE instructor_profiles ADD COLUMN bio VARCHAR(1000)"))
+                if "specialties" not in icols:
+                    conn.execute(text("ALTER TABLE instructor_profiles ADD COLUMN specialties VARCHAR(500)"))
             if not insp.has_table("notification_delivery_attempts"):
                 conn.execute(
                     text(
@@ -100,6 +145,103 @@ def ensure_columns(engine) -> None:
                             provider_message_id VARCHAR(128),
                             error_message VARCHAR(512),
                             attempted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                        )
+                        """
+                    )
+                )
+            if not insp.has_table("centers"):
+                conn.execute(
+                    text(
+                        """
+                        CREATE TABLE centers (
+                            id INTEGER PRIMARY KEY,
+                            name VARCHAR(128) NOT NULL,
+                            slug VARCHAR(128) UNIQUE NOT NULL,
+                            is_active BOOLEAN DEFAULT TRUE,
+                            tablet_welcome_text VARCHAR(256) DEFAULT 'Welcome to Fitlio.',
+                            tablet_theme VARCHAR(64) DEFAULT 'premium-green',
+                            tablet_logo_url VARCHAR(512),
+                            created_by_member_id INTEGER,
+                            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                        )
+                        """
+                    )
+                )
+            if not insp.has_table("center_memberships"):
+                conn.execute(
+                    text(
+                        """
+                        CREATE TABLE center_memberships (
+                            id INTEGER PRIMARY KEY,
+                            center_id INTEGER NOT NULL,
+                            member_id INTEGER NOT NULL,
+                            role VARCHAR(32) DEFAULT 'member',
+                            status VARCHAR(32) DEFAULT 'pending',
+                            invited_by_member_id INTEGER,
+                            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                        )
+                        """
+                    )
+                )
+            if not insp.has_table("instructor_reactions"):
+                conn.execute(
+                    text(
+                        """
+                        CREATE TABLE instructor_reactions (
+                            id INTEGER PRIMARY KEY,
+                            instructor_id INTEGER NOT NULL,
+                            member_id INTEGER NOT NULL,
+                            type VARCHAR(16) DEFAULT 'like',
+                            content VARCHAR(1000),
+                            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                        )
+                        """
+                    )
+                )
+            if not insp.has_table("suggestions"):
+                conn.execute(
+                    text(
+                        """
+                        CREATE TABLE suggestions (
+                            id INTEGER PRIMARY KEY,
+                            member_id INTEGER,
+                            center_id INTEGER,
+                            content VARCHAR(2000) NOT NULL,
+                            is_anonymous BOOLEAN DEFAULT TRUE,
+                            status VARCHAR(32) DEFAULT 'open',
+                            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                        )
+                        """
+                    )
+                )
+            if not insp.has_table("community_posts"):
+                conn.execute(
+                    text(
+                        """
+                        CREATE TABLE community_posts (
+                            id INTEGER PRIMARY KEY,
+                            author_member_id INTEGER NOT NULL,
+                            center_id INTEGER,
+                            content VARCHAR(2000),
+                            media_url VARCHAR(1024),
+                            media_type VARCHAR(16) DEFAULT 'image',
+                            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                        )
+                        """
+                    )
+                )
+            if not insp.has_table("community_reactions"):
+                conn.execute(
+                    text(
+                        """
+                        CREATE TABLE community_reactions (
+                            id INTEGER PRIMARY KEY,
+                            post_id INTEGER NOT NULL,
+                            member_id INTEGER NOT NULL,
+                            type VARCHAR(16) DEFAULT 'like',
+                            content VARCHAR(1000),
+                            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                         )
                         """
                     )

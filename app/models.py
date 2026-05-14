@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, Boolean
+from sqlalchemy import Column, Integer, String, DateTime, Boolean, Date
 from sqlalchemy.ext.declarative import declarative_base
 from datetime import datetime
 
@@ -12,6 +12,7 @@ class Member(Base):
     hashed_password = Column(String, nullable=False)
     full_name = Column(String, nullable=False)
     phone = Column(String)
+    birth_date = Column(Date, nullable=True)
     member_no = Column(String, unique=True, index=True, nullable=True)
     member_level = Column(String(32), nullable=False, default="starter")
     is_active = Column(Boolean, default=True)
@@ -26,6 +27,8 @@ class FitnessClass(Base):
     name = Column(String, nullable=False)
     instructor = Column(String, nullable=False)
     schedule = Column(DateTime, nullable=False)
+    center_id = Column(Integer, nullable=True, index=True)
+    level_required = Column(String(32), nullable=False, default="starter")
     capacity = Column(Integer, default=20)
     current_count = Column(Integer, default=0)
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -59,6 +62,11 @@ class Payment(Base):
     membership_id = Column(Integer, nullable=False)
     amount = Column(Integer, nullable=False)  # cents (e.g. 5000 = $50.00)
     currency = Column(String, default="aud")
+    center_id = Column(Integer, nullable=True)
+    source = Column(String(32), nullable=False, default="online")  # online | onsite_manual
+    payment_method = Column(String(32), nullable=False, default="card")
+    memo = Column(String(512), nullable=True)
+    recorded_by_member_id = Column(Integer, nullable=True)
     status = Column(String, default="pending")  # pending, completed, failed
     stripe_payment_intent_id = Column(String)  # Stripe 연동용
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -83,6 +91,9 @@ class InstructorProfile(Base):
     hourly_rate_cents = Column(Integer, nullable=False, default=50_000)  # KRW-style cents unit
     pay_per_class_cents = Column(Integer, nullable=False, default=80_000)  # flat per scheduled class
     email = Column(String, nullable=True)
+    avatar_url = Column(String(512), nullable=True)
+    bio = Column(String(1000), nullable=True)
+    specialties = Column(String(500), nullable=True)
     notes = Column(String, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
@@ -102,6 +113,35 @@ class NotificationRequest(Base):
     last_error = Column(String(512), nullable=True)
     sent_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class Center(Base):
+    __tablename__ = "centers"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(128), nullable=False)
+    slug = Column(String(128), unique=True, nullable=False, index=True)
+    is_active = Column(Boolean, default=True)
+    tablet_welcome_text = Column(String(256), nullable=False, default="Welcome to Fitlio.")
+    tablet_theme = Column(String(64), nullable=False, default="premium-green")
+    tablet_logo_url = Column(String(512), nullable=True)
+    created_by_member_id = Column(Integer, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class CenterMembership(Base):
+    __tablename__ = "center_memberships"
+
+    id = Column(Integer, primary_key=True, index=True)
+    center_id = Column(Integer, nullable=False, index=True)
+    member_id = Column(Integer, nullable=False, index=True)
+    role = Column(String(32), nullable=False, default="member")  # admin | staff | member
+    status = Column(
+        String(32), nullable=False, default="pending"
+    )  # active | pending | invited | rejected
+    invited_by_member_id = Column(Integer, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow)
 
 
 class DirectMessage(Base):
@@ -125,3 +165,49 @@ class NotificationDeliveryAttempt(Base):
     provider_message_id = Column(String(128), nullable=True)
     error_message = Column(String(512), nullable=True)
     attempted_at = Column(DateTime, default=datetime.utcnow, index=True)
+
+
+class InstructorReaction(Base):
+    __tablename__ = "instructor_reactions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    instructor_id = Column(Integer, nullable=False, index=True)
+    member_id = Column(Integer, nullable=False, index=True)
+    type = Column(String(16), nullable=False, default="like")  # like | comment
+    content = Column(String(1000), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class Suggestion(Base):
+    __tablename__ = "suggestions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    member_id = Column(Integer, nullable=True, index=True)
+    center_id = Column(Integer, nullable=True, index=True)
+    content = Column(String(2000), nullable=False)
+    is_anonymous = Column(Boolean, nullable=False, default=True)
+    status = Column(String(32), nullable=False, default="open")
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class CommunityPost(Base):
+    __tablename__ = "community_posts"
+
+    id = Column(Integer, primary_key=True, index=True)
+    author_member_id = Column(Integer, nullable=False, index=True)
+    center_id = Column(Integer, nullable=True, index=True)
+    content = Column(String(2000), nullable=True)
+    media_url = Column(String(1024), nullable=True)
+    media_type = Column(String(16), nullable=False, default="image")  # image | video
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class CommunityReaction(Base):
+    __tablename__ = "community_reactions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    post_id = Column(Integer, nullable=False, index=True)
+    member_id = Column(Integer, nullable=False, index=True)
+    type = Column(String(16), nullable=False, default="like")  # like | comment
+    content = Column(String(1000), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)

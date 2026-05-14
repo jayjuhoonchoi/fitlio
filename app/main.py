@@ -15,6 +15,8 @@ from app.me import router as me_router
 from app.messages import router as message_router
 from app.reminders import maybe_queue_membership_expiry_reminders
 from app.notification_dispatch import maybe_process_pending_notifications
+from app.centers import router as center_router
+from app.member_experience import router as member_experience_router
 
 models.Base.metadata.create_all(bind=engine)
 ensure_columns(engine)
@@ -58,6 +60,8 @@ app.include_router(attendance_router)
 app.include_router(admin_router)
 app.include_router(me_router)
 app.include_router(message_router)
+app.include_router(center_router)
+app.include_router(member_experience_router)
 
 
 @app.get("/", response_class=HTMLResponse)

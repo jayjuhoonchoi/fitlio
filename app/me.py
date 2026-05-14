@@ -10,6 +10,15 @@ from app import models
 router = APIRouter(prefix="/api/me", tags=["me"])
 
 
+def _calculate_age(birth_date):
+    if not birth_date:
+        return None
+    today = datetime.utcnow().date()
+    return today.year - birth_date.year - (
+        (today.month, today.day) < (birth_date.month, birth_date.day)
+    )
+
+
 @router.get("/summary")
 def my_summary(db: Session = Depends(get_db), user: dict = Depends(get_current_user)):
     mid = user["id"]
@@ -55,6 +64,9 @@ def my_summary(db: Session = Depends(get_db), user: dict = Depends(get_current_u
             "id": member.id if member else mid,
             "full_name": member.full_name if member else "",
             "email": member.email if member else "",
+            "birth_date": getattr(member, "birth_date", None) if member else None,
+            "age": _calculate_age(getattr(member, "birth_date", None)) if member else None,
+            "level": getattr(member, "member_level", "starter") if member else "starter",
             "role": user.get("role", "member"),
         },
         "membership": (
