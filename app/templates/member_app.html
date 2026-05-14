@@ -24,6 +24,11 @@
       from { opacity: 0; transform: translateY(6px); }
       to { opacity: 1; transform: translateY(0); }
     }
+    @keyframes pulseGlow {
+      0% { box-shadow: 0 0 0 rgba(47,133,90,0); }
+      50% { box-shadow: 0 0 0 8px rgba(47,133,90,.12); }
+      100% { box-shadow: 0 0 0 rgba(47,133,90,0); }
+    }
     body {
       font-family: Inter, system-ui, sans-serif;
       background:
@@ -111,6 +116,42 @@
     .mini h2 { font-size: 1.02rem; margin-bottom: .75rem; color: #3f4d44; }
     .msg-list { max-height: 260px; overflow: auto; border: 1px solid #d8dfd6; border-radius: 10px; padding: .65rem; background: #fffdf7; }
     .warn-card { border:1px solid #f2a2b7; background:linear-gradient(135deg,#fff1f4,#fdf7f8); }
+    .cta-pay { animation: pulseGlow 1.8s ease-in-out infinite; }
+    .feed-card { position: relative; overflow: hidden; }
+    .feed-card::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(120deg, transparent 20%, rgba(255,255,255,.42) 40%, transparent 60%);
+      transform: translateX(-120%);
+      transition: transform .9s ease;
+      pointer-events: none;
+    }
+    .feed-card:hover::before { transform: translateX(120%); }
+    .avatar {
+      width: 38px;
+      height: 38px;
+      border-radius: 999px;
+      border: 1px solid #bfd0c4;
+      background: linear-gradient(135deg,#eaf3eb,#f8fbf6);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: .76rem;
+      color: #3f5d4c;
+      font-weight: 700;
+      margin-right: .45rem;
+      overflow: hidden;
+    }
+    .avatar img { width: 100%; height: 100%; object-fit: cover; }
+    .media-box {
+      margin-top: .45rem;
+      border: 1px solid #d8dfd6;
+      border-radius: 10px;
+      background: #f6faf5;
+      overflow: hidden;
+    }
+    .media-box img, .media-box video { width: 100%; display: block; max-height: 260px; object-fit: cover; }
     .msg-item { padding: .45rem .55rem; border-radius: 8px; margin-bottom: .4rem; font-size: .82rem; border: 1px solid #d8dfd6; transition: transform .14s ease, box-shadow .14s ease; }
     .msg-item:hover { transform: translateY(-1px); box-shadow: 0 8px 12px rgba(34,54,43,.1); }
     .msg-item.me { background: #e7f3ea; border-color: #b6d5c0; }
@@ -257,7 +298,7 @@
               <option value="paypal">PayPal</option><option value="naverpay">NaverPay</option><option value="kakaopay">KakaoPay</option>
               <option value="payco">Payco</option><option value="bank_transfer">Bank Transfer</option><option value="card">Card</option>
             </select>
-            <button class="btn" id="quickMonthly">월간 결제</button>
+            <button class="btn cta-pay" id="quickMonthly">월간 결제</button>
             <button class="btn btn2" id="quickYearly">연간 결제</button>
           </div>`;
         document.getElementById("quickMonthly").onclick=()=>purchaseNow("monthly");
@@ -296,7 +337,17 @@
       if(!r.ok){ box.innerHTML='<div class="card">—</div>'; return; }
       const list=await r.json().catch(()=>[]);
       if(!list.length){ box.innerHTML='<div class="card"><div class="empty-state">강사 프로필이 아직 없습니다.</div></div>'; return; }
-      box.innerHTML=list.map(i=>`<div class="card"><strong>${escape(i.display_name)}</strong><div class="meta">${escape(i.specialties||"")}</div><div class="meta">${escape(i.bio||"")}</div><div class="meta">❤️ ${i.likes}</div><div class="row"><button class="btn btn2" data-ilk="${i.id}">Like</button><input id="icom_${i.id}" placeholder="댓글"><button class="btn" data-icm="${i.id}">Comment</button></div><div class="meta">${(i.comments||[]).slice(0,3).map(c=>`• ${escape(c.content||"")}`).join("<br>") || "No comments yet."}</div></div>`).join("");
+      box.innerHTML=list.map(i=>`<div class="card feed-card">
+        <div style="display:flex;align-items:center;margin-bottom:.3rem">
+          <span class="avatar">${avatarMarkup(i.avatar_url, i.display_name)}</span>
+          <strong>${escape(i.display_name)}</strong>
+        </div>
+        <div class="meta">${escape(i.specialties||"")}</div>
+        <div class="meta">${escape(i.bio||"")}</div>
+        <div class="meta">❤️ ${i.likes}</div>
+        <div class="row"><button class="btn btn2" data-ilk="${i.id}">Like</button><input id="icom_${i.id}" placeholder="댓글"><button class="btn" data-icm="${i.id}">Comment</button></div>
+        <div class="meta">${(i.comments||[]).slice(0,3).map(c=>`• ${escape(c.content||"")}`).join("<br>") || "No comments yet."}</div>
+      </div>`).join("");
       box.querySelectorAll("[data-ilk]").forEach(b=>b.onclick=async()=>{ await fetch("/member/instructors/"+b.dataset.ilk+"/like",{method:"POST",headers:auth}); loadInstructorFeed(); });
       box.querySelectorAll("[data-icm]").forEach(b=>b.onclick=async()=>{ const id=b.dataset.icm; const v=(document.getElementById("icom_"+id)||{}).value||""; if(!v.trim()) return; await fetch("/member/instructors/"+id+"/comments",{method:"POST",headers:{...auth,"Content-Type":"application/json"},body:JSON.stringify({instructor_id:+id,content:v})}); loadInstructorFeed(); });
     }
@@ -316,7 +367,7 @@
       if(!r.ok){ box.innerHTML='<div class="card">—</div>'; return; }
       const list=await r.json().catch(()=>[]);
       if(!list.length){ box.innerHTML='<div class="card"><div class="empty-state">커뮤니티 첫 글을 남겨보세요.</div></div>'; return; }
-      box.innerHTML=list.map(p=>`<div class="card"><strong>${escape(p.author_name||"Member")}</strong><div class="meta">${new Date(p.created_at).toLocaleString()}</div><div style="margin:.45rem 0">${escape(p.content||"")}</div>${p.media_url?`<div class="meta">${escape(p.media_type)}: ${escape(p.media_url)}</div>`:""}<div class="meta">❤️ ${p.likes}</div><div class="row"><button class="btn btn2" data-plk="${p.id}">Like</button><input id="pcom_${p.id}" placeholder="댓글"><button class="btn" data-pcm="${p.id}">Comment</button></div><div class="meta">${(p.comments||[]).slice(-3).map(c=>`• ${escape(c.content||"")}`).join("<br>") || "No comments yet."}</div></div>`).join("");
+      box.innerHTML=list.map(p=>`<div class="card feed-card"><strong>${escape(p.author_name||"Member")}</strong><div class="meta">${new Date(p.created_at).toLocaleString()}</div><div style="margin:.45rem 0">${escape(p.content||"")}</div>${mediaTag(p.media_url, p.media_type)}<div class="meta">❤️ ${p.likes}</div><div class="row"><button class="btn btn2" data-plk="${p.id}">Like</button><input id="pcom_${p.id}" placeholder="댓글"><button class="btn" data-pcm="${p.id}">Comment</button></div><div class="meta">${(p.comments||[]).slice(-3).map(c=>`• ${escape(c.content||"")}`).join("<br>") || "No comments yet."}</div></div>`).join("");
       box.querySelectorAll("[data-plk]").forEach(b=>b.onclick=async()=>{ await fetch("/member/community/posts/"+b.dataset.plk+"/like",{method:"POST",headers:auth}); loadCommunityFeed(); });
       box.querySelectorAll("[data-pcm]").forEach(b=>b.onclick=async()=>{ const id=b.dataset.pcm; const text=(document.getElementById("pcom_"+id)||{}).value||""; if(!text.trim()) return; await fetch("/member/community/comments",{method:"POST",headers:{...auth,"Content-Type":"application/json"},body:JSON.stringify({post_id:+id,content:text})}); loadCommunityFeed(); });
     }
@@ -340,6 +391,29 @@
       el.querySelectorAll("[data-bid]").forEach(b=>b.onclick=()=>book(b.dataset.bid));
     }
     function escape(s){ const d=document.createElement("div"); d.textContent=s; return d.innerHTML; }
+    function avatarMarkup(url, name){
+      const u = safeUrl(url);
+      if(u) return `<img src="${u}" alt="${escape(name||'avatar')}">`;
+      const n = String(name||"M").trim();
+      return escape((n[0]||"M").toUpperCase());
+    }
+    function safeUrl(url){
+      const raw = String(url||"").trim();
+      if(!raw) return "";
+      try{
+        const u = new URL(raw);
+        if(u.protocol === "http:" || u.protocol === "https:") return escape(raw);
+      }catch(_){}
+      return "";
+    }
+    function mediaTag(url, type){
+      const u = safeUrl(url);
+      if(!u) return "";
+      if(type === "video"){
+        return `<div class="media-box"><video controls preload="metadata" src="${u}"></video></div>`;
+      }
+      return `<div class="media-box"><img loading="lazy" src="${u}" alt="community media"></div>`;
+    }
     async function book(id){
       document.getElementById("log").textContent="";
       const r=await fetch("/classes/"+id+"/book?member_id="+encodeURIComponent(memberId),{method:"POST",headers:auth});
