@@ -236,6 +236,96 @@ def retention_report(
     return {"months": months, "points": points}
 
 
+@router.get("/reports/occupancy-trend")
+def occupancy_trend_report(
+    months: int = 6,
+    db: Session = Depends(get_db),
+    _: dict = Depends(require_admin),
+):
+    if months < 1 or months > 24:
+        raise HTTPException(status_code=400, detail="Months must be between 1 and 24")
+    now = datetime.utcnow()
+    y = now.year
+    m = now.month
+    points = []
+    for _ in range(months):
+        last = monthrange(y, m)[1]
+        start = datetime(y, m, 1)
+        end = datetime(y, m, last, 23, 59, 59)
+        classes = (
+            db.query(FitnessClass)
+            .filter(FitnessClass.schedule >= start, FitnessClass.schedule <= end)
+            .all()
+        )
+        capacity_total = sum(c.capacity for c in classes)
+        booked_total = 0
+        for c in classes:
+            booked_total += (
+                db.query(Booking)
+                .filter(
+                    Booking.class_id == c.id,
+                    Booking.status == "confirmed",
+                )
+                .count()
+            )
+        fill_rate = (booked_total / capacity_total * 100.0) if capacity_total else 0.0
+        points.append(
+            {
+                "year": y,
+                "month": m,
+                "label": f"{y}-{m:02d}",
+                "classes_count": len(classes),
+                "capacity_total": capacity_total,
+                "booked_total": booked_total,
+                "fill_rate": round(fill_rate, 2),
+            }
+        )
+        m -= 1
+        if m == 0:
+            m = 12
+            y -= 1
+    points.reverse()
+    return {"months": months, "points": points}
+
+
+@router.get("/reports/member-risk")
+def member_risk_report(
+    days: int = 60,
+    db: Session = Depends(get_db),
+    _: dict = Depends(require_admin),
+):
+    if days < 14 or days > 180:
+        raise HTTPException(status_code=400, detail="Days must be between 14 and 180")
+    since = datetime.utcnow() - timedelta(days=days)
+    classes_count = (
+        db.query(FitnessClass)
+        .filter(FitnessClass.schedule >= since, FitnessClass.schedule <= datetime.utcnow())
+        .count()
+    )
+    denominator = max(classes_count, 1)
+    members = db.query(Member).all()
+    rows = []
+    for m in members:
+        attendance_count = (
+            db.query(Attendance)
+            .filter(Attendance.member_id == m.id, Attendance.checked_in_at >= since)
+            .count()
+        )
+        attendance_rate = round((attendance_count / denominator) * 100.0, 2)
+        rows.append(
+            {
+                "member_id": m.id,
+                "member_no": getattr(m, "member_no", None),
+                "full_name": m.full_name,
+                "attendance_count": attendance_count,
+                "attendance_rate": attendance_rate,
+                "at_risk": attendance_rate <= 50.0,
+            }
+        )
+    rows.sort(key=lambda r: r["attendance_rate"])
+    return rows
+
+
 @router.get("/reports/class-utilization")
 def class_utilization_report(
     days: int = 30,

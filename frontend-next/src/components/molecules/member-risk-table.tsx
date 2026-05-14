@@ -1,7 +1,73 @@
+"use client";
+
+import { useEffect, useState } from "react";
+
 import { Badge } from "@/components/atoms/badge";
-import { members } from "@/lib/mock-data";
+import { apiFetch } from "@/lib/api";
+import { members as fallbackMembers } from "@/lib/mock-data";
+
+type RiskMember = {
+  id: number;
+  full_name: string;
+  email: string;
+  member_no?: string | null;
+  member_level?: string;
+  is_active: boolean;
+  attendance_rate: number;
+};
 
 export function MemberRiskTable(): JSX.Element {
+  const [rows, setRows] = useState<RiskMember[]>([]);
+
+  useEffect(() => {
+    let mounted = true;
+    Promise.all([
+      apiFetch<
+        Array<{
+          id: number;
+          full_name: string;
+          email: string;
+          member_no?: string | null;
+          member_level?: string;
+          is_active: boolean;
+        }>
+      >("/admin/members"),
+      apiFetch<
+        Array<{
+          member_id: number;
+          attendance_rate: number;
+        }>
+      >("/admin/reports/member-risk")
+    ])
+      .then(([members, risk]) => {
+        if (!mounted) return;
+        const byMember = new Map<number, number>();
+        risk.forEach((row) => byMember.set(row.member_id, row.attendance_rate));
+        setRows(
+          members.map((member) => ({
+            ...member,
+            attendance_rate: byMember.get(member.id) ?? 0
+          }))
+        );
+      })
+      .catch(() => {
+        setRows(
+          fallbackMembers.map((member) => ({
+            id: Number(member.id.replace("m-", "")) || 0,
+            full_name: member.name,
+            email: member.email,
+            member_no: member.memberNo,
+            member_level: member.level,
+            is_active: member.active,
+            attendance_rate: member.attendanceRate
+          }))
+        );
+      });
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
   return (
     <div className="overflow-hidden rounded-xl border border-border">
       <table className="w-full text-sm">
@@ -17,20 +83,22 @@ export function MemberRiskTable(): JSX.Element {
           </tr>
         </thead>
         <tbody>
-          {members.map((member) => {
-            const atRisk = member.attendanceRate <= 50;
+          {rows.map((member) => {
+            const atRisk = member.attendance_rate <= 50;
             return (
               <tr key={member.id} className="border-t border-border/80">
-                <td className="px-3 py-2 font-medium">{member.memberNo}</td>
-                <td className="px-3 py-2">{member.name}</td>
+                <td className="px-3 py-2 font-medium">{member.member_no ?? `M-${member.id}`}</td>
+                <td className="px-3 py-2">{member.full_name}</td>
                 <td className="px-3 py-2 text-muted">{member.email}</td>
-                <td className="px-3 py-2 uppercase text-silver">{member.level}</td>
+                <td className="px-3 py-2 uppercase text-silver">
+                  {member.member_level ?? "starter"}
+                </td>
                 <td className="px-3 py-2">
-                  <Badge tone={member.active ? "accent" : "neutral"}>
-                    {member.active ? "ACTIVE" : "PAUSED"}
+                  <Badge tone={member.is_active ? "accent" : "neutral"}>
+                    {member.is_active ? "ACTIVE" : "PAUSED"}
                   </Badge>
                 </td>
-                <td className="px-3 py-2">{member.attendanceRate}%</td>
+                <td className="px-3 py-2">{member.attendance_rate}%</td>
                 <td className="px-3 py-2">
                   {atRisk ? (
                     <Badge tone="danger">At-Risk</Badge>
