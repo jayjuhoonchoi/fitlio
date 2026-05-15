@@ -43,6 +43,7 @@
       cursor:pointer;
     }
     .btn:hover{ background: rgba(255,255,255,.2); }
+    .btn:active{ transform: scale(.98); }
     .display{
       margin-top:16px;
       border-radius:16px;
@@ -107,8 +108,14 @@
     }
     function renderPad(){
       const pad = document.getElementById("pad");
-      pad.innerHTML = [..."123456789", "0"].map(n=>`<button class="btn" data-n="${n}">${n}</button>`).join("");
+      pad.innerHTML = [..."123456789", "0", "⌫"].map(n=>`<button class="btn" data-n="${n}">${n}</button>`).join("");
       pad.querySelectorAll("[data-n]").forEach(b=>b.onclick=()=>{
+        if(b.dataset.n === "⌫"){
+          pin = pin.slice(0, -1);
+          document.getElementById("display").textContent = pin.padEnd(4,"-");
+          document.getElementById("submitBtn").disabled = pin.length !== 4;
+          return;
+        }
         if(pin.length>=4) return;
         pin += b.dataset.n;
         document.getElementById("display").textContent = pin.padEnd(4,"-");
@@ -137,6 +144,13 @@
       document.getElementById("hint").textContent = r.ok ? "Done. Next member can check in." : "Try again or ask staff for help.";
       if(r.ok){
         document.getElementById("submitBtn").disabled = true;
+        setTimeout(()=>{
+          pin = "";
+          document.getElementById("display").textContent = "----";
+          document.getElementById("hint").textContent = "Enter 4 digits and tap Check-in.";
+          document.getElementById("result").textContent = "";
+          document.getElementById("result").classList.remove("success","error");
+        }, 2200);
       }else{
         document.getElementById("submitBtn").disabled = pin.length !== 4;
       }
