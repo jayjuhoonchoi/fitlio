@@ -27,10 +27,23 @@ Date: Friday sprint block
 - Error state shown for invalid check-in and submit lock recovers
 
 ## 5. Core smoke endpoints
+- Run deterministic command order:
+  1. `./scripts/preflight_env.sh http://127.0.0.1:8000`
+  2. `./scripts/smoke_core.sh`
 - `GET /health` returns healthy payload
 - `GET /member/home` returns membership summary (auth)
 - `GET /member/community/posts` returns visible posts only (auth)
 - `GET /centers/tablet/{slug}` returns tablet config
+- `POST /member/classes/{id}/quick-reserve` route reachable (auth/guarded)
+- `GET /admin/reports/weekly-performance` route reachable (admin-gated)
+- `GET /centers/discover` route reachable (auth-gated)
+- `POST /centers/tablet/check-in` returns contract-safe failure for invalid center
+
+## Failure remediation quick guide
+- Preflight Docker failure: start Docker daemon/Desktop, then rerun preflight.
+- Preflight health failure: `docker compose up -d --build` then `curl -fsS http://127.0.0.1:8000/health`.
+- Smoke auth-gate mismatch (not 401/403): verify auth middleware and router include order.
+- Tablet contract mismatch: inspect `app/centers.py` `tablet_check_in` error paths and headers.
 
 ## Exit criteria
 - P0/P1 open issues: 0

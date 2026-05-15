@@ -51,6 +51,8 @@ From `terraform/`:
 - **Print example SSH:** `terraform output -raw ssh_example`
 - **HTTPS health (after DNS points at the EIP):** `curl -fsS -o /dev/null -w "%{http_code}\n" https://fitlio-jay.duckdns.org/health`
 - **Check public DNS (bypass local cache):** `dig +short fitlio-jay.duckdns.org A @8.8.8.8`
+- **Run preflight checks (local base):** `./scripts/preflight_env.sh http://127.0.0.1:8000`
+- **Run preflight checks (HTTPS/DNS):** `./scripts/preflight_env.sh http://127.0.0.1:8000 fitlio-jay.duckdns.org`
 
 ## HTTPS one-shot fix
 
@@ -85,6 +87,10 @@ Admin notification operations:
 - `GET /admin/notifications/summary` queue KPI snapshot
 
 ## Sprint smoke helpers
+
+- Environment preflight:
+  - `./scripts/preflight_env.sh http://127.0.0.1:8000`
+  - with DNS/cert checks: `./scripts/preflight_env.sh http://127.0.0.1:8000 fitlio-jay.duckdns.org`
 
 - Core local smoke:
   - `./scripts/smoke_core.sh`
