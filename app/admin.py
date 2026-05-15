@@ -40,6 +40,37 @@ def _render_weekly_report_html(payload: dict) -> str:
     template = (TEMPLATES_DIR / "weekly_performance_report.html").read_text(
         encoding="utf-8"
     )
+    metrics = payload.get("metrics", {})
+    revenue = metrics.get("revenue", {})
+    member_growth = metrics.get("member_growth", {})
+    occupancy = metrics.get("occupancy", {})
+    at_risk = metrics.get("at_risk", {})
+    highlights = payload.get("highlights", {})
+    period = payload.get("period", {})
+    scope = payload.get("scope", {})
+
+    substitutions = {
+        "report_title": escape(str(payload.get("title", "Weekly Performance Report"))),
+        "scope_label": escape(str(scope.get("label", "Global Admin"))),
+        "period_start": escape(str(period.get("start", ""))),
+        "period_end": escape(str(period.get("end", ""))),
+        "generated_at": escape(str(payload.get("generated_at", ""))),
+        "revenue_total": f"{float(revenue.get('total_amount', 0.0)):.2f}",
+        "revenue_delta_pct": f"{float(revenue.get('change_vs_previous_week_pct', 0.0)):.2f}",
+        "highlight_revenue": escape(str(highlights.get("revenue", ""))),
+        "member_new": str(int(member_growth.get("new_members", 0))),
+        "member_base": str(int(member_growth.get("member_base", 0))),
+        "retention_rate": f"{float(member_growth.get('retention_rate', 0.0)):.2f}",
+        "highlight_member": escape(str(highlights.get("member_growth_retention", ""))),
+        "classes_count": str(int(occupancy.get("classes_count", 0))),
+        "booked_total": str(int(occupancy.get("booked_total", 0))),
+        "fill_rate": f"{float(occupancy.get('fill_rate', 0.0)):.2f}",
+        "highlight_occupancy": escape(str(highlights.get("class_occupancy", ""))),
+        "at_risk_count": str(int(at_risk.get("count", 0))),
+        "at_risk_pct": f"{float(at_risk.get('share_of_active_members_pct', 0.0)):.2f}",
+        "highlight_risk": escape(str(highlights.get("at_risk", ""))),
+    }
+    return Template(template).safe_substitute(substitutions)
 
 
 def _validate_member_risk_params(days: int, threshold_pct: float) -> None:
