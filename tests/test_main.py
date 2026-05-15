@@ -1836,6 +1836,212 @@ def test_quick_reserve_duplicate_request_protection(db_session):
     assert response.json()["detail"] == "You already reserved this class."
 
 
+def test_cancel_confirmed_booking_promotes_waitlist_member(db_session):
+    canceller = models.Member(
+        email="cancel.promote.canceller@fitlio.com",
+        hashed_password="x",
+        full_name="Cancel Promote Canceller",
+        role="member",
+        is_active=True,
+    )
+    waitlisted = models.Member(
+        email="cancel.promote.waitlisted@fitlio.com",
+        hashed_password="x",
+        full_name="Cancel Promote Waitlisted",
+        role="member",
+        is_active=True,
+    )
+    klass = models.FitnessClass(
+        name="Cancel Promote Class",
+        instructor="Coach Promote",
+        schedule=datetime.utcnow() + timedelta(hours=6),
+        capacity=1,
+        current_count=1,
+    )
+    db_session.add(canceller)
+    db_session.add(waitlisted)
+    db_session.add(klass)
+    db_session.flush()
+    confirmed = models.Booking(
+        member_id=canceller.id,
+        class_id=klass.id,
+        status="confirmed",
+    )
+    waiting = models.Booking(
+        member_id=waitlisted.id,
+        class_id=klass.id,
+        status="waiting",
+    )
+    db_session.add(confirmed)
+    db_session.add(waiting)
+    db_session.commit()
+
+    from app.deps import get_current_user
+
+    app.dependency_overrides[get_db] = _override_db(db_session)
+    app.dependency_overrides[get_current_user] = lambda: {
+        "id": canceller.id,
+        "role": "member",
+    }
+    response = client.request(
+        "DELETE",
+        f"/classes/{klass.id}/cancel",
+        params={"member_id": canceller.id},
+    )
+    app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["message"] == "Booking cancelled successfully"
+    assert payload["waitlist_promotion"]["promoted"] is True
+    assert payload["waitlist_promotion"]["member_id"] == waitlisted.id
+    assert payload["waitlist_promotion"]["notification_enqueued"] is True
+
+    db_session.refresh(confirmed)
+    db_session.refresh(waiting)
+    db_session.refresh(klass)
+    assert confirmed.status == "cancelled"
+    assert waiting.status == "confirmed"
+    assert klass.current_count == 1
+    note = (
+        db_session.query(models.NotificationRequest)
+        .filter(
+            models.NotificationRequest.member_id == waitlisted.id,
+            models.NotificationRequest.topic == "waitlist_promoted",
+        )
+        .first()
+    )
+    assert note is not None
+    assert note.status == "pending"
+
+
+def test_capacity_increase_promotes_waitlist_in_fifo_order(db_session):
+    first = models.Member(
+        email="capacity.fifo.first@fitlio.com",
+        hashed_password="x",
+        full_name="Capacity FIFO First",
+        role="member",
+        is_active=True,
+    )
+    second = models.Member(
+        email="capacity.fifo.second@fitlio.com",
+        hashed_password="x",
+        full_name="Capacity FIFO Second",
+        role="member",
+        is_active=True,
+    )
+    klass = models.FitnessClass(
+        name="Capacity FIFO Class",
+        instructor="Coach FIFO",
+        schedule=datetime.utcnow() + timedelta(hours=7),
+        capacity=1,
+        current_count=1,
+    )
+    admin = models.Member(
+        email="capacity.fifo.admin@fitlio.com",
+        hashed_password="x",
+        full_name="Capacity FIFO Admin",
+        role="admin",
+        is_active=True,
+    )
+    db_session.add(first)
+    db_session.add(second)
+    db_session.add(klass)
+    db_session.add(admin)
+    db_session.flush()
+    first_waiting = models.Booking(
+        member_id=first.id,
+        class_id=klass.id,
+        status="waiting",
+        created_at=datetime.utcnow() - timedelta(minutes=2),
+    )
+    second_waiting = models.Booking(
+        member_id=second.id,
+        class_id=klass.id,
+        status="waiting",
+        created_at=datetime.utcnow() - timedelta(minutes=1),
+    )
+    db_session.add(first_waiting)
+    db_session.add(second_waiting)
+    db_session.commit()
+
+    app.dependency_overrides[get_db] = _override_db(db_session)
+    app.dependency_overrides[require_admin] = lambda: {"id": admin.id, "role": "admin"}
+    response = client.put(
+        f"/admin/classes/{klass.id}",
+        json={"capacity": 3},
+    )
+    app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    db_session.refresh(first_waiting)
+    db_session.refresh(second_waiting)
+    db_session.refresh(klass)
+    assert first_waiting.status == "confirmed"
+    assert second_waiting.status == "confirmed"
+    assert klass.current_count == 3
+    notes = (
+        db_session.query(models.NotificationRequest)
+        .filter(models.NotificationRequest.topic == "waitlist_promoted")
+        .order_by(models.NotificationRequest.created_at.asc())
+        .all()
+    )
+    assert len(notes) == 2
+    assert notes[0].member_id == first.id
+    assert notes[1].member_id == second.id
+
+
+def test_cancel_confirmed_booking_with_no_waitlist_has_no_promotion(db_session):
+    member = models.Member(
+        email="cancel.no.waitlist@fitlio.com",
+        hashed_password="x",
+        full_name="Cancel No Waitlist",
+        role="member",
+        is_active=True,
+    )
+    klass = models.FitnessClass(
+        name="Cancel No Waitlist Class",
+        instructor="Coach No Waitlist",
+        schedule=datetime.utcnow() + timedelta(hours=8),
+        capacity=2,
+        current_count=1,
+    )
+    db_session.add(member)
+    db_session.add(klass)
+    db_session.flush()
+    booking = models.Booking(member_id=member.id, class_id=klass.id, status="confirmed")
+    db_session.add(booking)
+    db_session.commit()
+
+    from app.deps import get_current_user
+
+    app.dependency_overrides[get_db] = _override_db(db_session)
+    app.dependency_overrides[get_current_user] = lambda: {"id": member.id, "role": "member"}
+    response = client.request(
+        "DELETE",
+        f"/classes/{klass.id}/cancel",
+        params={"member_id": member.id},
+    )
+    app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["waitlist_promotion"]["promoted"] is False
+    assert payload["waitlist_promotion"]["booking_id"] is None
+    assert payload["waitlist_promotion"]["member_id"] is None
+    assert payload["waitlist_promotion"]["notification_enqueued"] is False
+    db_session.refresh(booking)
+    db_session.refresh(klass)
+    assert booking.status == "cancelled"
+    assert klass.current_count == 0
+    notes = (
+        db_session.query(models.NotificationRequest)
+        .filter(models.NotificationRequest.topic == "waitlist_promoted")
+        .all()
+    )
+    assert len(notes) == 0
+
+
 def test_admin_weekly_performance_requires_auth():
     response = client.get("/admin/reports/weekly-performance")
     assert response.status_code == 401

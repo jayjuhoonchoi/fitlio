@@ -26,6 +26,7 @@ from app.models import (
 )
 from app.reminders import queue_membership_expiry_reminders
 from app.notification_dispatch import process_pending_notifications
+from app.bookings import promote_waitlist_for_available_seats
 
 router = APIRouter(prefix="/admin")
 TEMPLATES_DIR = Path(__file__).resolve().parent / "templates"
@@ -1047,8 +1048,19 @@ def update_class_admin(
                 status_code=400,
                 detail="Capacity cannot be lower than current bookings",
             )
+        previous_capacity = row.capacity
+        previous_count = row.current_count
         row.capacity = body.capacity
         row.current_count = min(row.current_count, row.capacity)
+        previous_open_seats = max(0, previous_capacity - previous_count)
+        current_open_seats = max(0, row.capacity - row.current_count)
+        newly_available_seats = max(0, current_open_seats - previous_open_seats)
+        if newly_available_seats > 0:
+            promote_waitlist_for_available_seats(
+                db=db,
+                fitness_class=row,
+                max_promotions=newly_available_seats,
+            )
     if body.center_id is not None:
         row.center_id = body.center_id
     if body.level_required is not None:

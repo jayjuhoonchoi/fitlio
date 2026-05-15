@@ -4,7 +4,7 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.database import get_db
-from app.models import FitnessClass, Booking, Member
+from app.models import FitnessClass, Booking, Member, NotificationRequest
 from app.deps import get_current_user, require_admin
 
 router = APIRouter(redirect_slashes=False)
@@ -73,6 +73,63 @@ def _attempt_reserve(db: Session, class_id: int, member_id: int):
         "message": "Class reserved successfully.",
         "waitlisted": False,
     }
+
+
+def _enqueue_waitlist_promotion_notification(
+    db: Session, fitness_class: FitnessClass, member_id: int
+) -> bool:
+    message = (
+        f"You have been promoted from the waitlist for {fitness_class.name} "
+        f"scheduled at {fitness_class.schedule.isoformat()}."
+    )
+    db.add(
+        NotificationRequest(
+            member_id=member_id,
+            topic="waitlist_promoted",
+            message=message,
+            channel="inapp",
+            status="pending",
+        )
+    )
+    return True
+
+
+def promote_waitlist_for_available_seats(
+    db: Session,
+    fitness_class: FitnessClass,
+    max_promotions: int = 1,
+):
+    promotions = []
+    if max_promotions <= 0:
+        return promotions
+
+    available_seats = max(0, fitness_class.capacity - fitness_class.current_count)
+    promotions_to_apply = min(max_promotions, available_seats)
+    for _ in range(promotions_to_apply):
+        next_waiting = (
+            db.query(Booking)
+            .filter(Booking.class_id == fitness_class.id, Booking.status == "waiting")
+            .order_by(Booking.created_at.asc(), Booking.id.asc())
+            .with_for_update()
+            .first()
+        )
+        if not next_waiting:
+            break
+        next_waiting.status = "confirmed"
+        fitness_class.current_count += 1
+        notification_enqueued = _enqueue_waitlist_promotion_notification(
+            db, fitness_class=fitness_class, member_id=next_waiting.member_id
+        )
+        # Keep iteration deterministic even when Session autoflush is disabled.
+        db.flush()
+        promotions.append(
+            {
+                "booking_id": next_waiting.id,
+                "member_id": next_waiting.member_id,
+                "notification_enqueued": notification_enqueued,
+            }
+        )
+    return promotions
 
 @router.get("/classes")
 def get_classes(db: Session = Depends(get_db)):
@@ -192,19 +249,27 @@ def cancel_booking(
         raise HTTPException(status_code=404, detail="Booking not found")
     cancelled_status = booking.status
     booking.status = "cancelled"
+    promotions = []
     if cancelled_status == "confirmed":
         fitness_class.current_count = max(0, fitness_class.current_count - 1)
-        next_waiting = (
-            db.query(Booking)
-            .filter(Booking.class_id == class_id, Booking.status == "waiting")
-            .order_by(Booking.created_at.asc(), Booking.id.asc())
-            .first()
+        promotions = promote_waitlist_for_available_seats(
+            db=db,
+            fitness_class=fitness_class,
+            max_promotions=1,
         )
-        if next_waiting:
-            next_waiting.status = "confirmed"
-            fitness_class.current_count += 1
     db.commit()
-    return {"message": "Booking cancelled successfully"}
+    first_promotion = promotions[0] if promotions else None
+    return {
+        "message": "Booking cancelled successfully",
+        "waitlist_promotion": {
+            "promoted": first_promotion is not None,
+            "booking_id": first_promotion["booking_id"] if first_promotion else None,
+            "member_id": first_promotion["member_id"] if first_promotion else None,
+            "notification_enqueued": (
+                first_promotion["notification_enqueued"] if first_promotion else False
+            ),
+        },
+    }
 
 
 @router.get("/classes/{class_id}/waitlist")
