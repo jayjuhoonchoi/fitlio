@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.deps import get_current_user
 from app.models import (
+    Attendance,
     Center,
     CenterMembership,
     CommunityPost,
@@ -103,6 +104,16 @@ def _is_admin_or_staff(db: Session, member_id: int) -> bool:
     return bool(row)
 
 
+def _this_month_attendance_count(db: Session, member_id: int) -> int:
+    now = datetime.utcnow()
+    month_start = datetime(now.year, now.month, 1)
+    return (
+        db.query(Attendance)
+        .filter(Attendance.member_id == member_id, Attendance.checked_in_at >= month_start)
+        .count()
+    )
+
+
 @router.get("/home")
 def member_home_data(db: Session = Depends(get_db), user: dict = Depends(get_current_user)):
     member = db.query(Member).filter(Member.id == user["id"]).first()
@@ -116,10 +127,7 @@ def member_home_data(db: Session = Depends(get_db), user: dict = Depends(get_cur
     )
     now = datetime.utcnow()
     is_expired = not membership or membership.end_date < now or membership.status != "active"
-    month_start = datetime(now.year, now.month, 1)
-    used = 0
-    if membership:
-        used = db.query(func.count()).select_from(Payment).filter(Payment.member_id == member.id).count()
+    used = _this_month_attendance_count(db, member.id) if membership else 0
     centers = (
         db.query(CenterMembership, Center)
         .join(Center, Center.id == CenterMembership.center_id)
@@ -144,7 +152,7 @@ def member_home_data(db: Session = Depends(get_db), user: dict = Depends(get_cur
                     else None
                 ),
                 "is_expired": is_expired,
-                "can_pay_now": is_expired,
+                "can_pay_now": is_expired or membership.status in {"cancelled", "expired"},
             }
             if membership
             else {"status": "none", "is_expired": True, "can_pay_now": True}
@@ -305,7 +313,7 @@ def purchase_membership(
     membership = Membership(
         member_id=user["id"],
         plan=body.plan,
-        status="active" if body.payment_method == "bank_transfer" else "pending",
+        status="pending",
         end_date=end_date,
         auto_renew=True,
     )
@@ -317,7 +325,7 @@ def purchase_membership(
         membership_id=membership.id,
         amount=amount,
         currency="aud",
-        status="completed",
+        status="pending",
         source="online",
         payment_method=body.payment_method,
         stripe_payment_intent_id=f"sim_{body.payment_method}_{membership.id}",
@@ -326,9 +334,11 @@ def purchase_membership(
     db.add(payment)
     db.commit()
     db.refresh(payment)
-    if body.payment_method != "bank_transfer":
-        payment.status = "pending"
-        db.commit()
+    message = (
+        "Bank transfer requested. Membership activates after admin confirmation."
+        if body.payment_method == "bank_transfer"
+        else "Payment initiated. Complete checkout to activate membership."
+    )
     return {
         "membership_id": membership.id,
         "payment_id": payment.id,
@@ -336,6 +346,7 @@ def purchase_membership(
         "payment_status": payment.status,
         "checkout_url": intent.checkout_url,
         "external_ref": intent.external_ref,
+        "message": message,
     }
 
 
@@ -534,11 +545,25 @@ def payment_webhook(
     body: PaymentWebhookBody,
     db: Session = Depends(get_db),
 ):
+    payload_raw = json.dumps(body.payload or {}, ensure_ascii=True)[:3800]
+    duplicate = (
+        db.query(PaymentWebhookEvent)
+        .filter(
+            PaymentWebhookEvent.provider == body.provider,
+            PaymentWebhookEvent.event_type == body.event_type,
+            PaymentWebhookEvent.external_ref == body.external_ref,
+            PaymentWebhookEvent.payload == payload_raw,
+        )
+        .first()
+    )
+    if duplicate:
+        return {"ok": True, "processed": bool(duplicate.processed), "duplicate": True}
+
     event = PaymentWebhookEvent(
         provider=body.provider,
         event_type=body.event_type,
         external_ref=body.external_ref,
-        payload=json.dumps(body.payload or {}, ensure_ascii=True)[:3800],
+        payload=payload_raw,
         processed=False,
     )
     db.add(event)
@@ -550,8 +575,8 @@ def payment_webhook(
             if membership:
                 if body.status == "completed":
                     membership.status = "active"
-                elif body.status in {"failed", "cancelled"}:
+                elif body.status in {"failed", "cancelled"} and membership.status == "pending":
                     membership.status = "cancelled"
             event.processed = True
     db.commit()
-    return {"ok": True, "processed": event.processed}
+    return {"ok": True, "processed": event.processed, "duplicate": False}
