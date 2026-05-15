@@ -1,0 +1,25 @@
+:root {
+  --font-sans: Inter, "SF Pro Text", "Segoe UI", Roboto, "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", -apple-system, system-ui, sans-serif;
+  --bg: #f4f2e9;
+  --bg-grad-a: rgba(73, 123, 97, 0.1);
+  --bg-grad-b: rgba(103, 126, 158, 0.12);
+  --panel: #fffdf8;
+  --panel-soft: #f7f4eb;
+  --line: #d2dbd1;
+  --line-strong: #b6c8ba;
+  --text: #223127;
+  --muted: #5f7164;
+  --heading: #1d4a36;
+  --accent: #2f855a;
+  --accent-2: #3f9b6b;
+  --danger: #9f1239;
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-lg: 18px;
+  --shadow-soft: 0 10px 24px rgba(29, 53, 39, 0.08);
+  --shadow-strong: 0 18px 36px rgba(29, 53, 39, 0.12);
+  --focus-ring: 0 0 0 3px rgba(47, 133, 90, 0.18);
+  --glass: 0 0 0 1px rgba(255, 255, 255, 0.72) inset, 0 0 0 1px rgba(174, 196, 181, 0.4);
+  --anim-rise: riseIn 0.22s ease both;
+  --anim-soft: softPop 0.28s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}

@@ -5,26 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Fitlio — Admin</title>
   <style>
+    @import url("/assets/luxury_tokens.css");
     * { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
-      --font-sans: Inter, "SF Pro Text", "Segoe UI", Roboto, "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", -apple-system, system-ui, sans-serif;
-      --bg: #f4f2e9;
-      --panel: #fffdf8;
-      --panel-soft: #f7f4eb;
-      --line: #d2dbd1;
       --line-strong: #b3c6b8;
-      --text: #223127;
       --muted: #5e7063;
-      --heading: #1d4a36;
-      --accent: #2f855a;
-      --accent-2: #3f9b6b;
-      --radius-sm: 10px;
-      --radius-md: 14px;
-      --radius-lg: 18px;
       --shadow-soft: 0 10px 24px rgba(28, 48, 37, 0.08);
       --shadow-strong: 0 18px 34px rgba(28, 48, 37, 0.12);
-      --focus-ring: 0 0 0 3px rgba(47, 133, 90, 0.18);
-      --glass: 0 0 0 1px rgba(255, 255, 255, 0.72) inset, 0 0 0 1px rgba(174, 196, 181, 0.4);
     }
     @keyframes riseIn {
       from { opacity: 0; transform: translateY(5px); }
@@ -113,7 +100,7 @@
       white-space: pre-wrap;
       word-break: break-word;
       box-shadow: var(--shadow-soft);
-      animation: riseIn 0.22s ease both;
+      animation: var(--anim-rise);
     }
     .row {
       display: flex;
@@ -244,7 +231,7 @@
       border-radius: 12px;
       padding: 12px;
       box-shadow: var(--shadow-soft);
-      animation: riseIn 0.22s ease both;
+      animation: var(--anim-rise);
       position: relative;
       overflow: hidden;
     }
@@ -291,8 +278,8 @@
     .flash.ok { color: #166534; }
     #panel .row,
     #panel .table,
-    #panel .box { animation: riseIn 0.22s ease both; }
-    #panel.panel-enter { animation: softPop 0.28s cubic-bezier(0.22, 0.61, 0.36, 1) both; }
+    #panel .box { animation: var(--anim-rise); }
+    #panel.panel-enter { animation: var(--anim-soft); }
     .stagger > * { animation: softPop 0.3s cubic-bezier(0.22, 0.61, 0.36, 1) both; }
     .stagger > *:nth-child(2) { animation-delay: 0.03s; }
     .stagger > *:nth-child(3) { animation-delay: 0.06s; }

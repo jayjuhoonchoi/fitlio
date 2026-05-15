@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from fastapi import FastAPI
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, Response
 
 from app.database import engine
 from app import models
@@ -32,6 +32,15 @@ def _html(name: str) -> HTMLResponse:
     body = (TEMPLATES / name).read_text(encoding="utf-8")
     return HTMLResponse(
         content=body,
+        headers={"Cache-Control": "no-store, no-cache, must-revalidate, max-age=0"},
+    )
+
+
+def _css_asset(name: str) -> Response:
+    body = (TEMPLATES / "assets" / name).read_text(encoding="utf-8")
+    return Response(
+        content=body,
+        media_type="text/css; charset=utf-8",
         headers={"Cache-Control": "no-store, no-cache, must-revalidate, max-age=0"},
     )
 
@@ -93,6 +102,11 @@ def admin_app_page():
 @app.get("/app/tablet/{center_slug}", response_class=HTMLResponse)
 def tablet_kiosk_page(center_slug: str):
     return _html("tablet_kiosk.html")
+
+
+@app.get("/assets/luxury_tokens.css")
+def luxury_tokens_css():
+    return _css_asset("luxury_tokens.css")
 
 
 @app.get("/legacy")
