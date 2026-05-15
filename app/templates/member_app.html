@@ -399,8 +399,8 @@
     if (!token || !memberId) location.href = "/login/member";
     const auth = { Authorization: "Bearer " + token };
     const S = {
-      en: { mem:"Member", out:"Sign out", sum:"My summary", prof:"My profile", ph:"Payment history", renew:"Renew now", pay:"Pay membership", payd:"Creates active membership + payment.", m30:"Monthly", y365:"Yearly", cls:"Open classes", visits:"Visits this month", days:"Days left", none:"No active pass", book:"Book", booked:"Booked", fail:"Failed", load:"Loading…", myb:"My bookings", cancel:"Cancel", done:"Completed", ci:"Quick check-in", cid:"Find nearest class and check in with your phone last 4 digits.", cib:"Check in", chat:"Messages with admin", centerClass:"Center + level classes", insf:"Instructor profiles", sug:"Anonymous suggestion", comm:"Community", reserveConfirmed:"Reservation confirmed.", reserveWaitlisted:"Class is full. You are now waitlisted.", reserveDuplicate:"You already have this class reserved.", reserveFail:"Could not reserve class.", centerDiscovery:"Center discovery", search:"Search", refreshStatus:"Refresh status", centerStatusPending:"Pending approval", centerStatusActive:"Joined", centerStatusRejected:"Rejected", centerStatusNone:"Not joined", centerRequestJoin:"Request to join", centerAlreadyPending:"Request already pending.", centerAlreadyActive:"Already joined this center.", centerJoinSubmitted:"Join request submitted. Await admin approval.", centerJoinFailed:"Could not submit join request." },
-      ko: { mem:"회원", out:"로그아웃", sum:"내 요약", prof:"내 프로필", ph:"결제 이력", renew:"만료/갱신 안내", pay:"이용권 결제", payd:"결제 시 이용권과 결제 내역이 생성됩니다.", m30:"월간", y365:"연간", cls:"수업 목록", visits:"이번 달 방문", days:"남은 일수", none:"이용권 없음", book:"예약", booked:"예약됨", fail:"실패", load:"불러오는 중…", myb:"내 예약", cancel:"취소", done:"완료", ci:"간편 출석", cid:"가장 가까운 수업을 확인하고 휴대폰 뒷자리 4개로 출석하세요.", cib:"출석 체크", chat:"관리자와 메세지", centerClass:"센터/레벨 수업", insf:"강사 프로필", sug:"익명 건의함", comm:"커뮤니티", reserveConfirmed:"예약이 확정되었습니다.", reserveWaitlisted:"정원이 가득 차 대기열에 등록되었습니다.", reserveDuplicate:"이미 예약(또는 대기)된 수업입니다.", reserveFail:"수업 예약에 실패했습니다.", centerDiscovery:"센터 찾기/가입", search:"검색", refreshStatus:"상태 새로고침", centerStatusPending:"승인 대기", centerStatusActive:"가입 완료", centerStatusRejected:"거절됨", centerStatusNone:"미가입", centerRequestJoin:"가입 요청", centerAlreadyPending:"이미 가입 요청 대기 중입니다.", centerAlreadyActive:"이미 가입된 센터입니다.", centerJoinSubmitted:"가입 요청이 접수되었습니다. 관리자 승인 대기 중입니다.", centerJoinFailed:"가입 요청에 실패했습니다." }
+      en: { mem:"Member", out:"Sign out", sum:"My summary", prof:"My profile", ph:"Payment history", renew:"Renew now", pay:"Pay membership", payd:"Creates active membership + payment.", m30:"Monthly", y365:"Yearly", cls:"Open classes", visits:"Visits this month", days:"Days left", none:"No active pass", book:"Book", booked:"Booked", fail:"Failed", load:"Loading…", myb:"My bookings", cancel:"Cancel", done:"Completed", ci:"Quick check-in", cid:"Find nearest class and check in with your phone last 4 digits.", cib:"Check in", chat:"Messages with admin", centerClass:"Center + level classes", insf:"Instructor profiles", sug:"Anonymous suggestion", comm:"Community", reserveConfirmed:"Reservation confirmed.", reserveWaitlisted:"Class is full. You are now waitlisted.", reserveDuplicate:"You already have this class reserved.", reserveFail:"Could not reserve class.", centerDiscovery:"Center discovery", search:"Search", refreshStatus:"Refresh status", centerStatusPending:"Pending approval", centerStatusActive:"Joined", centerStatusRejected:"Rejected", centerStatusNone:"Not joined", centerRequestJoin:"Request to join", centerAlreadyPending:"Request already pending.", centerAlreadyActive:"Already joined this center.", centerJoinSubmitted:"Join request submitted. Await admin approval.", centerJoinFailed:"Could not submit join request.", paymentPending:"Payment pending confirmation.", paymentFailedRetry:"Payment failed. Please retry now.", paymentCancelledRetry:"Payment was cancelled. Retry when ready.", renewalExpiredCta:"Your membership has expired. Renew now.", renewNow:"Renew now", retryPayment:"Retry payment", retryReady:"Retry available." },
+      ko: { mem:"회원", out:"로그아웃", sum:"내 요약", prof:"내 프로필", ph:"결제 이력", renew:"만료/갱신 안내", pay:"이용권 결제", payd:"결제 시 이용권과 결제 내역이 생성됩니다.", m30:"월간", y365:"연간", cls:"수업 목록", visits:"이번 달 방문", days:"남은 일수", none:"이용권 없음", book:"예약", booked:"예약됨", fail:"실패", load:"불러오는 중…", myb:"내 예약", cancel:"취소", done:"완료", ci:"간편 출석", cid:"가장 가까운 수업을 확인하고 휴대폰 뒷자리 4개로 출석하세요.", cib:"출석 체크", chat:"관리자와 메세지", centerClass:"센터/레벨 수업", insf:"강사 프로필", sug:"익명 건의함", comm:"커뮤니티", reserveConfirmed:"예약이 확정되었습니다.", reserveWaitlisted:"정원이 가득 차 대기열에 등록되었습니다.", reserveDuplicate:"이미 예약(또는 대기)된 수업입니다.", reserveFail:"수업 예약에 실패했습니다.", centerDiscovery:"센터 찾기/가입", search:"검색", refreshStatus:"상태 새로고침", centerStatusPending:"승인 대기", centerStatusActive:"가입 완료", centerStatusRejected:"거절됨", centerStatusNone:"미가입", centerRequestJoin:"가입 요청", centerAlreadyPending:"이미 가입 요청 대기 중입니다.", centerAlreadyActive:"이미 가입된 센터입니다.", centerJoinSubmitted:"가입 요청이 접수되었습니다. 관리자 승인 대기 중입니다.", centerJoinFailed:"가입 요청에 실패했습니다.", paymentPending:"결제 확인 대기 중입니다.", paymentFailedRetry:"결제가 실패했습니다. 다시 시도해 주세요.", paymentCancelledRetry:"결제가 취소되었습니다. 다시 시도할 수 있습니다.", renewalExpiredCta:"이용권이 만료되었습니다. 지금 갱신하세요.", renewNow:"지금 갱신", retryPayment:"결제 재시도", retryReady:"재시도 가능 상태입니다." }
     };
     let lang = localStorage.getItem("fitlio_lang")||"ko";
     function t(k){ return S[lang][k]||k; }
@@ -436,20 +436,33 @@
       const d=await r.json().catch(()=>null);
       if(!d){ box.textContent="—"; return; }
       const m=d.membership||{};
+      const paymentState = m.payment_state || {};
+      const renewalPrompt = m.renewal_prompt || "none";
+      const latestPaymentStatus = String(m.latest_payment_status || paymentState.status || "").toLowerCase();
+      const paymentNotice = latestPaymentStatus === "failed"
+        ? t("paymentFailedRetry")
+        : latestPaymentStatus === "cancelled"
+          ? t("paymentCancelledRetry")
+          : latestPaymentStatus === "pending"
+            ? t("paymentPending")
+            : "";
       if(m.can_pay_now){
-        box.innerHTML=`<div>이용권이 만료되었거나 없습니다. 즉시 결제 가능합니다.</div>
+        const ctaText = renewalPrompt === "retry_payment" ? t("retryPayment") : t("renewNow");
+        const titleText = renewalPrompt === "retry_payment" ? t("retryReady") : t("renewalExpiredCta");
+        box.innerHTML=`<div><strong>${titleText}</strong></div>
+          ${paymentNotice ? `<div class="meta">${escape(paymentNotice)}</div>` : ""}
           <div class="row" style="margin-top:.5rem">
             <select id="payMethodQuick">
               <option value="paypal">PayPal</option><option value="naverpay">NaverPay</option><option value="kakaopay">KakaoPay</option>
               <option value="payco">Payco</option><option value="bank_transfer">Bank Transfer</option><option value="card">Card</option>
             </select>
-            <button class="btn cta-pay" id="quickMonthly">월간 결제</button>
-            <button class="btn btn2" id="quickYearly">연간 결제</button>
+            <button class="btn cta-pay" id="quickMonthly">${ctaText} · ${t("m30")}</button>
+            <button class="btn btn2" id="quickYearly">${ctaText} · ${t("y365")}</button>
           </div>`;
         document.getElementById("quickMonthly").onclick=()=>purchaseNow("monthly");
         document.getElementById("quickYearly").onclick=()=>purchaseNow("yearly");
       }else{
-        box.innerHTML=`<div>남은 일수 <b>${m.days_left ?? "—"}</b>일</div><div>남은 횟수 <b>${m.visits_remaining ?? "unlimited"}</b></div>`;
+        box.innerHTML=`<div>남은 일수 <b>${m.days_left ?? "—"}</b>일</div><div>남은 횟수 <b>${m.visits_remaining ?? "unlimited"}</b></div>${paymentNotice ? `<div class="meta">${escape(paymentNotice)}</div>` : ""}`;
       }
       cp.innerHTML = `<option value="">All centers</option>` + (d.centers||[]).map(c=>`<option value="${c.id}">${escape(c.name)}</option>`).join("");
       loadCenterClasses();
@@ -460,7 +473,11 @@
       const d=await r.json().catch(()=>({}));
       const log=document.getElementById("log");
       log.classList.toggle("ok", !!r.ok);
-      log.textContent = r.ok ? (d.message || `결제 요청 완료 (${method})`) : (d.detail||t("fail"));
+      const lifecycle = String(d.payment_lifecycle || "").toLowerCase();
+      const typeLabel = d.attempt_type === "retry" ? t("retryPayment") : t("renewNow");
+      log.textContent = r.ok
+        ? (d.message || `${typeLabel} 요청 완료 (${method})`) + (lifecycle ? ` [${lifecycle}]` : "")
+        : (d.detail||t("fail"));
       if(r.ok && d.checkout_url && method !== "bank_transfer"){
         window.open(d.checkout_url, "_blank");
       }

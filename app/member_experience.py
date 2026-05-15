@@ -29,6 +29,48 @@ from app.payment_gateway import create_payment_intent
 router = APIRouter(prefix="/member", tags=["member-experience"])
 
 PAYMENT_METHODS = {"paypal", "naverpay", "kakaopay", "payco", "bank_transfer", "card"}
+PAYMENT_KNOWN_STATUSES = {"pending", "completed", "failed", "cancelled"}
+PAYMENT_TERMINAL_STATUSES = {"completed", "failed", "cancelled"}
+
+
+def _normalize_payment_status(status: str | None) -> str:
+    normalized = (status or "").strip().lower()
+    return normalized if normalized in PAYMENT_KNOWN_STATUSES else "pending"
+
+
+def _payment_state(status: str | None) -> dict:
+    normalized = _normalize_payment_status(status)
+    if normalized == "completed":
+        return {
+            "status": "completed",
+            "phase": "succeeded",
+            "is_terminal": True,
+            "retry_ready": False,
+            "member_message": "Payment completed. Membership is active.",
+        }
+    if normalized == "failed":
+        return {
+            "status": "failed",
+            "phase": "terminal_failed",
+            "is_terminal": True,
+            "retry_ready": True,
+            "member_message": "Payment failed. Please retry to activate your membership.",
+        }
+    if normalized == "cancelled":
+        return {
+            "status": "cancelled",
+            "phase": "terminal_cancelled",
+            "is_terminal": True,
+            "retry_ready": True,
+            "member_message": "Payment was cancelled. Retry whenever you are ready.",
+        }
+    return {
+        "status": "pending",
+        "phase": "in_flight",
+        "is_terminal": False,
+        "retry_ready": False,
+        "member_message": "Payment is pending confirmation.",
+    }
 
 
 class MembershipPurchaseBody(BaseModel):
@@ -130,8 +172,31 @@ def member_home_data(db: Session = Depends(get_db), user: dict = Depends(get_cur
         .order_by(Membership.end_date.desc())
         .first()
     )
+    latest_payment = None
+    if membership:
+        latest_payment = (
+            db.query(Payment)
+            .filter(Payment.membership_id == membership.id)
+            .order_by(Payment.created_at.desc())
+            .first()
+        )
+    if not latest_payment:
+        latest_payment = (
+            db.query(Payment)
+            .filter(Payment.member_id == member.id)
+            .order_by(Payment.created_at.desc())
+            .first()
+        )
     now = datetime.utcnow()
     is_expired = not membership or membership.end_date < now or membership.status != "active"
+    payment_state = _payment_state(getattr(latest_payment, "status", None))
+    can_retry_payment = payment_state["retry_ready"]
+    can_pay_now = (
+        is_expired
+        or (membership and membership.status in {"cancelled", "expired", "failed"})
+        or can_retry_payment
+    )
+    renewal_prompt = "retry_payment" if can_retry_payment else ("renew_membership" if can_pay_now else "none")
     used = _this_month_attendance_count(db, member.id) if membership else 0
     centers = (
         db.query(CenterMembership, Center)
@@ -157,10 +222,20 @@ def member_home_data(db: Session = Depends(get_db), user: dict = Depends(get_cur
                     else None
                 ),
                 "is_expired": is_expired,
-                "can_pay_now": is_expired or membership.status in {"cancelled", "expired"},
+                "can_pay_now": can_pay_now,
+                "renewal_prompt": renewal_prompt,
+                "latest_payment_status": payment_state["status"],
+                "payment_state": payment_state,
             }
             if membership
-            else {"status": "none", "is_expired": True, "can_pay_now": True}
+            else {
+                "status": "none",
+                "is_expired": True,
+                "can_pay_now": True,
+                "renewal_prompt": renewal_prompt,
+                "latest_payment_status": payment_state["status"],
+                "payment_state": payment_state,
+            }
         ),
         "centers": [{"id": c.id, "name": c.name, "slug": c.slug} for _, c in centers],
     }
@@ -315,16 +390,43 @@ def purchase_membership(
         end_date = now + timedelta(days=365)
         amount = 50000
     intent = create_payment_intent(body.payment_method, amount, "aud")
-    membership = Membership(
-        member_id=user["id"],
-        plan=body.plan,
-        status="pending",
-        end_date=end_date,
-        auto_renew=True,
+    retry_candidate_payment = (
+        db.query(Payment)
+        .filter(
+            Payment.member_id == user["id"],
+            Payment.status.in_(["failed", "cancelled"]),
+        )
+        .order_by(Payment.created_at.desc())
+        .first()
     )
-    db.add(membership)
-    db.commit()
-    db.refresh(membership)
+    membership = None
+    is_retry = False
+    if retry_candidate_payment:
+        membership = (
+            db.query(Membership)
+            .filter(Membership.id == retry_candidate_payment.membership_id)
+            .first()
+        )
+        if membership and membership.plan == body.plan:
+            is_retry = True
+            membership.status = "pending"
+            membership.end_date = end_date
+            membership.auto_renew = True
+            db.commit()
+            db.refresh(membership)
+
+    if not membership:
+        membership = Membership(
+            member_id=user["id"],
+            plan=body.plan,
+            status="pending",
+            end_date=end_date,
+            auto_renew=True,
+        )
+        db.add(membership)
+        db.commit()
+        db.refresh(membership)
+
     payment = Payment(
         member_id=user["id"],
         membership_id=membership.id,
@@ -339,16 +441,25 @@ def purchase_membership(
     db.add(payment)
     db.commit()
     db.refresh(payment)
+    payment_state = _payment_state(payment.status)
     message = (
         "Bank transfer requested. Membership activates after admin confirmation."
         if body.payment_method == "bank_transfer"
-        else "Payment initiated. Complete checkout to activate membership."
+        else (
+            "Retry started. Complete checkout to reactivate your membership."
+            if is_retry
+            else "Payment initiated. Complete checkout to activate membership."
+        )
     )
     return {
         "membership_id": membership.id,
         "payment_id": payment.id,
         "payment_method": body.payment_method,
         "payment_status": payment.status,
+        "payment_state": payment_state,
+        "payment_lifecycle": payment_state["phase"],
+        "can_retry_payment": payment_state["retry_ready"],
+        "attempt_type": "retry" if is_retry else "new_purchase",
         "checkout_url": intent.checkout_url,
         "external_ref": intent.external_ref,
         "message": message,
@@ -590,13 +701,18 @@ def payment_webhook(
     db.add(event)
     if body.external_ref:
         payment = db.query(Payment).filter(Payment.external_ref == body.external_ref).first()
-        if payment and body.status in {"completed", "failed", "cancelled", "pending"}:
-            payment.status = body.status
+        normalized_status = _normalize_payment_status(body.status)
+        if payment and normalized_status in PAYMENT_KNOWN_STATUSES:
+            payment.status = normalized_status
             membership = db.query(Membership).filter(Membership.id == payment.membership_id).first()
             if membership:
-                if body.status == "completed":
+                if normalized_status == "completed":
                     membership.status = "active"
-                elif body.status in {"failed", "cancelled"} and membership.status == "pending":
+                elif normalized_status == "pending" and membership.status in {"failed", "cancelled"}:
+                    membership.status = "pending"
+                elif normalized_status == "failed" and membership.status in {"pending", "cancelled"}:
+                    membership.status = "failed"
+                elif normalized_status == "cancelled" and membership.status in {"pending", "failed"}:
                     membership.status = "cancelled"
             event.processed = True
     db.commit()

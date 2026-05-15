@@ -784,6 +784,8 @@ def list_payments(
             "currency": p.currency,
             "status": p.status,
             "source": getattr(p, "source", "online"),
+            "payment_method": getattr(p, "payment_method", "card"),
+            "external_ref": getattr(p, "external_ref", None),
             "center_id": getattr(p, "center_id", None),
             "memo": getattr(p, "memo", None),
             "created_at": p.created_at,

@@ -10,6 +10,44 @@ from app.deps import get_current_user
 
 router = APIRouter(prefix="/payments", tags=["payments"])
 
+PAYMENT_KNOWN_STATUSES = {"pending", "completed", "failed", "cancelled"}
+
+
+def _normalize_payment_status(status: str | None) -> str:
+    normalized = (status or "").strip().lower()
+    return normalized if normalized in PAYMENT_KNOWN_STATUSES else "pending"
+
+
+def _payment_state(status: str | None) -> dict:
+    normalized = _normalize_payment_status(status)
+    if normalized == "completed":
+        return {
+            "status": "completed",
+            "lifecycle": "succeeded",
+            "is_terminal": True,
+            "can_retry": False,
+        }
+    if normalized == "failed":
+        return {
+            "status": "failed",
+            "lifecycle": "terminal_failed",
+            "is_terminal": True,
+            "can_retry": True,
+        }
+    if normalized == "cancelled":
+        return {
+            "status": "cancelled",
+            "lifecycle": "terminal_cancelled",
+            "is_terminal": True,
+            "can_retry": True,
+        }
+    return {
+        "status": "pending",
+        "lifecycle": "in_flight",
+        "is_terminal": False,
+        "can_retry": False,
+    }
+
 class MembershipCreate(BaseModel):
     plan: str  # monthly, yearly
     payment_method: str = "card"  # paypal | naverpay | kakaopay | payco | bank_transfer | card
@@ -78,6 +116,7 @@ def create_membership(
             "amount": payment.amount / 100,  # cents → dollars
             "currency": payment.currency,
             "status": payment.status,
+            "state": _payment_state(payment.status),
             "payment_method": getattr(payment, "payment_method", "card"),
             "stripe_payment_intent_id": payment.stripe_payment_intent_id
         }
@@ -125,9 +164,11 @@ def get_payment_history(
             "amount": p.amount / 100,
             "currency": p.currency,
             "status": p.status,
+            "state": _payment_state(p.status),
             "source": getattr(p, "source", "online"),
             "payment_method": getattr(p, "payment_method", "card"),
             "center_id": getattr(p, "center_id", None),
+            "external_ref": getattr(p, "external_ref", None),
             "memo": getattr(p, "memo", None),
             "created_at": p.created_at
         }

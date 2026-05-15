@@ -888,6 +888,165 @@ def test_payment_webhook_duplicate_is_idempotent(db_session):
     assert len(events) == 1
 
 
+def test_payment_webhook_failed_transitions_membership_to_failed(db_session):
+    member = models.Member(
+        email="member.webhook.failed@fitlio.com",
+        hashed_password="x",
+        full_name="Webhook Failed Member",
+        role="member",
+    )
+    db_session.add(member)
+    db_session.flush()
+    membership = models.Membership(
+        member_id=member.id,
+        plan="monthly",
+        status="pending",
+        end_date=datetime.utcnow() + timedelta(days=30),
+    )
+    db_session.add(membership)
+    db_session.flush()
+    payment = models.Payment(
+        member_id=member.id,
+        membership_id=membership.id,
+        amount=5000,
+        currency="aud",
+        status="pending",
+        source="online",
+        payment_method="card",
+        external_ref="card_failed_20260101010101_abcd1234",
+    )
+    db_session.add(payment)
+    db_session.commit()
+
+    app.dependency_overrides[get_db] = _override_db(db_session)
+    body = {
+        "provider": "card",
+        "event_type": "payment.updated",
+        "external_ref": payment.external_ref,
+        "status": "failed",
+        "payload": {"trace": "failed-state"},
+    }
+    res = client.post("/member/payments/webhook", json=body)
+    app.dependency_overrides.clear()
+
+    assert res.status_code == 200
+    assert res.json()["processed"] is True
+    db_session.refresh(payment)
+    db_session.refresh(membership)
+    assert payment.status == "failed"
+    assert membership.status == "failed"
+
+
+def test_retry_after_failure_purchase_reuses_membership(db_session):
+    member = models.Member(
+        email="member.retry.purchase@fitlio.com",
+        hashed_password="x",
+        full_name="Retry Purchase Member",
+        role="member",
+    )
+    db_session.add(member)
+    db_session.flush()
+    failed_membership = models.Membership(
+        member_id=member.id,
+        plan="monthly",
+        status="failed",
+        end_date=datetime.utcnow() - timedelta(days=2),
+    )
+    db_session.add(failed_membership)
+    db_session.flush()
+    db_session.add(
+        models.Payment(
+            member_id=member.id,
+            membership_id=failed_membership.id,
+            amount=5000,
+            currency="aud",
+            status="failed",
+            source="online",
+            payment_method="card",
+            external_ref="card_retry_old_ref",
+        )
+    )
+    db_session.commit()
+
+    from app.deps import get_current_user
+
+    app.dependency_overrides[get_db] = _override_db(db_session)
+    app.dependency_overrides[get_current_user] = lambda: {"id": member.id, "role": "member"}
+    response = client.post(
+        "/member/purchase",
+        json={"plan": "monthly", "payment_method": "card"},
+    )
+    app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["attempt_type"] == "retry"
+    assert payload["membership_id"] == failed_membership.id
+    assert payload["payment_status"] == "pending"
+    assert payload["payment_lifecycle"] == "in_flight"
+    db_session.refresh(failed_membership)
+    assert failed_membership.status == "pending"
+
+    pending_payments = (
+        db_session.query(models.Payment)
+        .filter(
+            models.Payment.membership_id == failed_membership.id,
+            models.Payment.status == "pending",
+        )
+        .all()
+    )
+    assert len(pending_payments) == 1
+
+
+def test_member_home_expired_failed_payment_payload(db_session):
+    member = models.Member(
+        email="member.home.failed@fitlio.com",
+        hashed_password="x",
+        full_name="Expired Failed Member",
+        role="member",
+    )
+    db_session.add(member)
+    db_session.flush()
+    membership = models.Membership(
+        member_id=member.id,
+        plan="monthly",
+        status="failed",
+        end_date=datetime.utcnow() - timedelta(days=1),
+    )
+    db_session.add(membership)
+    db_session.flush()
+    db_session.add(
+        models.Payment(
+            member_id=member.id,
+            membership_id=membership.id,
+            amount=5000,
+            currency="aud",
+            status="failed",
+            source="online",
+            payment_method="card",
+            external_ref="card_failed_member_home",
+        )
+    )
+    db_session.commit()
+
+    from app.deps import get_current_user
+
+    app.dependency_overrides[get_db] = _override_db(db_session)
+    app.dependency_overrides[get_current_user] = lambda: {"id": member.id, "role": "member"}
+    response = client.get("/member/home")
+    app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    payload = response.json()
+    m = payload["membership"]
+    assert m["is_expired"] is True
+    assert m["can_pay_now"] is True
+    assert m["renewal_prompt"] == "retry_payment"
+    assert m["latest_payment_status"] == "failed"
+    assert m["payment_state"]["status"] == "failed"
+    assert m["payment_state"]["retry_ready"] is True
+
+
 def test_moderation_report_status_update(db_session):
     admin = models.Member(
         email="admin.moderation@fitlio.com",
