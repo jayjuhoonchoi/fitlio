@@ -66,6 +66,7 @@
     }
     .go:disabled{ opacity:.65; cursor:not-allowed; }
     .hint{ margin-top:10px; opacity:.82; font-size:.92rem; }
+    .result-strong{ font-weight:700; letter-spacing:.01em; }
   </style>
 </head>
 <body>
@@ -127,11 +128,18 @@
       document.getElementById("hint").textContent = "Checking in...";
       const r = await fetch("/centers/tablet/check-in",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({center_slug:slug,phone_last4:pin})});
       const d = await r.json().catch(()=>({}));
-      setResult(r.ok ? (d.message || "Check-in done") : (d.detail || "Failed"), !!r.ok);
+      const text = r.ok
+        ? (`${d.message || "Check-in done"}${d.days_left!=null ? ` (Days left: ${d.days_left})` : ""}`)
+        : (d.detail || "Failed");
+      setResult(text, !!r.ok);
       if(r.ok) pin="";
       document.getElementById("display").textContent = "----";
       document.getElementById("hint").textContent = r.ok ? "Done. Next member can check in." : "Try again or ask staff for help.";
-      if(!r.ok) document.getElementById("submitBtn").disabled = pin.length !== 4;
+      if(r.ok){
+        document.getElementById("submitBtn").disabled = true;
+      }else{
+        document.getElementById("submitBtn").disabled = pin.length !== 4;
+      }
     };
     renderPad();
     document.getElementById("submitBtn").disabled = true;

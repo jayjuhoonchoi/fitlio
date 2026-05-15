@@ -472,11 +472,17 @@ def tablet_check_in(
         remaining_text = f"{max(0, membership.monthly_limit - usage_after)}/{membership.monthly_limit}"
     else:
         remaining_text = "unlimited"
+    days_left = max(0, (membership.end_date - now).days) if membership.end_date else None
     return {
-        "message": f"Welcome back, {member.full_name}! Remaining usage {remaining_text}.",
+        "message": (
+            f"Welcome back, {member.full_name}! Remaining usage {remaining_text}."
+            if days_left is None
+            else f"Welcome back, {member.full_name}! Remaining usage {remaining_text}, {days_left} days left."
+        ),
         "member_name": member.full_name,
         "member_no": getattr(member, "member_no", None),
         "remaining_usage": remaining_text,
+        "days_left": days_left,
         "membership_status": membership.status,
         "center_name": center.name,
     }
