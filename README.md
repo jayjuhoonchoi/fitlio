@@ -96,6 +96,11 @@ Admin notification operations:
   - `./scripts/smoke_core.sh`
   - or custom base URL: `./scripts/smoke_core.sh https://fitlio-jay.duckdns.org`
 
+- Quick page benchmark:
+  - `./scripts/bench_pages.sh`
+  - or custom base URL: `./scripts/bench_pages.sh https://fitlio-jay.duckdns.org`
+  - run twice; compare second-run `time_starttransfer` and `time_total` for cache effects
+
 - QA checklist:
   - `docs/today-qa-checklist.md`
 
