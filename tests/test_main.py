@@ -1089,6 +1089,198 @@ def test_moderation_report_status_update(db_session):
     assert report.status == "resolved"
 
 
+def test_community_post_media_validation_accept_and_reject(db_session):
+    member = models.Member(
+        email="community.media.member@fitlio.com",
+        hashed_password="x",
+        full_name="Community Media Member",
+        role="member",
+    )
+    db_session.add(member)
+    db_session.commit()
+
+    from app.deps import get_current_user
+
+    app.dependency_overrides[get_db] = _override_db(db_session)
+    app.dependency_overrides[get_current_user] = lambda: {"id": member.id, "role": "member"}
+
+    ok = client.post(
+        "/member/community/posts",
+        json={
+            "content": "",
+            "media_url": "https://cdn.fitlio.local/community/photo.jpg",
+            "media_type": "image",
+        },
+    )
+    assert ok.status_code == 200
+    row = db_session.query(models.CommunityPost).filter(models.CommunityPost.id == ok.json()["id"]).first()
+    assert row is not None
+    assert row.media_url == "https://cdn.fitlio.local/community/photo.jpg"
+    assert row.media_type == "image"
+
+    bad_scheme = client.post(
+        "/member/community/posts",
+        json={
+            "content": "bad",
+            "media_url": "javascript:alert(1)",
+            "media_type": "image",
+        },
+    )
+    assert bad_scheme.status_code == 400
+    assert "http or https" in bad_scheme.json()["detail"]
+
+    bad_type = client.post(
+        "/member/community/posts",
+        json={
+            "content": "bad",
+            "media_url": "https://cdn.fitlio.local/community/photo.jpg",
+            "media_type": "video",
+        },
+    )
+    assert bad_type.status_code == 400
+    assert "does not match media type" in bad_type.json()["detail"]
+    app.dependency_overrides.clear()
+
+
+def test_community_feed_excludes_hidden_post_and_hidden_comments(db_session):
+    member = models.Member(
+        email="community.feed.member@fitlio.com",
+        hashed_password="x",
+        full_name="Community Feed Member",
+        role="member",
+    )
+    author = models.Member(
+        email="community.feed.author@fitlio.com",
+        hashed_password="x",
+        full_name="Community Feed Author",
+        role="member",
+    )
+    db_session.add(member)
+    db_session.add(author)
+    db_session.flush()
+    visible_post = models.CommunityPost(
+        author_member_id=author.id,
+        content="visible post",
+        is_hidden=False,
+    )
+    hidden_post = models.CommunityPost(
+        author_member_id=author.id,
+        content="hidden post",
+        is_hidden=True,
+    )
+    db_session.add(visible_post)
+    db_session.add(hidden_post)
+    db_session.flush()
+    db_session.add(
+        models.CommunityReaction(
+            post_id=visible_post.id,
+            member_id=author.id,
+            type="comment",
+            content="visible comment",
+            is_hidden=False,
+        )
+    )
+    db_session.add(
+        models.CommunityReaction(
+            post_id=visible_post.id,
+            member_id=author.id,
+            type="comment",
+            content="hidden comment",
+            is_hidden=True,
+        )
+    )
+    db_session.commit()
+
+    from app.deps import get_current_user
+
+    app.dependency_overrides[get_db] = _override_db(db_session)
+    app.dependency_overrides[get_current_user] = lambda: {"id": member.id, "role": "member"}
+    response = client.get("/member/community/posts")
+    app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    rows = response.json()
+    assert len(rows) == 1
+    assert rows[0]["content"] == "visible post"
+    assert all(c["content"] != "hidden comment" for c in rows[0]["comments"])
+
+
+def test_report_and_moderation_state_transitions(db_session):
+    admin = models.Member(
+        email="community.mod.admin@fitlio.com",
+        hashed_password="x",
+        full_name="Community Mod Admin",
+        role="admin",
+    )
+    reporter = models.Member(
+        email="community.mod.reporter@fitlio.com",
+        hashed_password="x",
+        full_name="Community Reporter",
+        role="member",
+    )
+    author = models.Member(
+        email="community.mod.author@fitlio.com",
+        hashed_password="x",
+        full_name="Community Author",
+        role="member",
+    )
+    db_session.add(admin)
+    db_session.add(reporter)
+    db_session.add(author)
+    db_session.flush()
+    post = models.CommunityPost(author_member_id=author.id, content="moderate me")
+    db_session.add(post)
+    db_session.commit()
+
+    from app.deps import get_current_user
+
+    app.dependency_overrides[get_db] = _override_db(db_session)
+    app.dependency_overrides[get_current_user] = lambda: {"id": reporter.id, "role": "member"}
+    report_res = client.post(
+        "/member/community/reports",
+        json={"target_type": "community_post", "target_id": post.id, "reason": "abuse"},
+    )
+    assert report_res.status_code == 200
+    report_id = report_res.json()["id"]
+
+    app.dependency_overrides[get_current_user] = lambda: {"id": admin.id, "role": "admin"}
+    hide_res = client.post(
+        "/member/moderation/hide",
+        json={"target_type": "community_post", "target_id": post.id, "hide": True, "reason": "reported"},
+    )
+    assert hide_res.status_code == 200
+    assert hide_res.json()["hidden"] is True
+
+    resolve_res = client.post(
+        "/member/moderation/reports/status",
+        json={"report_id": report_id, "status": "resolved"},
+    )
+    assert resolve_res.status_code == 200
+    assert resolve_res.json()["status"] == "resolved"
+
+    unhide_res = client.post(
+        "/member/moderation/hide",
+        json={"target_type": "community_post", "target_id": post.id, "hide": False},
+    )
+    assert unhide_res.status_code == 200
+    assert unhide_res.json()["hidden"] is False
+
+    reject_res = client.post(
+        "/member/moderation/reports/status",
+        json={"report_id": report_id, "status": "rejected"},
+    )
+    app.dependency_overrides.clear()
+
+    assert reject_res.status_code == 200
+    assert reject_res.json()["status"] == "rejected"
+    db_post = db_session.query(models.CommunityPost).filter(models.CommunityPost.id == post.id).first()
+    db_report = db_session.query(models.ContentReport).filter(models.ContentReport.id == report_id).first()
+    assert db_post is not None
+    assert db_report is not None
+    assert db_post.is_hidden is False
+    assert db_report.status == "rejected"
+
+
 def test_admin_class_create_supports_center_and_level(db_session):
     admin = models.Member(
         email="admin.class@fitlio.com",

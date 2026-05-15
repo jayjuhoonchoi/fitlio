@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta
 
 import json
+from urllib.parse import urlsplit, urlunsplit
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy import func
@@ -31,6 +32,9 @@ router = APIRouter(prefix="/member", tags=["member-experience"])
 PAYMENT_METHODS = {"paypal", "naverpay", "kakaopay", "payco", "bank_transfer", "card"}
 PAYMENT_KNOWN_STATUSES = {"pending", "completed", "failed", "cancelled"}
 PAYMENT_TERMINAL_STATUSES = {"completed", "failed", "cancelled"}
+COMMUNITY_MEDIA_TYPES = {"image", "video"}
+IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
+VIDEO_EXTENSIONS = {".mp4", ".webm", ".mov", ".m4v", ".ogg"}
 
 
 def _normalize_payment_status(status: str | None) -> str:
@@ -133,6 +137,50 @@ def _member_center_ids(db: Session, member_id: int):
         .all()
     )
     return [r[0] for r in rows]
+
+
+def _normalize_media_type(media_type: str | None) -> str:
+    normalized = (media_type or "image").strip().lower()
+    return normalized if normalized in COMMUNITY_MEDIA_TYPES else "image"
+
+
+def _normalized_media_url(raw_url: str | None) -> str | None:
+    value = (raw_url or "").strip()
+    if not value:
+        return None
+    parsed = urlsplit(value)
+    scheme = parsed.scheme.lower()
+    if scheme not in {"http", "https"}:
+        raise HTTPException(status_code=400, detail="Media URL must use http or https")
+    if not parsed.netloc:
+        raise HTTPException(status_code=400, detail="Media URL host is required")
+    if parsed.username or parsed.password:
+        raise HTTPException(status_code=400, detail="Media URL credentials are not allowed")
+    cleaned = urlunsplit((scheme, parsed.netloc.lower(), parsed.path or "/", parsed.query, ""))
+    return cleaned
+
+
+def _media_url_matches_type(media_url: str, media_type: str) -> bool:
+    lowered = media_url.lower()
+    dot_idx = lowered.rfind(".")
+    ext = lowered[dot_idx:] if dot_idx != -1 else ""
+    if media_type == "image":
+        return ext in IMAGE_EXTENSIONS
+    return ext in VIDEO_EXTENSIONS
+
+
+def _normalize_post_media(media_url: str | None, media_type: str | None) -> tuple[str | None, str | None]:
+    normalized_url = _normalized_media_url(media_url)
+    normalized_type = _normalize_media_type(media_type)
+    if not normalized_url:
+        return None, None
+    if not _media_url_matches_type(normalized_url, normalized_type):
+        expected = ", ".join(sorted(IMAGE_EXTENSIONS if normalized_type == "image" else VIDEO_EXTENSIONS))
+        raise HTTPException(
+            status_code=400,
+            detail=f"Media URL does not match media type '{normalized_type}'. Allowed extensions: {expected}",
+        )
+    return normalized_url, normalized_type
 
 
 def _is_admin_or_staff(db: Session, member_id: int) -> bool:
@@ -536,14 +584,16 @@ def create_community_post(
     db: Session = Depends(get_db),
     user: dict = Depends(get_current_user),
 ):
-    if not (body.content or "").strip() and not (body.media_url or "").strip():
+    content = (body.content or "").strip()
+    media_url, media_type = _normalize_post_media(body.media_url, body.media_type)
+    if not content and not media_url:
         raise HTTPException(status_code=400, detail="Post content or media required")
     row = CommunityPost(
         author_member_id=user["id"],
         center_id=body.center_id,
-        content=(body.content or "").strip() or None,
-        media_url=(body.media_url or "").strip() or None,
-        media_type=body.media_type,
+        content=content or None,
+        media_url=media_url,
+        media_type=media_type or "image",
     )
     db.add(row)
     db.commit()
@@ -555,6 +605,8 @@ def create_community_post(
 def like_post(post_id: int, db: Session = Depends(get_db), user: dict = Depends(get_current_user)):
     post = db.query(CommunityPost).filter(CommunityPost.id == post_id).first()
     if not post:
+        raise HTTPException(status_code=404, detail="Post not found")
+    if post.is_hidden:
         raise HTTPException(status_code=404, detail="Post not found")
     existing = (
         db.query(CommunityReaction)
@@ -581,6 +633,8 @@ def comment_post(
     post = db.query(CommunityPost).filter(CommunityPost.id == body.post_id).first()
     if not post:
         raise HTTPException(status_code=404, detail="Post not found")
+    if post.is_hidden:
+        raise HTTPException(status_code=404, detail="Post not found")
     db.add(
         CommunityReaction(
             post_id=body.post_id,
@@ -599,11 +653,22 @@ def report_content(
     db: Session = Depends(get_db),
     user: dict = Depends(get_current_user),
 ):
+    reason = body.reason.strip()
+    if not reason:
+        raise HTTPException(status_code=400, detail="Report reason required")
+    if body.target_type == "community_post":
+        target = db.query(CommunityPost).filter(CommunityPost.id == body.target_id).first()
+        if not target or target.is_hidden:
+            raise HTTPException(status_code=404, detail="Target content not found")
+    else:
+        target = db.query(CommunityReaction).filter(CommunityReaction.id == body.target_id).first()
+        if not target or target.type != "comment" or target.is_hidden:
+            raise HTTPException(status_code=404, detail="Target content not found")
     row = ContentReport(
         reporter_member_id=user["id"],
         target_type=body.target_type,
         target_id=body.target_id,
-        reason=body.reason.strip(),
+        reason=reason,
         status="open",
     )
     db.add(row)
