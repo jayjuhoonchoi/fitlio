@@ -61,7 +61,26 @@ With API running and DNS/port as you use in prod:
 
 Run twice; second run should show similar or better `time_starttransfer` for cached static routes.
 
-## 6. If something fails
+## 6. Push commits to GitHub (“잔디 심기”)
+
+From your laptop (needs network + GitHub access):
+
+```bash
+cd ~/fitlio   # or your clone path
+git status
+git push -u origin main
+```
+
+If SSH fails, check `ssh -T git@github.com` or use HTTPS remote:
+
+```bash
+git remote set-url origin https://github.com/jayjuhoonchoi/fitlio.git
+git push -u origin main
+```
+
+After push, confirm on GitHub: **branch `main`**, **latest commit** matches `git log -1`.
+
+## 7. If something fails
 
 1. Note the **first** failing command and exact output.
 2. Open `docs/today-qa-checklist.md` for flow-level checks.
