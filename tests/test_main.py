@@ -774,3 +774,133 @@ def test_moderation_report_status_update(db_session):
     assert response.json()["status"] == "resolved"
     db_session.refresh(report)
     assert report.status == "resolved"
+
+
+def test_admin_class_create_supports_center_and_level(db_session):
+    admin = models.Member(
+        email="admin.class@fitlio.com",
+        hashed_password="x",
+        full_name="Class Admin",
+        role="admin",
+    )
+    instructor = models.InstructorProfile(
+        display_name="Coach Class",
+        hourly_rate_cents=100000,
+        pay_per_class_cents=150000,
+    )
+    db_session.add(admin)
+    db_session.add(instructor)
+    db_session.commit()
+
+    app.dependency_overrides[get_db] = _override_db(db_session)
+    app.dependency_overrides[require_admin] = lambda: {"id": admin.id, "role": "admin"}
+    payload = {
+        "name": "Center Elite HIIT",
+        "instructor": "Coach Class",
+        "schedule": (datetime.utcnow() + timedelta(days=1)).isoformat(),
+        "capacity": 18,
+        "center_id": 7,
+        "level_required": "elite",
+    }
+    response = client.post("/admin/classes", json=payload)
+    app.dependency_overrides.clear()
+
+    assert response.status_code == 201
+    class_id = response.json()["id"]
+    row = db_session.query(models.FitnessClass).filter(models.FitnessClass.id == class_id).first()
+    assert row is not None
+    assert row.center_id == 7
+    assert row.level_required == "elite"
+
+
+def test_admin_class_update_supports_center_and_level(db_session):
+    admin = models.Member(
+        email="admin.class.update@fitlio.com",
+        hashed_password="x",
+        full_name="Class Update Admin",
+        role="admin",
+    )
+    instructor = models.InstructorProfile(
+        display_name="Coach Update",
+        hourly_rate_cents=100000,
+        pay_per_class_cents=150000,
+    )
+    klass = models.FitnessClass(
+        name="Starter Flow",
+        instructor="Coach Update",
+        schedule=datetime.utcnow() + timedelta(days=2),
+        capacity=20,
+        center_id=1,
+        level_required="starter",
+    )
+    db_session.add(admin)
+    db_session.add(instructor)
+    db_session.add(klass)
+    db_session.commit()
+
+    app.dependency_overrides[get_db] = _override_db(db_session)
+    app.dependency_overrides[require_admin] = lambda: {"id": admin.id, "role": "admin"}
+    payload = {
+        "name": "Core Flow",
+        "instructor": "Coach Update",
+        "schedule": (datetime.utcnow() + timedelta(days=3)).isoformat(),
+        "capacity": 22,
+        "center_id": 9,
+        "level_required": "core",
+    }
+    response = client.put(f"/admin/classes/{klass.id}", json=payload)
+    app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    db_session.refresh(klass)
+    assert klass.center_id == 9
+    assert klass.level_required == "core"
+
+
+def test_tablet_check_in_includes_days_left(db_session):
+    center = models.Center(
+        name="Tablet Center",
+        slug="tablet-center",
+    )
+    member = models.Member(
+        email="tablet.member@fitlio.com",
+        hashed_password="x",
+        full_name="Tablet Member",
+        phone="+82-10-9999-1234",
+        role="member",
+        is_active=True,
+    )
+    db_session.add(center)
+    db_session.add(member)
+    db_session.flush()
+    db_session.add(
+        models.CenterMembership(
+            center_id=center.id,
+            member_id=member.id,
+            role="member",
+            status="active",
+        )
+    )
+    db_session.add(
+        models.Membership(
+            member_id=member.id,
+            plan="monthly",
+            status="active",
+            monthly_limit=12,
+            end_date=datetime.utcnow() + timedelta(days=9),
+        )
+    )
+    db_session.commit()
+
+    app.dependency_overrides[get_db] = _override_db(db_session)
+    response = client.post(
+        "/centers/tablet/check-in",
+        json={"center_slug": "tablet-center", "phone_last4": "1234"},
+    )
+    app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert "days_left" in payload
+    assert payload["days_left"] is not None
+    assert payload["days_left"] >= 0
