@@ -10,16 +10,14 @@ echo "[fitlio-https] project=${PROJECT_DIR}"
 
 cd "${PROJECT_DIR}"
 
-if ! command -v docker >/dev/null 2>&1; then
-  echo "[fitlio-https] docker is not installed."
+if [[ ! -x "./scripts/preflight_env.sh" ]]; then
+  echo "[fitlio-https] missing executable ./scripts/preflight_env.sh"
+  echo "Run: chmod +x ./scripts/preflight_env.sh"
   exit 1
 fi
 
-if ! command -v certbot >/dev/null 2>&1; then
-  echo "[fitlio-https] certbot is not installed."
-  echo "Install on Ubuntu: sudo apt-get update && sudo apt-get install -y certbot"
-  exit 1
-fi
+echo "[fitlio-https] running environment preflight..."
+./scripts/preflight_env.sh "http://127.0.0.1:8000" "${DOMAIN}"
 
 CURRENT_IP="$(curl -4fsS https://ifconfig.me || true)"
 DNS_IP="$(dig +short "${DOMAIN}" A @8.8.8.8 | tail -n 1 || true)"
