@@ -3102,3 +3102,33 @@ def test_tablet_check_in_qr_rejects_bad_token(db_session):
 
     assert response.status_code == 401
     assert response.headers.get("X-Tablet-Result-Code") == "INVALID_CHECKIN_QR"
+
+
+def test_member_checkin_qr_requires_member_role(db_session):
+    admin = models.Member(
+        email="admin.qr.deny@fitlio.com",
+        hashed_password="x",
+        full_name="Admin QR",
+        role="admin",
+    )
+    db_session.add(admin)
+    db_session.commit()
+
+    from app.deps import get_current_user
+
+    app.dependency_overrides[get_db] = _override_db(db_session)
+    app.dependency_overrides[get_current_user] = lambda: {"id": admin.id, "role": "admin"}
+    response = client.get("/member/checkin-qr")
+    app.dependency_overrides.clear()
+
+    assert response.status_code == 403
+
+
+def test_admin_class_roster_requires_auth():
+    response = client.get("/admin/classes/1/roster")
+    assert response.status_code == 401
+
+
+def test_premium_overview_requires_auth():
+    response = client.get("/admin/reports/premium-overview?months=6")
+    assert response.status_code == 401

@@ -106,3 +106,5 @@ Admin notification operations:
 
 - Next-session kickoff:
   - `docs/tomorrow-first-hour.md`
+- **Confirming what changed after a pull:**
+  - `docs/verify-changes.md`

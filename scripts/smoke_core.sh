@@ -34,4 +34,16 @@ code_discover="$(curl -s -o /dev/null -w "%{http_code}" "${BASE_URL}/centers/dis
 code_tablet_contract="$(curl -s -o /dev/null -w "%{http_code}" -X POST -H "Content-Type: application/json" -d '{"center_slug":"non-existent-center","phone_last4":"0000"}' "${BASE_URL}/centers/tablet/check-in" || true)"
 [[ "${code_tablet_contract}" == "404" ]] && pass "tablet contract endpoint failure contract" || fail "tablet contract endpoint failure contract"
 
+code_member_qr="$(curl -s -o /dev/null -w "%{http_code}" "${BASE_URL}/member/checkin-qr" || true)"
+[[ "${code_member_qr}" == "401" || "${code_member_qr}" == "403" ]] && pass "member checkin-qr auth gate" || fail "member checkin-qr auth gate"
+
+code_tablet_qr="$(curl -s -o /dev/null -w "%{http_code}" -X POST -H "Content-Type: application/json" -d '{"center_slug":"smoke-center","token":"01234567890123456789012345"}' "${BASE_URL}/centers/tablet/check-in-qr" || true)"
+[[ "${code_tablet_qr}" == "401" ]] && pass "tablet check-in-qr rejects invalid token" || fail "tablet check-in-qr rejects invalid token"
+
+code_roster="$(curl -s -o /dev/null -w "%{http_code}" "${BASE_URL}/admin/classes/1/roster" || true)"
+[[ "${code_roster}" == "401" || "${code_roster}" == "403" ]] && pass "admin class roster auth gate" || fail "admin class roster auth gate"
+
+code_premium="$(curl -s -o /dev/null -w "%{http_code}" "${BASE_URL}/admin/reports/premium-overview?months=6" || true)"
+[[ "${code_premium}" == "401" || "${code_premium}" == "403" ]] && pass "premium-overview auth gate" || fail "premium-overview auth gate"
+
 echo "[smoke] done"

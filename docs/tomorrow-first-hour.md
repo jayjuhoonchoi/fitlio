@@ -29,7 +29,8 @@ Objective: start with confidence and release readiness.
 ## 40-55 min
 - Verify tablet flow:
   - themed kiosk loads
-  - 4-digit input + backspace + clear behavior
+  - PIN: 4-digit input + backspace + clear behavior
+  - **QR: switch to QR mode; camera or pasted member token completes check-in**
   - success message includes remaining usage and days-left
   - auto-reset after success
 
