@@ -29,12 +29,93 @@ from app.notification_dispatch import process_pending_notifications
 
 router = APIRouter(prefix="/admin")
 TEMPLATES_DIR = Path(__file__).resolve().parent / "templates"
+MIN_RISK_DAYS = 14
+MAX_RISK_DAYS = 180
+MIN_RISK_THRESHOLD_PCT = 0.0
+MAX_RISK_THRESHOLD_PCT = 100.0
 
 
 def _render_weekly_report_html(payload: dict) -> str:
     template = (TEMPLATES_DIR / "weekly_performance_report.html").read_text(
         encoding="utf-8"
     )
+
+
+def _validate_member_risk_params(days: int, threshold_pct: float) -> None:
+    if days < MIN_RISK_DAYS or days > MAX_RISK_DAYS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Days must be between {MIN_RISK_DAYS} and {MAX_RISK_DAYS}",
+        )
+    if threshold_pct < MIN_RISK_THRESHOLD_PCT or threshold_pct > MAX_RISK_THRESHOLD_PCT:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Threshold must be between "
+                f"{MIN_RISK_THRESHOLD_PCT:.0f} and {MAX_RISK_THRESHOLD_PCT:.0f}"
+            ),
+        )
+
+
+def _build_member_risk_rows(
+    db: Session,
+    members: list[Member],
+    days: int,
+    threshold_pct: float,
+) -> list[dict]:
+    now = datetime.utcnow()
+    since = now - timedelta(days=days)
+    classes_count = (
+        db.query(FitnessClass)
+        .filter(FitnessClass.schedule >= since, FitnessClass.schedule <= now)
+        .count()
+    )
+    denominator = max(classes_count, 1)
+    attendance_rows = (
+        db.query(Attendance.member_id, func.count(Attendance.id))
+        .filter(Attendance.checked_in_at >= since, Attendance.checked_in_at <= now)
+        .group_by(Attendance.member_id)
+        .all()
+    )
+    attendance_by_member = {member_id: count for member_id, count in attendance_rows}
+    booking_rows = (
+        db.query(Booking.member_id, func.count(Booking.id))
+        .join(FitnessClass, FitnessClass.id == Booking.class_id)
+        .filter(
+            Booking.status == "confirmed",
+            FitnessClass.schedule >= since,
+            FitnessClass.schedule <= now,
+        )
+        .group_by(Booking.member_id)
+        .all()
+    )
+    booked_by_member = {member_id: count for member_id, count in booking_rows}
+    rows = []
+    for member in members:
+        attendance_count = attendance_by_member.get(member.id, 0)
+        booked_count = booked_by_member.get(member.id, 0)
+        member_denominator = max(booked_count, denominator)
+        attendance_rate = round((attendance_count / member_denominator) * 100.0, 2)
+        at_risk = attendance_rate < threshold_pct
+        rows.append(
+            {
+                "member_id": member.id,
+                "member_no": getattr(member, "member_no", None),
+                "full_name": member.full_name,
+                "booked_count": booked_count,
+                "attendance_count": attendance_count,
+                "attendance_rate": attendance_rate,
+                "at_risk": at_risk,
+                "risk_window_days": days,
+                "risk_threshold_pct": round(threshold_pct, 2),
+                "rationale": (
+                    f"Attendance {attendance_rate:.2f}% in last {days}d "
+                    f"(threshold < {threshold_pct:.2f}%)"
+                ),
+            }
+        )
+    rows.sort(key=lambda r: r["attendance_rate"])
+    return rows
     metrics = payload["metrics"]
     period = payload["period"]
     scope = payload["scope"]
@@ -331,58 +412,14 @@ def occupancy_trend_report(
 
 @router.get("/reports/member-risk")
 def member_risk_report(
-    days: int = 60,
+    days: int = 30,
+    threshold_pct: float = 50.0,
     db: Session = Depends(get_db),
     _: dict = Depends(require_admin),
 ):
-    if days < 14 or days > 180:
-        raise HTTPException(status_code=400, detail="Days must be between 14 and 180")
-    since = datetime.utcnow() - timedelta(days=days)
-    classes_count = (
-        db.query(FitnessClass)
-        .filter(FitnessClass.schedule >= since, FitnessClass.schedule <= datetime.utcnow())
-        .count()
-    )
-    denominator = max(classes_count, 1)
+    _validate_member_risk_params(days, threshold_pct)
     members = db.query(Member).all()
-    attendance_rows = (
-        db.query(Attendance.member_id, func.count(Attendance.id))
-        .filter(Attendance.checked_in_at >= since)
-        .group_by(Attendance.member_id)
-        .all()
-    )
-    attendance_by_member = {member_id: count for member_id, count in attendance_rows}
-    booking_rows = (
-        db.query(Booking.member_id, func.count(Booking.id))
-        .join(FitnessClass, FitnessClass.id == Booking.class_id)
-        .filter(
-            Booking.status == "confirmed",
-            FitnessClass.schedule >= since,
-            FitnessClass.schedule <= datetime.utcnow(),
-        )
-        .group_by(Booking.member_id)
-        .all()
-    )
-    booked_by_member = {member_id: count for member_id, count in booking_rows}
-    rows = []
-    for m in members:
-        attendance_count = attendance_by_member.get(m.id, 0)
-        booked_count = booked_by_member.get(m.id, 0)
-        member_denominator = max(booked_count, denominator)
-        attendance_rate = round((attendance_count / member_denominator) * 100.0, 2)
-        rows.append(
-            {
-                "member_id": m.id,
-                "member_no": getattr(m, "member_no", None),
-                "full_name": m.full_name,
-                "booked_count": booked_count,
-                "attendance_count": attendance_count,
-                "attendance_rate": attendance_rate,
-                "at_risk": attendance_rate <= 50.0,
-            }
-        )
-    rows.sort(key=lambda r: r["attendance_rate"])
-    return rows
+    return _build_member_risk_rows(db=db, members=members, days=days, threshold_pct=threshold_pct)
 
 
 @router.get("/reports/class-utilization")
@@ -670,8 +707,24 @@ def get_recent_attendances(db: Session = Depends(get_db), _: dict = Depends(requ
 
 
 @router.get("/members")
-def get_members(db: Session = Depends(get_db), _: dict = Depends(require_admin)):
+def get_members(
+    risk_days: int = 30,
+    risk_threshold_pct: float = 50.0,
+    include_retention_risk: bool = True,
+    db: Session = Depends(get_db),
+    _: dict = Depends(require_admin),
+):
+    _validate_member_risk_params(risk_days, risk_threshold_pct)
     members = db.query(Member).all()
+    risk_by_member_id = {}
+    if include_retention_risk:
+        risk_rows = _build_member_risk_rows(
+            db=db,
+            members=members,
+            days=risk_days,
+            threshold_pct=risk_threshold_pct,
+        )
+        risk_by_member_id = {row["member_id"]: row for row in risk_rows}
     return [
         {
             "id": m.id,
@@ -684,6 +737,30 @@ def get_members(db: Session = Depends(get_db), _: dict = Depends(require_admin))
             "is_active": m.is_active,
             "role": getattr(m, "role", "member"),
             "created_at": m.created_at,
+            "at_risk": risk_by_member_id.get(m.id, {}).get("at_risk"),
+            "attendance_rate": risk_by_member_id.get(m.id, {}).get("attendance_rate"),
+            "risk_reason": risk_by_member_id.get(m.id, {}).get("rationale"),
+            "retention_risk": (
+                {
+                    "at_risk": risk_by_member_id.get(m.id, {}).get("at_risk"),
+                    "attendance_rate": risk_by_member_id.get(m.id, {}).get(
+                        "attendance_rate"
+                    ),
+                    "attendance_count": risk_by_member_id.get(m.id, {}).get(
+                        "attendance_count"
+                    ),
+                    "booked_count": risk_by_member_id.get(m.id, {}).get("booked_count"),
+                    "risk_window_days": risk_by_member_id.get(m.id, {}).get(
+                        "risk_window_days"
+                    ),
+                    "risk_threshold_pct": risk_by_member_id.get(m.id, {}).get(
+                        "risk_threshold_pct"
+                    ),
+                    "rationale": risk_by_member_id.get(m.id, {}).get("rationale"),
+                }
+                if include_retention_risk
+                else None
+            ),
         }
         for m in members
     ]

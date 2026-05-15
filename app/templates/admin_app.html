@@ -219,6 +219,9 @@
     .chip.active { background: #e8f6ee; border-color: #9dd6b4; color: #1f6a43; }
     .chip.cancelled { background: #eceff3; border-color: #c3ccd6; color: #5e6b78; }
     .chip.error { background: #fde8ed; border-color: #f2a2b7; color: #9f1239; }
+    .chip.risk { background: #fde8ed; border-color: #f2a2b7; color: #9f1239; text-transform: none; }
+    .chip.safe { background: #e8f6ee; border-color: #9dd6b4; color: #1f6a43; text-transform: none; }
+    .risk-note { font-size: 0.72rem; color: #5e7063; margin-top: 4px; line-height: 1.35; }
     .stats {
       display: grid;
       gap: 12px;
@@ -453,7 +456,7 @@
         p.innerHTML=j.length?`<table class="table"><thead><tr><th>ID</th><th>Member</th><th>Amount</th><th>${t("status")}</th><th>At</th></tr></thead><tbody>${j.map(x=>`<tr><td>${x.id}</td><td>${x.member_id}</td><td>${x.amount} ${x.currency}</td><td>${statusChip(x.status)}</td><td>${new Date(x.created_at).toLocaleString()}</td></tr>`).join("")}</tbody></table>`:`<div class="empty-state">No payment records yet.</div>`; return;}
       if(tab==="mem"){ title.textContent=t("mem"); let j=[]; try{ j=await apiJson("/admin/members"); }catch(e){ flash(e.message||t("err")); return; }
         p.innerHTML=`<div id="flash" class="flash"></div>
-        <table class="table"><thead><tr><th>ID</th><th>Member No</th><th>Name</th><th>Email</th><th>Phone</th><th>Birth</th><th>Level</th><th>Role</th><th>Active</th><th></th></tr></thead><tbody>
+        <table class="table"><thead><tr><th>ID</th><th>Member No</th><th>Name</th><th>Email</th><th>Phone</th><th>Birth</th><th>Level</th><th>Role</th><th>Active</th><th>Retention Risk</th><th></th></tr></thead><tbody>
         ${j.map(x=>`<tr>
           <td>${x.id}</td>
           <td><input id="mno_${x.id}" value="${esc(x.member_no||"")}"></td>
@@ -476,6 +479,10 @@
             </select>
           </td>
           <td><input id="mac_${x.id}" type="checkbox" ${x.is_active ? "checked" : ""}></td>
+          <td>
+            ${x.at_risk ? '<span class="chip risk">At-Risk</span>' : '<span class="chip safe">Healthy</span>'}
+            <div class="risk-note">${esc(x.risk_reason || `Attendance ${Number(x.attendance_rate || 0).toFixed(2)}%`)}</div>
+          </td>
           <td><button class="btn" data-msave="${x.id}">${t("save")}</button></td>
         </tr>`).join("")}</tbody></table>`;
         p.querySelectorAll("[data-msave]").forEach(b=>b.onclick=async()=>{ 

@@ -171,8 +171,162 @@ def test_admin_member_risk_response_shape(db_session):
         "attendance_count",
         "attendance_rate",
         "at_risk",
+        "risk_window_days",
+        "risk_threshold_pct",
+        "rationale",
     ):
         assert key in row
+
+
+def test_admin_member_risk_threshold_behavior(db_session):
+    low_member = models.Member(
+        email="risk.threshold.low@fitlio.com",
+        hashed_password="x",
+        full_name="Risk Threshold Low",
+        role="member",
+    )
+    high_member = models.Member(
+        email="risk.threshold.high@fitlio.com",
+        hashed_password="x",
+        full_name="Risk Threshold High",
+        role="member",
+    )
+    db_session.add(low_member)
+    db_session.add(high_member)
+    db_session.flush()
+
+    scheduled_at = datetime.utcnow() - timedelta(days=1)
+    classes = []
+    for idx in range(4):
+        klass = models.FitnessClass(
+            name=f"Risk Threshold Class {idx}",
+            instructor="Coach Risk",
+            schedule=scheduled_at,
+            capacity=20,
+            current_count=0,
+        )
+        db_session.add(klass)
+        classes.append(klass)
+    db_session.flush()
+
+    for klass in classes:
+        db_session.add(
+            models.Booking(member_id=low_member.id, class_id=klass.id, status="confirmed")
+        )
+        db_session.add(
+            models.Booking(member_id=high_member.id, class_id=klass.id, status="confirmed")
+        )
+    db_session.flush()
+
+    db_session.add(
+        models.Attendance(member_id=low_member.id, class_id=classes[0].id, status="present")
+    )
+    for klass in classes[:3]:
+        db_session.add(
+            models.Attendance(member_id=high_member.id, class_id=klass.id, status="present")
+        )
+    db_session.commit()
+
+    app.dependency_overrides[require_admin] = _override_admin
+    app.dependency_overrides[get_db] = _override_db(db_session)
+    response = client.get("/admin/reports/member-risk?days=30&threshold_pct=50")
+    app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    rows = response.json()
+    by_member = {row["member_id"]: row for row in rows}
+    assert by_member[low_member.id]["attendance_rate"] == 25.0
+    assert by_member[low_member.id]["at_risk"] is True
+    assert by_member[high_member.id]["attendance_rate"] == 75.0
+    assert by_member[high_member.id]["at_risk"] is False
+
+
+def test_admin_members_include_retention_risk_shape(db_session):
+    member = models.Member(
+        email="risk.shape.member@fitlio.com",
+        hashed_password="x",
+        full_name="Risk Shape Member",
+        role="member",
+    )
+    db_session.add(member)
+    db_session.flush()
+    klass = models.FitnessClass(
+        name="Risk Shape Class",
+        instructor="Coach Shape",
+        schedule=datetime.utcnow() - timedelta(days=1),
+        capacity=20,
+        current_count=0,
+    )
+    db_session.add(klass)
+    db_session.flush()
+    db_session.add(models.Booking(member_id=member.id, class_id=klass.id, status="confirmed"))
+    db_session.add(models.Attendance(member_id=member.id, class_id=klass.id, status="present"))
+    db_session.commit()
+
+    app.dependency_overrides[require_admin] = _override_admin
+    app.dependency_overrides[get_db] = _override_db(db_session)
+    response = client.get("/admin/members?risk_days=30&risk_threshold_pct=50")
+    app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    rows = response.json()
+    assert len(rows) >= 1
+    target = next(row for row in rows if row["id"] == member.id)
+    for key in ("at_risk", "attendance_rate", "risk_reason", "retention_risk"):
+        assert key in target
+    for key in (
+        "at_risk",
+        "attendance_rate",
+        "attendance_count",
+        "booked_count",
+        "risk_window_days",
+        "risk_threshold_pct",
+        "rationale",
+    ):
+        assert key in target["retention_risk"]
+
+
+def test_admin_member_risk_non_risk_member_case(db_session):
+    member = models.Member(
+        email="risk.non.member@fitlio.com",
+        hashed_password="x",
+        full_name="Risk Non Member",
+        role="member",
+    )
+    db_session.add(member)
+    db_session.flush()
+
+    scheduled_at = datetime.utcnow() - timedelta(days=2)
+    classes = []
+    for idx in range(2):
+        klass = models.FitnessClass(
+            name=f"Risk Non Class {idx}",
+            instructor="Coach Safe",
+            schedule=scheduled_at,
+            capacity=10,
+            current_count=0,
+        )
+        db_session.add(klass)
+        classes.append(klass)
+    db_session.flush()
+
+    for klass in classes:
+        db_session.add(models.Booking(member_id=member.id, class_id=klass.id, status="confirmed"))
+        db_session.add(
+            models.Attendance(member_id=member.id, class_id=klass.id, status="present")
+        )
+    db_session.commit()
+
+    app.dependency_overrides[require_admin] = _override_admin
+    app.dependency_overrides[get_db] = _override_db(db_session)
+    response = client.get("/admin/reports/member-risk?days=30&threshold_pct=50")
+    app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    rows = response.json()
+    row = next(item for item in rows if item["member_id"] == member.id)
+    assert row["attendance_rate"] == 100.0
+    assert row["at_risk"] is False
 
 
 def test_messages_send_and_thread_flow(db_session):
