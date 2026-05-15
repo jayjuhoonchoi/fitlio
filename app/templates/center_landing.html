@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Fitlio Center</title>
+  <style>
+    :root {
+      --accent: #2f855a;
+      --text: #243127;
+      --muted: #5a6a5f;
+      --panel: #ffffff;
+      --line: #d6e1d7;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--text);
+      background: #f4f7f3;
+      line-height: 1.5;
+    }
+    .hero {
+      padding: 56px 20px 48px;
+      color: #ffffff;
+      background: linear-gradient(135deg, #214c38, var(--accent));
+      background-size: cover;
+      background-position: center;
+    }
+    .wrap { max-width: 960px; margin: 0 auto; }
+    .brand { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; }
+    .brand img { width: 44px; height: 44px; object-fit: cover; border-radius: 10px; background: #ffffff; }
+    .brand-name { font-size: 1.1rem; font-weight: 700; }
+    h1 { margin: 0 0 10px; font-size: 2rem; line-height: 1.2; }
+    .lead { margin: 0; max-width: 700px; font-size: 1.05rem; opacity: 0.95; }
+    main { padding: 26px 20px 42px; }
+    section {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 20px;
+      margin-bottom: 14px;
+    }
+    h2 { margin: 0 0 10px; font-size: 1.2rem; }
+    .cta-btn {
+      display: inline-block;
+      padding: 10px 18px;
+      border-radius: 999px;
+      background: var(--accent);
+      color: #ffffff;
+      text-decoration: none;
+      font-weight: 600;
+    }
+    .hidden { display: none; }
+    .error { color: #9f1239; font-size: 0.95rem; }
+  </style>
+</head>
+<body>
+  <header id="hero" class="hero hidden">
+    <div class="wrap">
+      <div class="brand">
+        <img id="logo" alt="Center logo" class="hidden">
+        <div id="brandName" class="brand-name"></div>
+      </div>
+      <h1 id="heroHeadline"></h1>
+      <p id="heroSubheadline" class="lead"></p>
+    </div>
+  </header>
+  <main class="wrap">
+    <p id="err" class="error hidden"></p>
+    <section id="about" class="hidden">
+      <h2 id="aboutTitle"></h2>
+      <p id="aboutBody"></p>
+    </section>
+    <section id="schedule" class="hidden">
+      <h2 id="scheduleTitle"></h2>
+      <p id="scheduleBody"></p>
+    </section>
+    <section id="cta" class="hidden">
+      <h2 id="ctaTitle"></h2>
+      <a id="ctaButton" class="cta-btn" target="_blank" rel="noopener noreferrer"></a>
+    </section>
+  </main>
+  <script>
+    const slug = window.location.pathname.split("/").pop();
+    const setText = (id, value) => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.textContent = value || "";
+    };
+    const show = (id, on) => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.classList.toggle("hidden", !on);
+    };
+    async function loadLanding() {
+      const err = document.getElementById("err");
+      try {
+        const r = await fetch("/centers/public/" + encodeURIComponent(slug) + "/landing");
+        if (!r.ok) {
+          throw new Error(r.status === 404 ? "Landing page is unavailable." : "Failed to load landing page.");
+        }
+        const data = await r.json();
+        document.title = data.center_name + " | Fitlio";
+        const branding = data.branding || {};
+        const accent = branding.tablet_accent_color || "#2f855a";
+        document.documentElement.style.setProperty("--accent", accent);
+        const bg = branding.tablet_background_url ? "url('" + branding.tablet_background_url.replace(/'/g, "%27") + "')" : "";
+        const hero = document.getElementById("hero");
+        if (bg) {
+          hero.style.backgroundImage = "linear-gradient(135deg, rgba(33,76,56,.82), rgba(47,133,90,.84)), " + bg;
+        }
+        setText("brandName", data.center_name || "");
+        if (branding.tablet_logo_url) {
+          const logo = document.getElementById("logo");
+          logo.src = branding.tablet_logo_url;
+          show("logo", true);
+        }
+        const blocks = (data.landing_content && data.landing_content.blocks) || [];
+        for (const block of blocks) {
+          if (!block || !block.type) continue;
+          if (block.type === "hero") {
+            setText("heroHeadline", block.headline || data.center_name || "");
+            setText("heroSubheadline", block.subheadline || "");
+            show("hero", true);
+          } else if (block.type === "about") {
+            setText("aboutTitle", block.title || "About");
+            setText("aboutBody", block.body || "");
+            show("about", true);
+          } else if (block.type === "schedule") {
+            setText("scheduleTitle", block.title || "Schedule");
+            setText("scheduleBody", block.body || "");
+            show("schedule", true);
+          } else if (block.type === "cta") {
+            setText("ctaTitle", block.title || "Get started");
+            const btn = document.getElementById("ctaButton");
+            btn.textContent = block.button_text || "Contact us";
+            if (block.button_url) {
+              btn.href = block.button_url;
+              show("cta", true);
+            }
+          }
+        }
+      } catch (e) {
+        err.textContent = e.message || "Unable to load center page.";
+        show("err", true);
+      }
+    }
+    loadLanding();
+  </script>
+</body>
+</html>

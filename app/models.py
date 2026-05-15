@@ -128,6 +128,8 @@ class Center(Base):
     tablet_logo_url = Column(String(512), nullable=True)
     tablet_accent_color = Column(String(32), nullable=False, default="#2f855a")
     tablet_background_url = Column(String(1024), nullable=True)
+    landing_content_json = Column(String(12000), nullable=False, default='{"blocks":[]}')
+    landing_is_published = Column(Boolean, nullable=False, default=False)
     created_by_member_id = Column(Integer, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 

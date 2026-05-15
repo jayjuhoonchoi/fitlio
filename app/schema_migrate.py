@@ -256,10 +256,32 @@ def ensure_columns(engine) -> None:
                     )
                 if "tablet_background_url" not in ccols:
                     conn.execute(text("ALTER TABLE centers ADD COLUMN tablet_background_url VARCHAR(1024)"))
+                if "landing_content_json" not in ccols:
+                    conn.execute(
+                        text(
+                            "ALTER TABLE centers ADD COLUMN landing_content_json VARCHAR(12000) DEFAULT '{\"blocks\":[]}'"
+                        )
+                    )
+                if "landing_is_published" not in ccols:
+                    conn.execute(
+                        text("ALTER TABLE centers ADD COLUMN landing_is_published BOOLEAN DEFAULT FALSE")
+                    )
                 conn.execute(
                     text(
                         "UPDATE centers SET tablet_accent_color='#2f855a' "
                         "WHERE tablet_accent_color IS NULL OR tablet_accent_color=''"
+                    )
+                )
+                conn.execute(
+                    text(
+                        "UPDATE centers SET landing_content_json='{\"blocks\":[]}' "
+                        "WHERE landing_content_json IS NULL OR landing_content_json=''"
+                    )
+                )
+                conn.execute(
+                    text(
+                        "UPDATE centers SET landing_is_published=FALSE "
+                        "WHERE landing_is_published IS NULL"
                     )
                 )
             if insp.has_table("community_posts"):

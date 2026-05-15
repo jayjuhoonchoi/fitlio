@@ -764,6 +764,23 @@
             <button class="btn btn2" id="tOpen">Open tablet</button>
           </div>
         </div>
+        <div class="box" style="margin-bottom:.7rem">
+          <div class="hint">Landing CMS editor (hero/about/schedule/cta)</div>
+          <div class="row">
+            <input id="lCenterId" type="number" placeholder="center_id">
+            <button class="btn" id="lLoad">Load landing</button>
+            <button class="btn" id="lAddHero">+ hero</button>
+            <button class="btn" id="lAddAbout">+ about</button>
+            <button class="btn" id="lAddSchedule">+ schedule</button>
+            <button class="btn" id="lAddCta">+ cta</button>
+          </div>
+          <div class="row">
+            <label><input id="lPublish" type="checkbox"> Published</label>
+            <button class="btn" id="lSave">Save landing</button>
+            <button class="btn btn2" id="lOpen">Open public page</button>
+          </div>
+          <div id="lBlocks" class="hint">Load a center to edit blocks.</div>
+        </div>
         <div class="box">
           <div class="hint">Community moderation queue</div>
           <div class="row">
@@ -778,6 +795,71 @@
         document.getElementById("pRun").onclick=async()=>{ try{ await apiJson("/centers/onsite-payment",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({center_id:+val("pCenterId"),member_id:+val("pMemberId"),amount:+val("pAmount"),memo:val("pMemo")||null})}); flash("on-site payment recorded",true);}catch(e){ flash(e.message||t("err")); } };
         document.getElementById("tRun").onclick=async()=>{ try{ await apiJson("/centers/"+encodeURIComponent(val("tCenterId"))+"/tablet-theme",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({tablet_theme:val("tTheme"),tablet_welcome_text:val("tWelcome"),tablet_logo_url:val("tLogo")||null,tablet_accent_color:val("tAccent")||null,tablet_background_url:val("tBg")||null})}); flash("tablet branding saved",true);}catch(e){ flash(e.message||t("err")); } };
         document.getElementById("tOpen").onclick=async()=>{ try{ const centerId=+val("tCenterId"); const center = await apiJson("/centers/"+centerId); window.open("/app/tablet/"+encodeURIComponent(center.slug), "_blank"); }catch(e){ flash(e.message||t("err")); } };
+        function defaultBlock(type){
+          if(type==="hero") return {type:"hero",headline:"",subheadline:""};
+          if(type==="about") return {type:"about",title:"",body:""};
+          if(type==="schedule") return {type:"schedule",title:"",body:""};
+          return {type:"cta",title:"",button_text:"",button_url:""};
+        }
+        function drawLandingBlocks(blocks){
+          const box = document.getElementById("lBlocks");
+          if(!blocks.length){ box.innerHTML = '<div class="empty-state">No blocks. Add one using buttons above.</div>'; return; }
+          box.innerHTML = blocks.map((b,idx)=>`<div class="box" style="margin:.45rem 0">
+            <div class="row"><b>${esc(b.type||"block")}</b>
+              <button class="btn btn2" data-lup="${idx}">up</button>
+              <button class="btn btn2" data-ldown="${idx}">down</button>
+              <button class="btn btnWarn" data-ldel="${idx}">remove</button>
+            </div>
+            ${b.type==="hero" ? `<div class="row"><input id="lb_headline_${idx}" placeholder="headline" value="${esc(b.headline||"")}"><input id="lb_subheadline_${idx}" placeholder="subheadline" value="${esc(b.subheadline||"")}"></div>` : ""}
+            ${b.type==="about" ? `<div class="row"><input id="lb_title_${idx}" placeholder="title" value="${esc(b.title||"")}"></div><textarea id="lb_body_${idx}" style="width:100%;min-height:70px">${esc(b.body||"")}</textarea>` : ""}
+            ${b.type==="schedule" ? `<div class="row"><input id="lb_title_${idx}" placeholder="title" value="${esc(b.title||"")}"></div><textarea id="lb_body_${idx}" style="width:100%;min-height:70px">${esc(b.body||"")}</textarea>` : ""}
+            ${b.type==="cta" ? `<div class="row"><input id="lb_title_${idx}" placeholder="title" value="${esc(b.title||"")}"><input id="lb_button_text_${idx}" placeholder="button text" value="${esc(b.button_text||"")}"><input id="lb_button_url_${idx}" placeholder="button URL" value="${esc(b.button_url||"")}"></div>` : ""}
+          </div>`).join("");
+          box.querySelectorAll("[data-ldel]").forEach(btn=>btn.onclick=()=>{ const i=+btn.dataset.ldel; window.__fitlioLandingBlocks.splice(i,1); drawLandingBlocks(window.__fitlioLandingBlocks); });
+          box.querySelectorAll("[data-lup]").forEach(btn=>btn.onclick=()=>{ const i=+btn.dataset.lup; if(i<=0) return; const arr=window.__fitlioLandingBlocks; [arr[i-1],arr[i]]=[arr[i],arr[i-1]]; drawLandingBlocks(arr); });
+          box.querySelectorAll("[data-ldown]").forEach(btn=>btn.onclick=()=>{ const i=+btn.dataset.ldown; const arr=window.__fitlioLandingBlocks; if(i>=arr.length-1) return; [arr[i+1],arr[i]]=[arr[i],arr[i+1]]; drawLandingBlocks(arr); });
+        }
+        function collectLandingBlocks(){
+          return (window.__fitlioLandingBlocks||[]).map((b,idx)=>{
+            if(b.type==="hero") return {type:"hero",headline:val("lb_headline_"+idx),subheadline:val("lb_subheadline_"+idx)};
+            if(b.type==="about") return {type:"about",title:val("lb_title_"+idx),body:val("lb_body_"+idx)};
+            if(b.type==="schedule") return {type:"schedule",title:val("lb_title_"+idx),body:val("lb_body_"+idx)};
+            return {type:"cta",title:val("lb_title_"+idx),button_text:val("lb_button_text_"+idx),button_url:val("lb_button_url_"+idx)};
+          });
+        }
+        async function loadLanding(){
+          try{
+            const centerId=+val("lCenterId");
+            if(!centerId){ flash("center_id is required"); return; }
+            const data = await apiJson("/centers/"+centerId+"/landing");
+            window.__fitlioLandingCenter = data;
+            window.__fitlioLandingBlocks = Array.isArray(data.landing_content?.blocks) ? data.landing_content.blocks : [];
+            document.getElementById("lPublish").checked = !!data.landing_is_published;
+            drawLandingBlocks(window.__fitlioLandingBlocks);
+            flash("landing loaded",true);
+          }catch(e){ flash(e.message||t("err")); }
+        }
+        document.getElementById("lLoad").onclick=loadLanding;
+        document.getElementById("lAddHero").onclick=()=>{ window.__fitlioLandingBlocks = window.__fitlioLandingBlocks||[]; window.__fitlioLandingBlocks.push(defaultBlock("hero")); drawLandingBlocks(window.__fitlioLandingBlocks); };
+        document.getElementById("lAddAbout").onclick=()=>{ window.__fitlioLandingBlocks = window.__fitlioLandingBlocks||[]; window.__fitlioLandingBlocks.push(defaultBlock("about")); drawLandingBlocks(window.__fitlioLandingBlocks); };
+        document.getElementById("lAddSchedule").onclick=()=>{ window.__fitlioLandingBlocks = window.__fitlioLandingBlocks||[]; window.__fitlioLandingBlocks.push(defaultBlock("schedule")); drawLandingBlocks(window.__fitlioLandingBlocks); };
+        document.getElementById("lAddCta").onclick=()=>{ window.__fitlioLandingBlocks = window.__fitlioLandingBlocks||[]; window.__fitlioLandingBlocks.push(defaultBlock("cta")); drawLandingBlocks(window.__fitlioLandingBlocks); };
+        document.getElementById("lSave").onclick=async()=>{ try{
+          const centerId=+val("lCenterId");
+          if(!centerId){ flash("center_id is required"); return; }
+          const blocks = collectLandingBlocks();
+          const body={blocks,publish:document.getElementById("lPublish").checked};
+          const saved = await apiJson("/centers/"+centerId+"/landing",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+          window.__fitlioLandingBlocks = saved.landing_content?.blocks || blocks;
+          drawLandingBlocks(window.__fitlioLandingBlocks);
+          flash("landing saved",true);
+        }catch(e){ flash(e.message||t("err")); } };
+        document.getElementById("lOpen").onclick=async()=>{ try{
+          const centerId=+val("lCenterId");
+          if(!centerId){ flash("center_id is required"); return; }
+          const center = await apiJson("/centers/"+centerId);
+          window.open("/center/"+encodeURIComponent(center.slug), "_blank");
+        }catch(e){ flash(e.message||t("err")); } };
         document.getElementById("mRefresh").onclick=async()=>{ try{ const rows=await apiJson("/member/moderation/reports"); const box=document.getElementById("mQueue"); box.innerHTML = rows.length ? rows.slice(0,40).map(r=>`<div style="margin-bottom:.45rem;padding:.5rem;border:1px solid #d1d9d0;border-radius:8px"><b>#${r.id}</b> ${esc(r.target_type)}:${r.target_id} · ${esc(r.reason)} · <i>${esc(r.status)}</i><div style="margin-top:.35rem"><button class="btn btnWarn" data-hide="${r.id}:${r.target_type}:${r.target_id}">Hide</button> <button class="btn btn2" data-unhide="${r.id}:${r.target_type}:${r.target_id}">Unhide</button> <button class="btn btn2" data-resolve="${r.id}">Resolve</button> <button class="btn btn2" data-reject="${r.id}">Reject</button></div></div>`).join("") : "No open reports."; box.querySelectorAll("[data-hide]").forEach(b=>b.onclick=async()=>{ const [rid,target_type,target_id]=b.dataset.hide.split(":"); try{ const hideRes=await apiJson("/member/moderation/hide",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({target_type,target_id:+target_id,hide:true,reason:"reported"})}); await apiJson("/member/moderation/reports/status",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({report_id:+rid,status:"resolved"})}); flash(`Hidden=${hideRes.hidden}; report #${rid} resolved`,true); document.getElementById("mRefresh").click(); }catch(e){ flash(`Hide failed: ${e.message||t("err")}`); } }); box.querySelectorAll("[data-unhide]").forEach(b=>b.onclick=async()=>{ const [rid,target_type,target_id]=b.dataset.unhide.split(":"); try{ const res=await apiJson("/member/moderation/hide",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({target_type,target_id:+target_id,hide:false})}); flash(`Unhidden=${String(!res.hidden)} for report #${rid}`,true); document.getElementById("mRefresh").click(); }catch(e){ flash(`Unhide failed: ${e.message||t("err")}`); } }); box.querySelectorAll("[data-resolve]").forEach(b=>b.onclick=async()=>{ try{ const res=await apiJson("/member/moderation/reports/status",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({report_id:+b.dataset.resolve,status:"resolved"})}); flash(`Report #${res.id} marked ${res.status}`,true); document.getElementById("mRefresh").click(); }catch(e){ flash(`Resolve failed: ${e.message||t("err")}`); } }); box.querySelectorAll("[data-reject]").forEach(b=>b.onclick=async()=>{ try{ const res=await apiJson("/member/moderation/reports/status",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({report_id:+b.dataset.reject,status:"rejected"})}); flash(`Report #${res.id} marked ${res.status}`,true); document.getElementById("mRefresh").click(); }catch(e){ flash(`Reject failed: ${e.message||t("err")}`); } }); }catch(e){ flash(e.message||t("err")); } };
         return;
       }

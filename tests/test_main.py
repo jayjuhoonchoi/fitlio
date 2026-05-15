@@ -1803,6 +1803,129 @@ def test_center_membership_status_visibility(db_session):
         assert key in by_slug["active-hub"]
 
 
+def test_center_landing_admin_create_and_publish_flow(db_session):
+    admin = models.Member(
+        email="landing.admin@fitlio.com",
+        hashed_password="x",
+        full_name="Landing Admin",
+        role="admin",
+        is_active=True,
+    )
+    center = models.Center(name="Landing Hub", slug="landing-hub", is_active=True)
+    db_session.add(admin)
+    db_session.add(center)
+    db_session.flush()
+    db_session.add(
+        models.CenterMembership(
+            center_id=center.id,
+            member_id=admin.id,
+            role="admin",
+            status="active",
+        )
+    )
+    db_session.commit()
+
+    from app.deps import get_current_user
+
+    app.dependency_overrides[get_db] = _override_db(db_session)
+    app.dependency_overrides[get_current_user] = lambda: {"id": admin.id, "role": "admin"}
+    payload = {
+        "publish": True,
+        "blocks": [
+            {"type": "hero", "headline": "Train Better", "subheadline": "Move with us"},
+            {"type": "about", "title": "About", "body": "Premium coaching daily"},
+            {"type": "schedule", "title": "Schedule", "body": "Weekdays 06:00-22:00"},
+            {
+                "type": "cta",
+                "title": "Join now",
+                "button_text": "Book trial",
+                "button_url": "https://fitlio.example.com/trial",
+            },
+        ],
+    }
+    update = client.post(f"/centers/{center.id}/landing", json=payload)
+    get_admin = client.get(f"/centers/{center.id}/landing")
+    public_get = client.get(f"/centers/public/{center.slug}/landing")
+    page_get = client.get(f"/center/{center.slug}")
+    app.dependency_overrides.clear()
+
+    assert update.status_code == 200
+    update_payload = update.json()
+    assert update_payload["landing_is_published"] is True
+    assert len(update_payload["landing_content"]["blocks"]) == 4
+
+    assert get_admin.status_code == 200
+    admin_payload = get_admin.json()
+    assert admin_payload["center_id"] == center.id
+    assert admin_payload["center_slug"] == center.slug
+    assert admin_payload["landing_is_published"] is True
+
+    assert public_get.status_code == 200
+    public_payload = public_get.json()
+    assert public_payload["center_slug"] == center.slug
+    assert public_payload["branding"]["tablet_accent_color"] == "#2f855a"
+    assert public_payload["landing_content"]["blocks"][0]["type"] == "hero"
+
+    assert page_get.status_code == 200
+    assert "Fitlio Center" in page_get.text
+
+
+def test_center_landing_validation_and_unpublished_access(db_session):
+    admin = models.Member(
+        email="landing.validation.admin@fitlio.com",
+        hashed_password="x",
+        full_name="Landing Validation Admin",
+        role="admin",
+        is_active=True,
+    )
+    center = models.Center(name="Landing Draft", slug="landing-draft", is_active=True)
+    db_session.add(admin)
+    db_session.add(center)
+    db_session.flush()
+    db_session.add(
+        models.CenterMembership(
+            center_id=center.id,
+            member_id=admin.id,
+            role="admin",
+            status="active",
+        )
+    )
+    db_session.commit()
+
+    from app.deps import get_current_user
+
+    app.dependency_overrides[get_db] = _override_db(db_session)
+    app.dependency_overrides[get_current_user] = lambda: {"id": admin.id, "role": "admin"}
+    bad_payload = {
+        "publish": False,
+        "blocks": [
+            {
+                "type": "cta",
+                "title": "Book",
+                "button_text": "Open",
+                "button_url": "javascript:alert(1)",
+            }
+        ],
+    }
+    bad_update = client.post(f"/centers/{center.id}/landing", json=bad_payload)
+    good_update = client.post(
+        f"/centers/{center.id}/landing",
+        json={
+            "publish": False,
+            "blocks": [{"type": "hero", "headline": "Draft", "subheadline": "Coming soon"}],
+        },
+    )
+    public_get = client.get(f"/centers/public/{center.slug}/landing")
+    app.dependency_overrides.clear()
+
+    assert bad_update.status_code == 400
+    assert "http:// or https://" in bad_update.json()["detail"]
+    assert good_update.status_code == 200
+    assert good_update.json()["landing_is_published"] is False
+    assert public_get.status_code == 404
+    assert public_get.json()["detail"] == "Landing page not published"
+
+
 def test_quick_reserve_success_path(db_session):
     member = models.Member(
         email="quick.reserve.success@fitlio.com",

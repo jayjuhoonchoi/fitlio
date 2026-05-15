@@ -1,4 +1,7 @@
 from datetime import date, datetime
+import json
+import re
+from urllib.parse import urlparse
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
@@ -86,6 +89,16 @@ class TabletThemeBody(BaseModel):
     tablet_background_url: str | None = Field(default=None, max_length=1024)
 
 
+ALLOWED_LANDING_BLOCK_TYPES = {"hero", "about", "schedule", "cta"}
+HEX_COLOR_RE = re.compile(r"^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$")
+DEFAULT_LANDING_BLOCKS = [
+    {"type": "hero", "headline": "", "subheadline": ""},
+    {"type": "about", "title": "", "body": ""},
+    {"type": "schedule", "title": "", "body": ""},
+    {"type": "cta", "title": "", "button_text": "", "button_url": ""},
+]
+
+
 class OnsitePaymentBody(BaseModel):
     center_id: int
     member_id: int
@@ -97,6 +110,114 @@ class OnsitePaymentBody(BaseModel):
 class TabletCheckinBody(BaseModel):
     center_slug: str
     phone_last4: str = Field(..., min_length=4, max_length=4)
+
+
+class LandingBlockBody(BaseModel):
+    type: str = Field(..., pattern="^(hero|about|schedule|cta)$")
+    headline: str | None = Field(default=None, max_length=120)
+    subheadline: str | None = Field(default=None, max_length=240)
+    title: str | None = Field(default=None, max_length=120)
+    body: str | None = Field(default=None, max_length=1200)
+    button_text: str | None = Field(default=None, max_length=80)
+    button_url: str | None = Field(default=None, max_length=1024)
+
+
+class LandingContentBody(BaseModel):
+    blocks: list[LandingBlockBody] = Field(default_factory=list, max_length=20)
+    publish: bool | None = None
+
+
+def _clean_text(value: str | None, max_len: int) -> str:
+    if not value:
+        return ""
+    cleaned = value.strip()
+    return cleaned[:max_len]
+
+
+def _clean_optional_url(value: str | None, *, max_len: int) -> str | None:
+    if not value:
+        return None
+    candidate = value.strip()
+    if not candidate:
+        return None
+    if len(candidate) > max_len:
+        raise HTTPException(status_code=400, detail=f"URL must be <= {max_len} characters")
+    parsed = urlparse(candidate)
+    if parsed.scheme not in {"http", "https"}:
+        raise HTTPException(status_code=400, detail="URL must start with http:// or https://")
+    if not parsed.netloc:
+        raise HTTPException(status_code=400, detail="URL host is required")
+    return candidate
+
+
+def _default_landing_payload() -> dict:
+    return {"blocks": [dict(block) for block in DEFAULT_LANDING_BLOCKS]}
+
+
+def _load_landing_payload(center: Center) -> dict:
+    raw = (getattr(center, "landing_content_json", "") or "").strip()
+    if not raw:
+        return _default_landing_payload()
+    try:
+        parsed = json.loads(raw)
+    except json.JSONDecodeError:
+        return _default_landing_payload()
+    if not isinstance(parsed, dict):
+        return _default_landing_payload()
+    blocks = parsed.get("blocks")
+    if not isinstance(blocks, list):
+        return _default_landing_payload()
+    return {"blocks": blocks}
+
+
+def _sanitize_landing_blocks(blocks: list[LandingBlockBody]) -> list[dict]:
+    if not blocks:
+        raise HTTPException(status_code=400, detail="At least one landing block is required")
+    if len(blocks) > 20:
+        raise HTTPException(status_code=400, detail="Maximum 20 blocks supported")
+    seen_types = set()
+    sanitized: list[dict] = []
+    for block in blocks:
+        block_type = block.type.strip().lower()
+        if block_type not in ALLOWED_LANDING_BLOCK_TYPES:
+            raise HTTPException(status_code=400, detail=f"Unsupported block type: {block_type}")
+        if block_type in seen_types:
+            raise HTTPException(status_code=400, detail=f"Duplicate block type: {block_type}")
+        seen_types.add(block_type)
+        if block_type == "hero":
+            sanitized.append(
+                {
+                    "type": "hero",
+                    "headline": _clean_text(block.headline, 120),
+                    "subheadline": _clean_text(block.subheadline, 240),
+                }
+            )
+        elif block_type == "about":
+            sanitized.append(
+                {
+                    "type": "about",
+                    "title": _clean_text(block.title, 120),
+                    "body": _clean_text(block.body, 1200),
+                }
+            )
+        elif block_type == "schedule":
+            sanitized.append(
+                {
+                    "type": "schedule",
+                    "title": _clean_text(block.title, 120),
+                    "body": _clean_text(block.body, 1200),
+                }
+            )
+        else:
+            sanitized.append(
+                {
+                    "type": "cta",
+                    "title": _clean_text(block.title, 120),
+                    "button_text": _clean_text(block.button_text, 80),
+                    "button_url": _clean_optional_url(block.button_url, max_len=1024),
+                }
+            )
+    return sanitized
 
 
 def _tablet_checkin_error(
@@ -426,6 +547,7 @@ def center_detail(
         "slug": center.slug,
         "tablet_theme": center.tablet_theme,
         "tablet_welcome_text": center.tablet_welcome_text,
+        "landing_is_published": bool(getattr(center, "landing_is_published", False)),
     }
 
 
@@ -447,7 +569,10 @@ def update_tablet_theme(
     if body.tablet_logo_url is not None:
         center.tablet_logo_url = body.tablet_logo_url.strip() if body.tablet_logo_url else None
     if body.tablet_accent_color is not None:
-        center.tablet_accent_color = body.tablet_accent_color.strip() or "#2f855a"
+        color = body.tablet_accent_color.strip() if body.tablet_accent_color else ""
+        if color and not HEX_COLOR_RE.match(color):
+            raise HTTPException(status_code=400, detail="tablet_accent_color must be a hex color")
+        center.tablet_accent_color = color or "#2f855a"
     if body.tablet_background_url is not None:
         center.tablet_background_url = (
             body.tablet_background_url.strip() if body.tablet_background_url else None
@@ -461,6 +586,77 @@ def update_tablet_theme(
         "tablet_logo_url": center.tablet_logo_url,
         "tablet_accent_color": getattr(center, "tablet_accent_color", "#2f855a"),
         "tablet_background_url": getattr(center, "tablet_background_url", None),
+    }
+
+
+@router.get("/{center_id}/landing")
+def get_center_landing_admin(
+    center_id: int,
+    db: Session = Depends(get_db),
+    user: dict = Depends(get_current_user),
+):
+    _assert_center_admin(db, center_id, user["id"])
+    center = db.query(Center).filter(Center.id == center_id).first()
+    if not center:
+        raise HTTPException(status_code=404, detail="Center not found")
+    payload = _load_landing_payload(center)
+    return {
+        "center_id": center.id,
+        "center_slug": center.slug,
+        "center_name": center.name,
+        "landing_is_published": bool(getattr(center, "landing_is_published", False)),
+        "landing_content": payload,
+    }
+
+
+@router.post("/{center_id}/landing")
+def update_center_landing_admin(
+    center_id: int,
+    body: LandingContentBody,
+    db: Session = Depends(get_db),
+    user: dict = Depends(get_current_user),
+):
+    _assert_center_admin(db, center_id, user["id"])
+    center = db.query(Center).filter(Center.id == center_id).first()
+    if not center:
+        raise HTTPException(status_code=404, detail="Center not found")
+    sanitized_blocks = _sanitize_landing_blocks(body.blocks)
+    center.landing_content_json = json.dumps(
+        {"blocks": sanitized_blocks}, ensure_ascii=True, separators=(",", ":")
+    )
+    if body.publish is not None:
+        center.landing_is_published = body.publish
+    db.commit()
+    db.refresh(center)
+    return {
+        "center_id": center.id,
+        "landing_is_published": bool(getattr(center, "landing_is_published", False)),
+        "landing_content": _load_landing_payload(center),
+    }
+
+
+@router.get("/public/{center_slug}/landing")
+def get_center_public_landing(
+    center_slug: str,
+    db: Session = Depends(get_db),
+):
+    center = db.query(Center).filter(Center.slug == center_slug.strip().lower()).first()
+    if not center:
+        raise HTTPException(status_code=404, detail="Center not found")
+    if not center.is_active or not bool(getattr(center, "landing_is_published", False)):
+        raise HTTPException(status_code=404, detail="Landing page not published")
+    payload = _load_landing_payload(center)
+    return {
+        "center_id": center.id,
+        "center_name": center.name,
+        "center_slug": center.slug,
+        "branding": {
+            "tablet_theme": center.tablet_theme,
+            "tablet_logo_url": center.tablet_logo_url,
+            "tablet_accent_color": getattr(center, "tablet_accent_color", "#2f855a"),
+            "tablet_background_url": getattr(center, "tablet_background_url", None),
+        },
+        "landing_content": payload,
     }
 
 

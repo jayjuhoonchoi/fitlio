@@ -104,6 +104,11 @@ def tablet_kiosk_page(center_slug: str):
     return _html("tablet_kiosk.html")
 
 
+@app.get("/center/{center_slug}", response_class=HTMLResponse)
+def center_landing_page(center_slug: str):
+    return _html("center_landing.html")
+
+
 @app.get("/assets/luxury_tokens.css")
 def luxury_tokens_css():
     return _css_asset("luxury_tokens.css")
