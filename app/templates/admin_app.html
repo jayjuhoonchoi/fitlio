@@ -222,6 +222,10 @@
     .chip.error { background: #fde8ed; border-color: #f2a2b7; color: #9f1239; }
     .chip.risk { background: #fde8ed; border-color: #f2a2b7; color: #9f1239; text-transform: none; }
     .chip.safe { background: #e8f6ee; border-color: #9dd6b4; color: #1f6a43; text-transform: none; }
+    .chip.up { background: #e8f6ee; border-color: #9dd6b4; color: #1f6a43; text-transform: none; }
+    .chip.down { background: #fde8ed; border-color: #f2a2b7; color: #9f1239; text-transform: none; }
+    .chip.alert { background: #fff4db; border-color: #f3cb7f; color: #8a5a00; text-transform: none; }
+    .chip.stable { background: #eef4ea; border-color: #b8c5bb; color: #3a4f43; text-transform: none; }
     .risk-note { font-size: 0.72rem; color: #5e7063; margin-top: 4px; line-height: 1.35; }
     .stats {
       display: grid;
@@ -271,6 +275,57 @@
       overflow: hidden;
     }
     .bar > i { display: block; height: 100%; background: linear-gradient(90deg, #2f855a, #58b485); }
+    .analytics-shell { display: grid; gap: 12px; }
+    .analytics-hero {
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 14px;
+      background: linear-gradient(145deg, #f9fcf7, #f2f8ee);
+      box-shadow: var(--shadow-soft);
+    }
+    .analytics-hero .hero-title {
+      font-size: 0.76rem;
+      color: #547262;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 5px;
+      font-weight: 650;
+    }
+    .analytics-hero .hero-value {
+      font-size: 1.7rem;
+      line-height: 1.15;
+      letter-spacing: -0.02em;
+      font-weight: 720;
+      color: #1f6a43;
+    }
+    .kpi-sub {
+      margin-top: 6px;
+      font-size: 0.77rem;
+      color: #5e7063;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+    .trend-grid {
+      display: grid;
+      gap: 10px;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    }
+    .spark {
+      margin-top: 10px;
+      width: 100%;
+      height: 60px;
+      display: block;
+    }
+    .legend {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.74rem;
+      color: #5e7063;
+    }
     .flash {
       margin-bottom: 10px;
       font-size: 0.84rem;
@@ -391,6 +446,29 @@
     function statusChip(status){
       const s = String(status||"").toLowerCase();
       return `<span class="chip ${s}">${esc(s || "unknown")}</span>`;
+    }
+    function trendChip(delta, mode){
+      const n = Number(delta || 0);
+      const isPct = mode !== "pp";
+      const unit = isPct ? "%" : "pp";
+      const sign = n >= 0 ? "+" : "";
+      const cls = n >= 0 ? "up" : "down";
+      return `<span class="chip ${cls}">${sign}${n.toFixed(2)}${unit}</span>`;
+    }
+    function sparkline(points, valueKey){
+      const vals = (points || []).map((x)=>Number(x[valueKey] || 0));
+      if(!vals.length){
+        return `<svg class="spark" viewBox="0 0 100 30" preserveAspectRatio="none"><path d="M0,29 L100,29" stroke="#d5e0d7" stroke-width="1" fill="none"></path></svg>`;
+      }
+      const min = Math.min(...vals);
+      const max = Math.max(...vals);
+      const range = Math.max(1, max - min);
+      const path = vals.map((v, idx)=>{
+        const x = (idx / Math.max(vals.length - 1, 1)) * 100;
+        const y = 28 - ((v - min) / range) * 24;
+        return `${idx === 0 ? "M" : "L"}${x.toFixed(2)},${y.toFixed(2)}`;
+      }).join(" ");
+      return `<svg class="spark" viewBox="0 0 100 30" preserveAspectRatio="none" aria-hidden="true"><path d="${path}" stroke="#2f855a" stroke-width="2.2" fill="none" stroke-linecap="round"></path></svg>`;
     }
     function runKpiCountUp(root){
       if(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
@@ -547,30 +625,50 @@
       if(tab==="rep"){
         title.textContent=t("rep");
         try{
-          const [growth, retention, util] = await Promise.all([
-            apiJson("/admin/reports/member-growth?months=12"),
-            apiJson("/admin/reports/retention?months=12"),
-            apiJson("/admin/reports/class-utilization?days=30"),
-          ]);
-          const maxGrowth = Math.max(...growth.points.map(x=>x.new_members), 1);
-          const maxRetention = Math.max(...retention.points.map(x=>x.retention_rate), 1);
+          const overview = await apiJson("/admin/reports/premium-overview?months=6&risk_days=60&risk_threshold_pct=50");
+          const kpis = overview.kpis || {};
+          const trends = overview.trends || {};
+          const risk = overview.at_risk_summary || {};
+          const mrr = kpis.mrr || {};
+          const retention = kpis.retention_proxy || {};
+          const occupancy = kpis.occupancy || {};
+          const atRisk = kpis.at_risk || {};
+          const riskRows = (risk.top_members || []);
           p.innerHTML=`<div id="flash" class="flash"></div>
-            <div class="stats stagger">
-              <div class="kpi">${t("avgFill")}<b>${util.average_fill_rate}%</b></div>
-              <div class="kpi">${t("growth")} (12m)<b>${growth.points.reduce((a,b)=>a+b.new_members,0)}</b></div>
-              <div class="kpi">${t("retention")} (latest)<b>${(retention.points[retention.points.length-1]?.retention_rate ?? 0)}%</b></div>
-            </div>
-            <div class="box" style="margin-bottom:.8rem">
-              <div class="hint">${t("growth")}</div>
-              <div class="bar-wrap">${growth.points.map(x=>`<div class="bar-row"><span>${x.label}</span><div class="bar"><i style="width:${Math.max(4,(x.new_members/maxGrowth)*100)}%"></i></div><span>${x.new_members}</span></div>`).join("")}</div>
-            </div>
-            <div class="box" style="margin-bottom:.8rem">
-              <div class="hint">${t("retention")}</div>
-              <div class="bar-wrap">${retention.points.map(x=>`<div class="bar-row"><span>${x.label}</span><div class="bar"><i style="width:${Math.max(4,(x.retention_rate/maxRetention)*100)}%"></i></div><span>${x.retention_rate}%</span></div>`).join("")}</div>
-            </div>
-            <table class="table"><thead><tr><th>ID</th><th>${t("className")}</th><th>${t("name")}</th><th>${t("status")}</th><th>${t("avgFill")}</th></tr></thead><tbody>
-              ${util.rows.slice(0,25).map(r=>`<tr><td>${r.class_id}</td><td>${esc(r.name)}</td><td>${esc(r.instructor)}</td><td>${new Date(r.schedule).toLocaleString()}</td><td>${r.fill_rate}%</td></tr>`).join("")}
-            </tbody></table>`;
+            <div class="analytics-shell stagger">
+              <div class="analytics-hero">
+                <div class="hero-title">MRR</div>
+                <div class="hero-value">$${Number(mrr.value || 0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}</div>
+                <div class="kpi-sub">${trendChip(mrr.delta_pct || 0, "pct")} ${statusChip(mrr.status || "stable")} · Last ${overview.months} months</div>
+                ${sparkline(trends.mrr || [], "total_amount")}
+              </div>
+              <div class="trend-grid">
+                <div class="kpi">
+                  Retention proxy
+                  <b>${Number(retention.value || 0).toFixed(2)}%</b>
+                  <div class="kpi-sub">${trendChip(retention.delta_pct || 0, "pp")} ${statusChip(retention.status || "stable")} · active ${Number(retention.active_members || 0).toLocaleString()}</div>
+                  ${sparkline(trends.retention_proxy || [], "retention_rate")}
+                </div>
+                <div class="kpi">
+                  Occupancy trend
+                  <b>${Number(occupancy.value || 0).toFixed(2)}%</b>
+                  <div class="kpi-sub">${trendChip(occupancy.delta_pct || 0, "pp")} ${statusChip(occupancy.status || "stable")} · ${Number(occupancy.booked_total || 0).toLocaleString()} / ${Number(occupancy.capacity_total || 0).toLocaleString()}</div>
+                  ${sparkline(trends.occupancy || [], "fill_rate")}
+                </div>
+                <div class="kpi">
+                  At-risk members
+                  <b>${Number(atRisk.count || 0).toLocaleString()}</b>
+                  <div class="kpi-sub">${statusChip(atRisk.status || "stable")} ${Number(atRisk.share_of_active_members_pct || 0).toFixed(2)}% of active members</div>
+                  <div class="legend">Window ${Number(atRisk.risk_window_days || 0)}d · Threshold ${Number(atRisk.risk_threshold_pct || 0).toFixed(0)}%</div>
+                </div>
+              </div>
+              <div class="box">
+                <div class="hint">At-risk summary (top 5)</div>
+                ${riskRows.length ? `<table class="table"><thead><tr><th>ID</th><th>Member</th><th>${t("status")}</th><th>Attendance</th><th>Booked</th><th>Reason</th></tr></thead><tbody>
+                ${riskRows.map((r)=>`<tr><td>${r.member_id}</td><td>${esc(r.full_name)}</td><td>${statusChip("alert")}</td><td>${Number(r.attendance_rate || 0).toFixed(2)}%</td><td>${Number(r.booked_count || 0).toLocaleString()}</td><td>${esc(r.rationale || "")}</td></tr>`).join("")}
+                </tbody></table>` : `<div class="empty-state">No at-risk members in current window.</div>`}
+              </div>
+            </div>`;
           runKpiCountUp(p);
         }catch(e){
           flash(e.message||t("err"));

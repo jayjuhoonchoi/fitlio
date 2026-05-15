@@ -132,6 +132,95 @@ def test_admin_occupancy_trend_response_shape(db_session):
         assert key in point
 
 
+def test_admin_premium_overview_invalid_months(db_session):
+    app.dependency_overrides[require_admin] = _override_admin
+    app.dependency_overrides[get_db] = _override_db(db_session)
+    response = client.get("/admin/reports/premium-overview?months=2")
+    app.dependency_overrides.clear()
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Months must be between 3 and 24"
+
+
+def test_admin_premium_overview_response_shape(db_session):
+    now = datetime.utcnow()
+    member = models.Member(
+        email="premium.member@fitlio.com",
+        hashed_password="x",
+        full_name="Premium Member",
+        role="member",
+    )
+    db_session.add(member)
+    db_session.flush()
+
+    membership = models.Membership(
+        member_id=member.id,
+        plan="monthly",
+        start_date=now - timedelta(days=15),
+        end_date=now + timedelta(days=15),
+        status="active",
+    )
+    db_session.add(membership)
+
+    cls = models.FitnessClass(
+        name="Premium HIIT",
+        instructor="Coach Prime",
+        schedule=now - timedelta(days=2),
+        capacity=20,
+        current_count=0,
+    )
+    db_session.add(cls)
+    db_session.flush()
+
+    db_session.add(models.Booking(member_id=member.id, class_id=cls.id, status="confirmed"))
+    db_session.add(models.Attendance(member_id=member.id, class_id=cls.id, status="present"))
+    db_session.add(
+        models.Payment(
+            member_id=member.id,
+            membership_id=membership.id,
+            amount=12000,
+            status="completed",
+            payment_method="card",
+        )
+    )
+    db_session.commit()
+
+    app.dependency_overrides[require_admin] = _override_admin
+    app.dependency_overrides[get_db] = _override_db(db_session)
+    response = client.get(
+        "/admin/reports/premium-overview?months=6&risk_days=60&risk_threshold_pct=50"
+    )
+    app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["months"] == 6
+    assert "kpis" in payload
+    assert "trends" in payload
+    assert "at_risk_summary" in payload
+
+    for key in ("mrr", "retention_proxy", "occupancy", "at_risk"):
+        assert key in payload["kpis"]
+    for key in ("mrr", "retention_proxy", "occupancy"):
+        assert key in payload["trends"]
+        assert isinstance(payload["trends"][key], list)
+        assert len(payload["trends"][key]) == 6
+
+    mrr_kpi = payload["kpis"]["mrr"]
+    assert mrr_kpi["label"] == "MRR"
+    for key in ("value", "value_cents", "delta_pct", "status"):
+        assert key in mrr_kpi
+
+    risk_summary = payload["at_risk_summary"]
+    for key in (
+        "count",
+        "risk_window_days",
+        "risk_threshold_pct",
+        "share_of_active_members_pct",
+        "top_members",
+    ):
+        assert key in risk_summary
+
+
 def test_admin_member_risk_response_shape(db_session):
     member = models.Member(
         email="risk.member@fitlio.com",

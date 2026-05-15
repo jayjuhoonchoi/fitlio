@@ -468,6 +468,123 @@ def class_utilization_report(
     }
 
 
+@router.get("/reports/premium-overview")
+def premium_overview_report(
+    months: int = 6,
+    risk_days: int = 60,
+    risk_threshold_pct: float = 50.0,
+    db: Session = Depends(get_db),
+    _: dict = Depends(require_admin),
+):
+    if months < 3 or months > 24:
+        raise HTTPException(status_code=400, detail="Months must be between 3 and 24")
+    _validate_member_risk_params(risk_days, risk_threshold_pct)
+
+    mrr = sales_trend(months=months, db=db, _={})
+    retention = retention_report(months=months, db=db, _={})
+    occupancy = occupancy_trend_report(months=months, db=db, _={})
+    risk_rows = _build_member_risk_rows(
+        db=db,
+        members=db.query(Member).all(),
+        days=risk_days,
+        threshold_pct=risk_threshold_pct,
+    )
+
+    latest_mrr = mrr["points"][-1] if mrr["points"] else None
+    previous_mrr = mrr["points"][-2] if len(mrr["points"]) > 1 else None
+    latest_mrr_total = float((latest_mrr or {}).get("total_amount") or 0.0)
+    previous_mrr_total = float((previous_mrr or {}).get("total_amount") or 0.0)
+    mrr_delta_pct = 0.0
+    if previous_mrr_total > 0:
+        mrr_delta_pct = ((latest_mrr_total - previous_mrr_total) / previous_mrr_total) * 100.0
+
+    latest_retention = retention["points"][-1] if retention["points"] else None
+    previous_retention = retention["points"][-2] if len(retention["points"]) > 1 else None
+    latest_retention_rate = float((latest_retention or {}).get("retention_rate") or 0.0)
+    previous_retention_rate = float((previous_retention or {}).get("retention_rate") or 0.0)
+    retention_delta_pct = latest_retention_rate - previous_retention_rate
+
+    latest_occupancy = occupancy["points"][-1] if occupancy["points"] else None
+    previous_occupancy = occupancy["points"][-2] if len(occupancy["points"]) > 1 else None
+    latest_fill_rate = float((latest_occupancy or {}).get("fill_rate") or 0.0)
+    previous_fill_rate = float((previous_occupancy or {}).get("fill_rate") or 0.0)
+    occupancy_delta_pct = latest_fill_rate - previous_fill_rate
+
+    active_members = (
+        db.query(func.count(func.distinct(Membership.member_id)))
+        .filter(
+            Membership.status == "active",
+            Membership.start_date <= datetime.utcnow(),
+            Membership.end_date >= datetime.utcnow(),
+        )
+        .scalar()
+    ) or 0
+    at_risk_count = sum(1 for row in risk_rows if row["at_risk"])
+    at_risk_share = (at_risk_count / active_members * 100.0) if active_members else 0.0
+    top_at_risk = [
+        {
+            "member_id": row["member_id"],
+            "member_no": row.get("member_no"),
+            "full_name": row["full_name"],
+            "attendance_rate": row["attendance_rate"],
+            "booked_count": row["booked_count"],
+            "attendance_count": row["attendance_count"],
+            "rationale": row["rationale"],
+        }
+        for row in risk_rows
+        if row["at_risk"]
+    ][:5]
+
+    return {
+        "months": months,
+        "kpis": {
+            "mrr": {
+                "label": "MRR",
+                "value": round(latest_mrr_total, 2),
+                "value_cents": int((latest_mrr or {}).get("total_amount_cents") or 0),
+                "delta_pct": round(mrr_delta_pct, 2),
+                "status": "up" if mrr_delta_pct >= 0 else "down",
+            },
+            "retention_proxy": {
+                "label": "Retention proxy",
+                "value": round(latest_retention_rate, 2),
+                "delta_pct": round(retention_delta_pct, 2),
+                "status": "up" if retention_delta_pct >= 0 else "down",
+                "active_members": int((latest_retention or {}).get("active_members") or 0),
+                "member_base": int((latest_retention or {}).get("member_base") or 0),
+            },
+            "occupancy": {
+                "label": "Occupancy",
+                "value": round(latest_fill_rate, 2),
+                "delta_pct": round(occupancy_delta_pct, 2),
+                "status": "up" if occupancy_delta_pct >= 0 else "down",
+                "capacity_total": int((latest_occupancy or {}).get("capacity_total") or 0),
+                "booked_total": int((latest_occupancy or {}).get("booked_total") or 0),
+            },
+            "at_risk": {
+                "label": "At-risk members",
+                "count": at_risk_count,
+                "share_of_active_members_pct": round(at_risk_share, 2),
+                "status": "alert" if at_risk_count > 0 else "stable",
+                "risk_window_days": risk_days,
+                "risk_threshold_pct": round(risk_threshold_pct, 2),
+            },
+        },
+        "trends": {
+            "mrr": mrr["points"],
+            "retention_proxy": retention["points"],
+            "occupancy": occupancy["points"],
+        },
+        "at_risk_summary": {
+            "count": at_risk_count,
+            "risk_window_days": risk_days,
+            "risk_threshold_pct": round(risk_threshold_pct, 2),
+            "share_of_active_members_pct": round(at_risk_share, 2),
+            "top_members": top_at_risk,
+        },
+    }
+
+
 @router.get("/reports/weekly-performance")
 def weekly_performance_report(
     center_id: int | None = None,
