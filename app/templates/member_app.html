@@ -462,6 +462,9 @@
       const log=document.getElementById("log");
       log.classList.toggle("ok", !!r.ok);
       log.textContent = r.ok ? (d.message || `결제 요청 완료 (${method})`) : (d.detail||t("fail"));
+      if(r.ok && d.checkout_url && method !== "bank_transfer"){
+        window.open(d.checkout_url, "_blank");
+      }
       if(r.ok){ loadSummary(); loadMemberHome(); loadPaymentHistory(); }
     }
     async function loadCenterClasses(){

@@ -490,6 +490,8 @@ def list_classes_admin(db: Session = Depends(get_db), _: dict = Depends(require_
             "schedule": c.schedule,
             "capacity": c.capacity,
             "current_count": c.current_count,
+            "center_id": getattr(c, "center_id", None),
+            "level_required": getattr(c, "level_required", "starter"),
         }
         for c in classes
     ]
@@ -522,6 +524,8 @@ class ClassCreateAdmin(BaseModel):
     instructor: str = Field(..., min_length=1)
     schedule: datetime
     capacity: int = Field(default=20, ge=1, le=500)
+    center_id: int | None = None
+    level_required: str = Field(default="starter", pattern="^(starter|core|elite|vip)$")
 
 
 class ClassUpdateAdmin(BaseModel):
@@ -529,6 +533,8 @@ class ClassUpdateAdmin(BaseModel):
     instructor: str | None = Field(default=None, min_length=1)
     schedule: datetime | None = None
     capacity: int | None = Field(default=None, ge=1, le=500)
+    center_id: int | None = None
+    level_required: str | None = Field(default=None, pattern="^(starter|core|elite|vip)$")
 
 
 @router.get("/instructors")
@@ -678,6 +684,8 @@ def create_class_admin(
         instructor=body.instructor.strip(),
         schedule=body.schedule,
         capacity=body.capacity,
+        center_id=body.center_id,
+        level_required=body.level_required,
     )
     db.add(row)
     db.commit()
@@ -726,6 +734,10 @@ def update_class_admin(
             )
         row.capacity = body.capacity
         row.current_count = min(row.current_count, row.capacity)
+    if body.center_id is not None:
+        row.center_id = body.center_id
+    if body.level_required is not None:
+        row.level_required = body.level_required
     db.commit()
     db.refresh(row)
     return {"id": row.id, "updated": True}
