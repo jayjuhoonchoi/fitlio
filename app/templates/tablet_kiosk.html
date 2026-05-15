@@ -52,6 +52,8 @@
       font-size:1.08rem;
       min-height:58px;
     }
+    .success{ border-color: rgba(111,238,171,.45); background: rgba(106,194,145,.2); }
+    .error{ border-color: rgba(255,124,124,.5); background: rgba(120,29,29,.28); }
     .cta{ margin-top:14px; display:flex; gap:10px; }
     .go{
       border:none;
@@ -109,11 +111,17 @@
       });
     }
     document.getElementById("clearBtn").onclick=()=>{ pin=""; document.getElementById("display").textContent="----"; };
+    function setResult(text, ok){
+      const el = document.getElementById("result");
+      el.textContent = text || "";
+      el.classList.remove("success","error");
+      el.classList.add(ok ? "success" : "error");
+    }
     document.getElementById("submitBtn").onclick=async()=>{
       if(pin.length!==4) return;
       const r = await fetch("/centers/tablet/check-in",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({center_slug:slug,phone_last4:pin})});
       const d = await r.json().catch(()=>({}));
-      document.getElementById("result").textContent = r.ok ? (d.message || "Check-in done") : (d.detail || "Failed");
+      setResult(r.ok ? (d.message || "Check-in done") : (d.detail || "Failed"), !!r.ok);
       if(r.ok) pin="";
       document.getElementById("display").textContent = "----";
     };

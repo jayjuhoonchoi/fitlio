@@ -79,6 +79,11 @@ class PaymentWebhookBody(BaseModel):
     payload: dict | None = None
 
 
+class ModeratorDecisionBody(BaseModel):
+    report_id: int
+    status: str = Field(..., pattern="^(open|resolved|rejected)$")
+
+
 def _member_center_ids(db: Session, member_id: int):
     rows = (
         db.query(CenterMembership.center_id)
@@ -538,6 +543,22 @@ def moderation_hide(
         row.is_hidden = body.hide
     db.commit()
     return {"ok": True, "hidden": body.hide}
+
+
+@router.post("/moderation/reports/status")
+def moderation_report_status(
+    body: ModeratorDecisionBody,
+    db: Session = Depends(get_db),
+    user: dict = Depends(get_current_user),
+):
+    if not _is_admin_or_staff(db, user["id"]):
+        raise HTTPException(status_code=403, detail="Moderator access required")
+    report = db.query(ContentReport).filter(ContentReport.id == body.report_id).first()
+    if not report:
+        raise HTTPException(status_code=404, detail="Report not found")
+    report.status = body.status
+    db.commit()
+    return {"id": report.id, "status": report.status}
 
 
 @router.post("/payments/webhook")
