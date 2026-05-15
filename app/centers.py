@@ -99,6 +99,25 @@ class TabletCheckinBody(BaseModel):
     phone_last4: str = Field(..., min_length=4, max_length=4)
 
 
+def _tablet_checkin_error(
+    *,
+    http_status: int,
+    detail: str,
+    result_code: str,
+    can_retry: bool,
+):
+    raise HTTPException(
+        status_code=http_status,
+        detail=detail,
+        headers={
+            "X-Tablet-Result-Code": result_code,
+            "X-Tablet-Status-Label": "error",
+            "X-Tablet-UI-State": "error",
+            "X-Tablet-Can-Retry": "true" if can_retry else "false",
+        },
+    )
+
+
 @router.post("", status_code=201)
 def create_center(
     body: CenterCreate,
@@ -513,14 +532,24 @@ def tablet_check_in(
 ):
     center = db.query(Center).filter(Center.slug == body.center_slug.strip().lower()).first()
     if not center:
-        raise HTTPException(status_code=404, detail="Center not found")
+        _tablet_checkin_error(
+            http_status=404,
+            detail="Center not found",
+            result_code="CENTER_NOT_FOUND",
+            can_retry=False,
+        )
     member = (
         db.query(Member)
         .filter(Member.phone.endswith(body.phone_last4), Member.is_active == True)
         .first()
     )
     if not member:
-        raise HTTPException(status_code=404, detail="Member not found")
+        _tablet_checkin_error(
+            http_status=404,
+            detail="Member not found",
+            result_code="MEMBER_NOT_FOUND",
+            can_retry=True,
+        )
     cm = (
         db.query(CenterMembership)
         .filter(
@@ -531,7 +560,12 @@ def tablet_check_in(
         .first()
     )
     if not cm:
-        raise HTTPException(status_code=403, detail="Member is not active in this center")
+        _tablet_checkin_error(
+            http_status=403,
+            detail="Member is not active in this center",
+            result_code="CENTER_MEMBERSHIP_INACTIVE",
+            can_retry=False,
+        )
     membership = (
         db.query(Membership)
         .filter(Membership.member_id == member.id, Membership.status == "active")
@@ -539,7 +573,12 @@ def tablet_check_in(
         .first()
     )
     if not membership:
-        raise HTTPException(status_code=400, detail="No active membership")
+        _tablet_checkin_error(
+            http_status=400,
+            detail="No active membership",
+            result_code="NO_ACTIVE_MEMBERSHIP",
+            can_retry=False,
+        )
     now = datetime.utcnow()
     day_start = datetime(now.year, now.month, now.day)
     exists = (
@@ -548,7 +587,12 @@ def tablet_check_in(
         .first()
     )
     if exists:
-        raise HTTPException(status_code=400, detail="Already checked in today")
+        _tablet_checkin_error(
+            http_status=400,
+            detail="Already checked in today",
+            result_code="ALREADY_CHECKED_IN_TODAY",
+            can_retry=False,
+        )
     month_start = datetime(now.year, now.month, 1)
     usage = (
         db.query(Attendance)
@@ -556,17 +600,32 @@ def tablet_check_in(
         .count()
     )
     if membership.monthly_limit is not None and usage >= membership.monthly_limit:
-        raise HTTPException(status_code=400, detail="Monthly usage limit reached")
+        _tablet_checkin_error(
+            http_status=400,
+            detail="Monthly usage limit reached",
+            result_code="MONTHLY_USAGE_LIMIT_REACHED",
+            can_retry=False,
+        )
     attendance = Attendance(member_id=member.id, class_id=0, status="present")
     db.add(attendance)
     db.commit()
     usage_after = usage + 1
+    usage_limit = membership.monthly_limit
+    remaining_usage_count = (
+        max(0, usage_limit - usage_after) if usage_limit is not None else None
+    )
     if membership.monthly_limit is not None:
-        remaining_text = f"{max(0, membership.monthly_limit - usage_after)}/{membership.monthly_limit}"
+        remaining_text = f"{remaining_usage_count}/{membership.monthly_limit}"
     else:
         remaining_text = "unlimited"
     days_left = max(0, (membership.end_date - now).days) if membership.end_date else None
     return {
+        "ok": True,
+        "status_label": "success",
+        "result_code": "CHECK_IN_OK",
+        "ui_state": "success",
+        "can_retry": False,
+        "reset_after_ms": 2600,
         "message": (
             f"Welcome back, {member.full_name}! Remaining usage {remaining_text}."
             if days_left is None
@@ -575,6 +634,9 @@ def tablet_check_in(
         "member_name": member.full_name,
         "member_no": getattr(member, "member_no", None),
         "remaining_usage": remaining_text,
+        "remaining_usage_count": remaining_usage_count,
+        "usage_limit": usage_limit,
+        "usage_used_this_month": usage_after,
         "days_left": days_left,
         "membership_status": membership.status,
         "center_name": center.name,

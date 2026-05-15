@@ -1411,6 +1411,144 @@ def test_tablet_check_in_includes_days_left(db_session):
     assert payload["days_left"] >= 0
 
 
+def test_tablet_check_in_contract_additive_fields(db_session):
+    center = models.Center(
+        name="Tablet Contract Center",
+        slug="tablet-contract-center",
+    )
+    member = models.Member(
+        email="tablet.contract@fitlio.com",
+        hashed_password="x",
+        full_name="Tablet Contract Member",
+        phone="+82-10-2222-8888",
+        role="member",
+        is_active=True,
+    )
+    db_session.add(center)
+    db_session.add(member)
+    db_session.flush()
+    db_session.add(
+        models.CenterMembership(
+            center_id=center.id,
+            member_id=member.id,
+            role="member",
+            status="active",
+        )
+    )
+    db_session.add(
+        models.Membership(
+            member_id=member.id,
+            plan="monthly",
+            status="active",
+            monthly_limit=5,
+            end_date=datetime.utcnow() + timedelta(days=14),
+        )
+    )
+    db_session.commit()
+
+    app.dependency_overrides[get_db] = _override_db(db_session)
+    response = client.post(
+        "/centers/tablet/check-in",
+        json={"center_slug": "tablet-contract-center", "phone_last4": "8888"},
+    )
+    app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["ok"] is True
+    assert payload["status_label"] == "success"
+    assert payload["result_code"] == "CHECK_IN_OK"
+    assert payload["ui_state"] == "success"
+    assert payload["can_retry"] is False
+    assert isinstance(payload["reset_after_ms"], int)
+    assert payload["reset_after_ms"] >= 900
+    assert payload["usage_limit"] == 5
+    assert payload["usage_used_this_month"] >= 1
+    assert isinstance(payload["remaining_usage_count"], int)
+    assert payload["remaining_usage_count"] >= 0
+    assert "remaining_usage" in payload
+    assert "days_left" in payload
+
+
+def test_tablet_check_in_duplicate_returns_contract_headers(db_session):
+    center = models.Center(
+        name="Tablet Duplicate Center",
+        slug="tablet-duplicate-center",
+    )
+    member = models.Member(
+        email="tablet.duplicate@fitlio.com",
+        hashed_password="x",
+        full_name="Tablet Duplicate Member",
+        phone="+82-10-3030-4444",
+        role="member",
+        is_active=True,
+    )
+    db_session.add(center)
+    db_session.add(member)
+    db_session.flush()
+    db_session.add(
+        models.CenterMembership(
+            center_id=center.id,
+            member_id=member.id,
+            role="member",
+            status="active",
+        )
+    )
+    db_session.add(
+        models.Membership(
+            member_id=member.id,
+            plan="monthly",
+            status="active",
+            monthly_limit=12,
+            end_date=datetime.utcnow() + timedelta(days=7),
+        )
+    )
+    db_session.add(
+        models.Attendance(
+            member_id=member.id,
+            class_id=0,
+            status="present",
+            checked_in_at=datetime.utcnow(),
+        )
+    )
+    db_session.commit()
+
+    app.dependency_overrides[get_db] = _override_db(db_session)
+    response = client.post(
+        "/centers/tablet/check-in",
+        json={"center_slug": "tablet-duplicate-center", "phone_last4": "4444"},
+    )
+    app.dependency_overrides.clear()
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Already checked in today"
+    assert response.headers["X-Tablet-Result-Code"] == "ALREADY_CHECKED_IN_TODAY"
+    assert response.headers["X-Tablet-Status-Label"] == "error"
+    assert response.headers["X-Tablet-UI-State"] == "error"
+    assert response.headers["X-Tablet-Can-Retry"] == "false"
+
+
+def test_tablet_check_in_member_not_found_has_retry_header(db_session):
+    center = models.Center(
+        name="Tablet Retry Center",
+        slug="tablet-retry-center",
+    )
+    db_session.add(center)
+    db_session.commit()
+
+    app.dependency_overrides[get_db] = _override_db(db_session)
+    response = client.post(
+        "/centers/tablet/check-in",
+        json={"center_slug": "tablet-retry-center", "phone_last4": "1234"},
+    )
+    app.dependency_overrides.clear()
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Member not found"
+    assert response.headers["X-Tablet-Result-Code"] == "MEMBER_NOT_FOUND"
+    assert response.headers["X-Tablet-Can-Retry"] == "true"
+
+
 def test_center_discover_response_shape(db_session):
     center_a = models.Center(name="Gangnam Prime", slug="gangnam-prime", is_active=True)
     center_b = models.Center(name="Mapo Move", slug="mapo-move", is_active=True)

@@ -14,6 +14,9 @@
       --tablet-wrap-line: rgba(255,255,255,.28);
       --tablet-btn-bg: rgba(255,255,255,.12);
       --tablet-display-bg: rgba(255,255,255,.1);
+      --kiosk-anim-ms: 220ms;
+      --brand-title-size: clamp(1.3rem, 1vw + 1.1rem, 1.9rem);
+      --brand-sub-size: clamp(.95rem, .3vw + .85rem, 1.08rem);
     }
     *{ box-sizing:border-box; margin:0; padding:0; }
     body{
@@ -22,6 +25,7 @@
       color:var(--tablet-text);
       background: var(--tablet-body-bg);
       display:flex; align-items:center; justify-content:center; padding:20px;
+      transition: background var(--kiosk-anim-ms) ease;
     }
     .wrap{
       width:min(880px,100%);
@@ -30,58 +34,88 @@
       background: var(--tablet-wrap-bg);
       backdrop-filter: blur(14px);
       box-shadow: 0 24px 40px rgba(0,0,0,.35);
-      padding:28px;
+      padding:34px;
     }
-    .brand{ display:flex; gap:14px; align-items:center; margin-bottom:20px; }
+    .brand{ display:flex; gap:14px; align-items:center; margin-bottom:24px; }
     .logo{
-      width:54px; height:54px; border-radius:14px; background:rgba(255,255,255,.14);
+      width:58px; height:58px; border-radius:14px; background:rgba(255,255,255,.14);
       border:1px solid rgba(255,255,255,.28); display:flex; align-items:center; justify-content:center; font-weight:800;
+      overflow:hidden;
+      font-size:1.2rem;
+      letter-spacing:.02em;
     }
-    h1{ font-size:1.35rem; margin-bottom:6px; }
-    .sub{ opacity:.88; }
+    .brand-fallback{
+      justify-content:center;
+      text-align:center;
+      flex-direction:column;
+      gap:12px;
+    }
+    h1{ font-size:var(--brand-title-size); margin-bottom:7px; line-height:1.22; letter-spacing:.01em; }
+    .sub{ opacity:.88; font-size:var(--brand-sub-size); }
     .pad{
-      margin-top:20px; display:grid; grid-template-columns:repeat(3,1fr); gap:10px;
+      margin-top:24px; display:grid; grid-template-columns:repeat(3,1fr); gap:12px;
     }
     .btn{
       border:1px solid rgba(255,255,255,.24);
       border-radius:16px;
       background: var(--tablet-btn-bg);
       color:#fff;
-      font-size:1.28rem;
-      padding:14px;
+      font-size:1.36rem;
+      font-weight:700;
+      padding:16px;
+      min-height:66px;
       cursor:pointer;
+      transition: transform var(--kiosk-anim-ms) ease, background var(--kiosk-anim-ms) ease, border-color var(--kiosk-anim-ms) ease;
+      touch-action: manipulation;
     }
     .btn:hover{ background: rgba(255,255,255,.2); }
+    .btn:focus-visible{ outline:2px solid rgba(255,255,255,.8); outline-offset:2px; border-color:rgba(255,255,255,.55); }
     .btn:active{ transform: scale(.98); }
     .display{
       margin-top:16px;
       border-radius:16px;
       border:1px solid rgba(255,255,255,.24);
       background: var(--tablet-display-bg);
-      padding:14px;
+      padding:16px;
       font-size:1.08rem;
       min-height:58px;
+      transition: border-color var(--kiosk-anim-ms) ease, background var(--kiosk-anim-ms) ease;
+    }
+    #display{
+      font-size:1.65rem;
+      font-weight:700;
+      text-align:center;
+      letter-spacing:.24em;
+      font-variant-numeric: tabular-nums;
     }
     .success{ border-color: rgba(111,238,171,.45); background: rgba(106,194,145,.2); }
     .error{ border-color: rgba(255,124,124,.5); background: rgba(120,29,29,.28); }
-    .cta{ margin-top:14px; display:flex; gap:10px; }
+    .pending{ border-color: rgba(120,198,255,.58); background: rgba(19,72,122,.28); }
+    .cta{ margin-top:16px; display:flex; gap:10px; }
     .go{
       border:none;
       border-radius:14px;
       background: var(--accent);
       color:#fff;
       font-weight:700;
-      padding:12px 18px;
+      padding:13px 20px;
+      min-height:48px;
       cursor:pointer;
+      transition: transform var(--kiosk-anim-ms) ease, filter var(--kiosk-anim-ms) ease, opacity var(--kiosk-anim-ms) ease;
     }
+    .go:focus-visible{ outline:2px solid rgba(255,255,255,.8); outline-offset:2px; }
     .go:disabled{ opacity:.65; cursor:not-allowed; }
-    .hint{ margin-top:10px; opacity:.82; font-size:.92rem; }
+    .go:active{ transform: translateY(1px); }
+    .hint{ margin-top:12px; opacity:.9; font-size:.98rem; min-height:1.2rem; }
     .result-strong{ font-weight:700; letter-spacing:.01em; }
+    @media (prefers-reduced-motion: reduce){
+      *{ transition:none !important; animation:none !important; scroll-behavior:auto !important; }
+    }
   </style>
 </head>
 <body>
   <div class="wrap">
-    <div class="brand">
+    <div class="brand" id="brand">
       <div class="logo" id="logo">F</div>
       <div>
         <h1 id="title">Fitlio Check-in</h1>
@@ -100,72 +134,188 @@
   <script>
     const slug = location.pathname.split("/").pop();
     let pin = "";
-    async function loadCfg(){
-      const r = await fetch("/centers/tablet/"+encodeURIComponent(slug));
-      if(!r.ok) return;
-      const c = await r.json();
-      document.getElementById("title").textContent = c.center_name || "Fitlio Check-in";
-      document.getElementById("subtitle").textContent = c.tablet_welcome_text || "휴대폰 뒷자리 4자리를 입력하세요";
-      const accent = (c.tablet_accent_color || "#2f855a").trim();
-      document.documentElement.style.setProperty("--accent", accent);
-      if(c.tablet_background_url){
-        document.body.style.background = `linear-gradient(rgba(13,24,20,.45), rgba(12,22,18,.68)), url('${c.tablet_background_url}') center/cover no-repeat`;
+    let resetTimer = null;
+    const DEFAULT_TITLE = "Fitlio Check-in";
+    const DEFAULT_SUBTITLE = "휴대폰 뒷자리 4자리를 입력하세요";
+    const DEFAULT_HINT = "4자리를 입력한 뒤 Check-in을 누르세요.";
+    const DEFAULT_ACCENT = "#2f855a";
+    const DEFAULT_RESET_MS = 2600;
+    const $ = (id)=>document.getElementById(id);
+    function toText(v){ return typeof v === "string" ? v.trim() : ""; }
+    function normalizeCode(v){
+      const t = toText(v);
+      return t ? t.toUpperCase().replace(/[^A-Z0-9_]/g, "_") : "";
+    }
+    function clearResetTimer(){
+      if(resetTimer){
+        clearTimeout(resetTimer);
+        resetTimer = null;
       }
-      if(c.tablet_logo_url){
-        document.getElementById("logo").innerHTML = `<img src="${c.tablet_logo_url}" alt="logo" style="width:100%;height:100%;object-fit:cover;border-radius:12px">`;
+    }
+    function resetInput(opts={}){
+      clearResetTimer();
+      pin = "";
+      $("display").textContent = "----";
+      $("submitBtn").disabled = true;
+      if(opts.clearResult){
+        const r = $("result");
+        r.textContent = "";
+        r.classList.remove("success","error","pending");
+      }
+      if(opts.restoreHint){
+        $("hint").textContent = DEFAULT_HINT;
+      }
+    }
+    function scheduleReset(ms){
+      clearResetTimer();
+      const delay = Number.isFinite(ms) ? Math.max(900, ms) : DEFAULT_RESET_MS;
+      resetTimer = setTimeout(()=>{
+        resetInput({clearResult:true,restoreHint:true});
+      }, delay);
+    }
+    function applyBrandingFallback(c){
+      const hasLogo = !!toText(c.tablet_logo_url);
+      const hasBg = !!toText(c.tablet_background_url);
+      const hasAccent = !!toText(c.tablet_accent_color);
+      $("brand").classList.toggle("brand-fallback", !hasLogo && !hasBg && !hasAccent);
+    }
+    function usageText(d){
+      if(typeof d.remaining_usage_count === "number" && typeof d.usage_limit === "number"){
+        return `남은 횟수 ${d.remaining_usage_count}/${d.usage_limit}`;
+      }
+      const legacy = toText(d.remaining_usage);
+      if(legacy){
+        return `남은 횟수 ${legacy}`;
+      }
+      return "";
+    }
+    function daysText(d){
+      if(typeof d.days_left === "number"){
+        return `남은 일수 ${d.days_left}일`;
+      }
+      return "";
+    }
+    function resultText(d, fallback){
+      const base = toText(d.message) || fallback;
+      const details = [usageText(d), daysText(d)].filter(Boolean);
+      return details.length ? `${base} (${details.join(" / ")})` : base;
+    }
+    function extractErrorData(resp, body){
+      const safe = body && typeof body === "object" ? body : {};
+      const resultCode = normalizeCode(
+        safe.result_code ||
+        resp.headers.get("X-Tablet-Result-Code") ||
+        safe.error_code
+      ) || "UNKNOWN_ERROR";
+      const statusLabel = toText(
+        safe.status_label || resp.headers.get("X-Tablet-Status-Label")
+      ).toLowerCase() || "error";
+      const uiState = toText(
+        safe.ui_state || resp.headers.get("X-Tablet-UI-State")
+      ).toLowerCase() || "error";
+      const canRetryRaw = toText(
+        safe.can_retry || resp.headers.get("X-Tablet-Can-Retry")
+      ).toLowerCase();
+      const canRetry = canRetryRaw === "true" || canRetryRaw === "1" || canRetryRaw === "yes";
+      const detail = toText(safe.detail) || "Check-in failed. Please ask staff for help.";
+      return {resultCode, statusLabel, uiState, canRetry, detail};
+    }
+    function hintForError(err){
+      if(!err.canRetry){
+        return "프론트 데스크에 문의해 주세요.";
+      }
+      if(err.resultCode === "MEMBER_NOT_FOUND"){
+        return "번호를 다시 확인한 뒤 재시도해 주세요.";
+      }
+      return "번호를 확인하고 다시 시도해 주세요.";
+    }
+    async function loadCfg(){
+      try{
+        const r = await fetch("/centers/tablet/"+encodeURIComponent(slug));
+        if(!r.ok){
+          applyBrandingFallback({});
+          return;
+        }
+        const c = await r.json().catch(()=> ({}));
+        $("title").textContent = toText(c.center_name) || DEFAULT_TITLE;
+        $("subtitle").textContent = toText(c.tablet_welcome_text) || DEFAULT_SUBTITLE;
+        const accent = toText(c.tablet_accent_color) || DEFAULT_ACCENT;
+        document.documentElement.style.setProperty("--accent", accent);
+        if(toText(c.tablet_background_url)){
+          document.body.style.background = `linear-gradient(rgba(13,24,20,.45), rgba(12,22,18,.68)), url('${c.tablet_background_url}') center/cover no-repeat`;
+        }else{
+          document.body.style.background = "var(--tablet-body-bg)";
+        }
+        if(toText(c.tablet_logo_url)){
+          $("logo").innerHTML = `<img src="${c.tablet_logo_url}" alt="center logo" style="width:100%;height:100%;object-fit:cover;border-radius:12px">`;
+        }else{
+          $("logo").textContent = "F";
+        }
+        applyBrandingFallback(c);
+      }catch(_e){
+        $("logo").textContent = "F";
+        applyBrandingFallback({});
       }
     }
     function renderPad(){
-      const pad = document.getElementById("pad");
+      const pad = $("pad");
       pad.innerHTML = [..."123456789", "0", "⌫"].map(n=>`<button class="btn" data-n="${n}">${n}</button>`).join("");
       pad.querySelectorAll("[data-n]").forEach(b=>b.onclick=()=>{
+        clearResetTimer();
         if(b.dataset.n === "⌫"){
           pin = pin.slice(0, -1);
-          document.getElementById("display").textContent = pin.padEnd(4,"-");
-          document.getElementById("submitBtn").disabled = pin.length !== 4;
+          $("display").textContent = pin.padEnd(4,"-");
+          $("submitBtn").disabled = pin.length !== 4;
           return;
         }
         if(pin.length>=4) return;
         pin += b.dataset.n;
-        document.getElementById("display").textContent = pin.padEnd(4,"-");
-        document.getElementById("submitBtn").disabled = pin.length !== 4;
+        $("display").textContent = pin.padEnd(4,"-");
+        $("submitBtn").disabled = pin.length !== 4;
       });
     }
-    document.getElementById("clearBtn").onclick=()=>{ pin=""; document.getElementById("display").textContent="----"; document.getElementById("submitBtn").disabled = true; };
-    function setResult(text, ok){
-      const el = document.getElementById("result");
+    $("clearBtn").onclick=()=>{
+      resetInput({clearResult:true,restoreHint:true});
+    };
+    function setResult(text, state){
+      const el = $("result");
       el.textContent = text || "";
-      el.classList.remove("success","error");
-      el.classList.add(ok ? "success" : "error");
+      el.classList.remove("success","error","pending");
+      if(state){
+        el.classList.add(state);
+      }
     }
-    document.getElementById("submitBtn").onclick=async()=>{
+    $("submitBtn").onclick=async()=>{
       if(pin.length!==4) return;
-      document.getElementById("submitBtn").disabled = true;
-      document.getElementById("hint").textContent = "Checking in...";
-      const r = await fetch("/centers/tablet/check-in",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({center_slug:slug,phone_last4:pin})});
-      const d = await r.json().catch(()=>({}));
-      const text = r.ok
-        ? (`${d.message || "Check-in done"}${d.days_left!=null ? ` (Days left: ${d.days_left})` : ""}`)
-        : (d.detail || "Failed");
-      setResult(text, !!r.ok);
-      if(r.ok) pin="";
-      document.getElementById("display").textContent = "----";
-      document.getElementById("hint").textContent = r.ok ? "Done. Next member can check in." : "Try again or ask staff for help.";
-      if(r.ok){
-        document.getElementById("submitBtn").disabled = true;
-        setTimeout(()=>{
-          pin = "";
-          document.getElementById("display").textContent = "----";
-          document.getElementById("hint").textContent = "Enter 4 digits and tap Check-in.";
-          document.getElementById("result").textContent = "";
-          document.getElementById("result").classList.remove("success","error");
-        }, 2200);
-      }else{
-        document.getElementById("submitBtn").disabled = pin.length !== 4;
+      clearResetTimer();
+      $("submitBtn").disabled = true;
+      $("hint").textContent = "처리 중입니다...";
+      setResult("체크인 요청을 확인하고 있습니다.", "pending");
+      try{
+        const r = await fetch("/centers/tablet/check-in",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({center_slug:slug,phone_last4:pin})});
+        const d = await r.json().catch(()=>({}));
+        if(r.ok){
+          const resetAfterMs = Number.isFinite(d.reset_after_ms) ? d.reset_after_ms : DEFAULT_RESET_MS;
+          setResult(resultText(d, "체크인이 완료되었습니다."), "success");
+          $("hint").textContent = "완료되었습니다. 다음 회원을 준비해 주세요.";
+          resetInput({clearResult:false,restoreHint:false});
+          scheduleReset(resetAfterMs);
+          return;
+        }
+        const err = extractErrorData(r, d);
+        setResult(err.detail, err.uiState === "pending" ? "pending" : "error");
+        $("hint").textContent = hintForError(err);
+        $("display").textContent = pin.padEnd(4, "-");
+        $("submitBtn").disabled = pin.length !== 4;
+      }catch(_e){
+        setResult("네트워크 연결을 확인해 주세요.", "error");
+        $("hint").textContent = "연결 상태를 확인한 뒤 다시 시도해 주세요.";
+        $("submitBtn").disabled = pin.length !== 4;
       }
     };
     renderPad();
-    document.getElementById("submitBtn").disabled = true;
+    $("submitBtn").disabled = true;
+    $("hint").textContent = DEFAULT_HINT;
     loadCfg();
   </script>
 </body>
