@@ -645,3 +645,132 @@ def test_notifications_summary_counts(db_session):
     assert payload["by_channel"]["email"] >= 1
     assert payload["by_channel"]["sms"] >= 1
     assert payload["by_channel"]["inapp"] >= 1
+
+
+def test_member_purchase_starts_pending_and_returns_checkout(db_session):
+    member = models.Member(
+        email="member.purchase@fitlio.com",
+        hashed_password="x",
+        full_name="Purchase Member",
+        role="member",
+    )
+    db_session.add(member)
+    db_session.commit()
+
+    from app.deps import get_current_user
+
+    app.dependency_overrides[get_db] = _override_db(db_session)
+    app.dependency_overrides[get_current_user] = lambda: {"id": member.id, "role": "member"}
+    response = client.post(
+        "/member/purchase",
+        json={"plan": "monthly", "payment_method": "card"},
+    )
+    app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["payment_status"] == "pending"
+    assert payload["checkout_url"].startswith("https://pay.fitlio.local/checkout/")
+    assert payload["external_ref"]
+    payment = db_session.query(models.Payment).filter(models.Payment.id == payload["payment_id"]).first()
+    membership = db_session.query(models.Membership).filter(models.Membership.id == payload["membership_id"]).first()
+    assert payment is not None
+    assert membership is not None
+    assert payment.status == "pending"
+    assert membership.status == "pending"
+
+
+def test_payment_webhook_duplicate_is_idempotent(db_session):
+    member = models.Member(
+        email="member.webhook@fitlio.com",
+        hashed_password="x",
+        full_name="Webhook Member",
+        role="member",
+    )
+    db_session.add(member)
+    db_session.flush()
+    membership = models.Membership(
+        member_id=member.id,
+        plan="monthly",
+        status="pending",
+        end_date=datetime.utcnow() + timedelta(days=30),
+    )
+    db_session.add(membership)
+    db_session.flush()
+    payment = models.Payment(
+        member_id=member.id,
+        membership_id=membership.id,
+        amount=5000,
+        currency="aud",
+        status="pending",
+        source="online",
+        payment_method="card",
+        external_ref="card_20260101010101_abcdef12",
+    )
+    db_session.add(payment)
+    db_session.commit()
+
+    app.dependency_overrides[get_db] = _override_db(db_session)
+    body = {
+        "provider": "card",
+        "event_type": "payment.updated",
+        "external_ref": payment.external_ref,
+        "status": "completed",
+        "payload": {"trace": "same"},
+    }
+    first = client.post("/member/payments/webhook", json=body)
+    second = client.post("/member/payments/webhook", json=body)
+    app.dependency_overrides.clear()
+
+    assert first.status_code == 200
+    assert second.status_code == 200
+    assert first.json()["duplicate"] is False
+    assert second.json()["duplicate"] is True
+    db_session.refresh(payment)
+    db_session.refresh(membership)
+    assert payment.status == "completed"
+    assert membership.status == "active"
+    events = db_session.query(models.PaymentWebhookEvent).filter(models.PaymentWebhookEvent.external_ref == payment.external_ref).all()
+    assert len(events) == 1
+
+
+def test_moderation_report_status_update(db_session):
+    admin = models.Member(
+        email="admin.moderation@fitlio.com",
+        hashed_password="x",
+        full_name="Mod Admin",
+        role="admin",
+    )
+    member = models.Member(
+        email="member.moderation@fitlio.com",
+        hashed_password="x",
+        full_name="Mod Member",
+        role="member",
+    )
+    db_session.add(admin)
+    db_session.add(member)
+    db_session.flush()
+    report = models.ContentReport(
+        reporter_member_id=member.id,
+        target_type="community_post",
+        target_id=123,
+        reason="abuse",
+        status="open",
+    )
+    db_session.add(report)
+    db_session.commit()
+
+    from app.deps import get_current_user
+
+    app.dependency_overrides[get_db] = _override_db(db_session)
+    app.dependency_overrides[get_current_user] = lambda: {"id": admin.id, "role": "admin"}
+    response = client.post(
+        "/member/moderation/reports/status",
+        json={"report_id": report.id, "status": "resolved"},
+    )
+    app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "resolved"
+    db_session.refresh(report)
+    assert report.status == "resolved"
