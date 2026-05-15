@@ -1,6 +1,6 @@
 fastapi==0.111.0
 uvicorn==0.29.0
-sqlalchemy==2.0.30
+sqlalchemy==2.0.44
 python-jose==3.4.0
 passlib==1.7.4
 python-multipart==0.0.26
