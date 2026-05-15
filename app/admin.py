@@ -1,5 +1,8 @@
 from calendar import monthrange
 from datetime import date, datetime, timedelta
+from html import escape
+from pathlib import Path
+from string import Template
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
@@ -11,6 +14,8 @@ from app.deps import require_admin
 from app.models import (
     Attendance,
     Booking,
+    Center,
+    CenterMembership,
     FitnessClass,
     InstructorProfile,
     Member,
@@ -23,6 +28,38 @@ from app.reminders import queue_membership_expiry_reminders
 from app.notification_dispatch import process_pending_notifications
 
 router = APIRouter(prefix="/admin")
+TEMPLATES_DIR = Path(__file__).resolve().parent / "templates"
+
+
+def _render_weekly_report_html(payload: dict) -> str:
+    template = (TEMPLATES_DIR / "weekly_performance_report.html").read_text(
+        encoding="utf-8"
+    )
+    metrics = payload["metrics"]
+    period = payload["period"]
+    scope = payload["scope"]
+    highlights = payload["highlights"]
+    return Template(template).safe_substitute(
+        report_title=escape(payload["title"]),
+        generated_at=escape(payload["generated_at"]),
+        period_start=escape(period["start"]),
+        period_end=escape(period["end"]),
+        scope_label=escape(scope["label"]),
+        revenue_total=f"{metrics['revenue']['total_amount']:.2f}",
+        revenue_delta_pct=f"{metrics['revenue']['change_vs_previous_week_pct']:.2f}",
+        member_new=str(metrics["member_growth"]["new_members"]),
+        member_base=str(metrics["member_growth"]["member_base"]),
+        retention_rate=f"{metrics['member_growth']['retention_rate']:.2f}",
+        classes_count=str(metrics["occupancy"]["classes_count"]),
+        booked_total=str(metrics["occupancy"]["booked_total"]),
+        fill_rate=f"{metrics['occupancy']['fill_rate']:.2f}",
+        at_risk_count=str(metrics["at_risk"]["count"]),
+        at_risk_pct=f"{metrics['at_risk']['share_of_active_members_pct']:.2f}",
+        highlight_revenue=escape(highlights["revenue"]),
+        highlight_member=escape(highlights["member_growth_retention"]),
+        highlight_occupancy=escape(highlights["class_occupancy"]),
+        highlight_risk=escape(highlights["at_risk"]),
+    )
 
 
 @router.get("/stats")
@@ -391,6 +428,205 @@ def class_utilization_report(
         "classes_count": len(rows),
         "rows": rows,
     }
+
+
+@router.get("/reports/weekly-performance")
+def weekly_performance_report(
+    center_id: int | None = None,
+    db: Session = Depends(get_db),
+    _: dict = Depends(require_admin),
+):
+    now = datetime.utcnow()
+    week_end = datetime(now.year, now.month, now.day, 23, 59, 59)
+    week_start = week_end - timedelta(days=6)
+    prev_week_end = week_start - timedelta(seconds=1)
+    prev_week_start = prev_week_end - timedelta(days=6)
+
+    class_filter = []
+    payment_filter = []
+    membership_filter = []
+    member_filter = []
+    scope_label = "Global Admin"
+
+    if center_id is not None:
+        center = db.query(Center).filter(Center.id == center_id).first()
+        if not center:
+            raise HTTPException(status_code=404, detail="Center not found")
+        scope_label = f"Center #{center.id} - {center.name}"
+        class_filter.append(FitnessClass.center_id == center_id)
+        payment_filter.append(Payment.center_id == center_id)
+        membership_filter.extend(
+            [
+                CenterMembership.center_id == center_id,
+                CenterMembership.status == "active",
+            ]
+        )
+        member_filter.append(
+            Member.id.in_(
+                db.query(CenterMembership.member_id).filter(*membership_filter).subquery()
+            )
+        )
+
+    current_revenue_q = db.query(func.coalesce(func.sum(Payment.amount), 0)).filter(
+        Payment.status == "completed",
+        Payment.created_at >= week_start,
+        Payment.created_at <= week_end,
+        *payment_filter,
+    )
+    previous_revenue_q = db.query(func.coalesce(func.sum(Payment.amount), 0)).filter(
+        Payment.status == "completed",
+        Payment.created_at >= prev_week_start,
+        Payment.created_at <= prev_week_end,
+        *payment_filter,
+    )
+    current_revenue_cents = int(current_revenue_q.scalar() or 0)
+    previous_revenue_cents = int(previous_revenue_q.scalar() or 0)
+    revenue_delta_pct = 0.0
+    if previous_revenue_cents > 0:
+        revenue_delta_pct = (
+            (current_revenue_cents - previous_revenue_cents) / previous_revenue_cents
+        ) * 100.0
+
+    new_members = (
+        db.query(Member)
+        .filter(Member.created_at >= week_start, Member.created_at <= week_end, *member_filter)
+        .count()
+    )
+    member_base = db.query(Member).filter(Member.created_at <= week_end, *member_filter).count()
+
+    active_members_q = db.query(func.count(func.distinct(Membership.member_id))).filter(
+        Membership.status == "active",
+        Membership.start_date <= week_end,
+        Membership.end_date >= week_end,
+    )
+    if center_id is not None:
+        active_members_q = active_members_q.filter(
+            Membership.member_id.in_(
+                db.query(CenterMembership.member_id).filter(*membership_filter).subquery()
+            )
+        )
+    active_members = int(active_members_q.scalar() or 0)
+    retention_rate = (active_members / member_base * 100.0) if member_base else 0.0
+
+    weekly_classes = (
+        db.query(FitnessClass)
+        .filter(
+            FitnessClass.schedule >= week_start,
+            FitnessClass.schedule <= week_end,
+            *class_filter,
+        )
+        .all()
+    )
+    class_ids = [c.id for c in weekly_classes]
+    capacity_total = sum(c.capacity for c in weekly_classes)
+    booked_total = 0
+    if class_ids:
+        booked_total = (
+            db.query(Booking)
+            .filter(Booking.class_id.in_(class_ids), Booking.status == "confirmed")
+            .count()
+        )
+    fill_rate = (booked_total / capacity_total * 100.0) if capacity_total else 0.0
+
+    risk_days = 60
+    since = now - timedelta(days=risk_days)
+    classes_count_window = (
+        db.query(FitnessClass)
+        .filter(
+            FitnessClass.schedule >= since,
+            FitnessClass.schedule <= now,
+            *class_filter,
+        )
+        .count()
+    )
+    denominator = max(classes_count_window, 1)
+    members_q = db.query(Member).filter(*member_filter)
+    members = members_q.all()
+    attendance_rows = (
+        db.query(Attendance.member_id, func.count(Attendance.id))
+        .filter(Attendance.checked_in_at >= since)
+        .group_by(Attendance.member_id)
+        .all()
+    )
+    attendance_by_member = {member_id: count for member_id, count in attendance_rows}
+    booking_rows = (
+        db.query(Booking.member_id, func.count(Booking.id))
+        .join(FitnessClass, FitnessClass.id == Booking.class_id)
+        .filter(
+            Booking.status == "confirmed",
+            FitnessClass.schedule >= since,
+            FitnessClass.schedule <= now,
+            *class_filter,
+        )
+        .group_by(Booking.member_id)
+        .all()
+    )
+    booked_by_member = {member_id: count for member_id, count in booking_rows}
+    at_risk_count = 0
+    for member in members:
+        attendance_count = attendance_by_member.get(member.id, 0)
+        booked_count = booked_by_member.get(member.id, 0)
+        member_denominator = max(booked_count, denominator)
+        attendance_rate = (attendance_count / member_denominator) * 100.0
+        if attendance_rate <= 50.0:
+            at_risk_count += 1
+    at_risk_pct = (at_risk_count / active_members * 100.0) if active_members else 0.0
+
+    payload = {
+        "title": "Weekly Performance Report",
+        "generated_at": now.isoformat(),
+        "period": {
+            "start": week_start.date().isoformat(),
+            "end": week_end.date().isoformat(),
+        },
+        "scope": {
+            "center_id": center_id,
+            "label": scope_label,
+        },
+        "metrics": {
+            "revenue": {
+                "total_amount_cents": current_revenue_cents,
+                "total_amount": current_revenue_cents / 100.0,
+                "change_vs_previous_week_pct": round(revenue_delta_pct, 2),
+            },
+            "member_growth": {
+                "new_members": new_members,
+                "member_base": member_base,
+                "active_members": active_members,
+                "retention_rate": round(retention_rate, 2),
+            },
+            "occupancy": {
+                "classes_count": len(weekly_classes),
+                "capacity_total": capacity_total,
+                "booked_total": booked_total,
+                "fill_rate": round(fill_rate, 2),
+            },
+            "at_risk": {
+                "count": at_risk_count,
+                "risk_window_days": risk_days,
+                "share_of_active_members_pct": round(at_risk_pct, 2),
+            },
+        },
+    }
+    payload["highlights"] = {
+        "revenue": (
+            f"Revenue reached {payload['metrics']['revenue']['total_amount']:.2f} "
+            f"({payload['metrics']['revenue']['change_vs_previous_week_pct']:.2f}% vs last week)."
+        ),
+        "member_growth_retention": (
+            f"Added {new_members} members this week with "
+            f"{payload['metrics']['member_growth']['retention_rate']:.2f}% retention."
+        ),
+        "class_occupancy": (
+            f"{len(weekly_classes)} classes delivered at "
+            f"{payload['metrics']['occupancy']['fill_rate']:.2f}% average fill."
+        ),
+        "at_risk": (
+            f"{at_risk_count} members are at risk based on the last {risk_days} days."
+        ),
+    }
+    payload["html"] = _render_weekly_report_html(payload)
+    return payload
 
 
 @router.post("/notifications/membership-reminders/run")

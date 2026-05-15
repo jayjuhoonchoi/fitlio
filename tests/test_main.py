@@ -1026,3 +1026,104 @@ def test_quick_reserve_duplicate_request_protection(db_session):
 
     assert response.status_code == 409
     assert response.json()["detail"] == "You already reserved this class."
+
+
+def test_admin_weekly_performance_requires_auth():
+    response = client.get("/admin/reports/weekly-performance")
+    assert response.status_code == 401
+
+
+def test_admin_weekly_performance_response_shape(db_session):
+    admin = models.Member(
+        email="admin.weekly.shape@fitlio.com",
+        hashed_password="x",
+        full_name="Weekly Shape Admin",
+        role="admin",
+    )
+    member = models.Member(
+        email="member.weekly.shape@fitlio.com",
+        hashed_password="x",
+        full_name="Weekly Shape Member",
+        role="member",
+    )
+    db_session.add(admin)
+    db_session.add(member)
+    db_session.flush()
+
+    db_session.add(
+        models.Membership(
+            member_id=member.id,
+            plan="monthly",
+            status="active",
+            start_date=datetime.utcnow() - timedelta(days=7),
+            end_date=datetime.utcnow() + timedelta(days=20),
+        )
+    )
+    db_session.flush()
+    membership = db_session.query(models.Membership).filter(models.Membership.member_id == member.id).first()
+    klass = models.FitnessClass(
+        name="Weekly Shape Class",
+        instructor="Coach Weekly",
+        schedule=datetime.utcnow() - timedelta(days=1),
+        capacity=20,
+        current_count=0,
+    )
+    db_session.add(klass)
+    db_session.flush()
+    db_session.add(
+        models.Booking(
+            member_id=member.id,
+            class_id=klass.id,
+            status="confirmed",
+        )
+    )
+    db_session.add(
+        models.Payment(
+            member_id=member.id,
+            membership_id=membership.id,
+            amount=12345,
+            currency="aud",
+            status="completed",
+            payment_method="card",
+        )
+    )
+    db_session.commit()
+
+    app.dependency_overrides[get_db] = _override_db(db_session)
+    app.dependency_overrides[require_admin] = lambda: {"id": admin.id, "role": "admin"}
+    response = client.get("/admin/reports/weekly-performance")
+    app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    payload = response.json()
+    for key in ("title", "generated_at", "period", "scope", "metrics", "highlights", "html"):
+        assert key in payload
+    assert "start" in payload["period"]
+    assert "end" in payload["period"]
+    assert "center_id" in payload["scope"]
+    assert "label" in payload["scope"]
+    for section in ("revenue", "member_growth", "occupancy", "at_risk"):
+        assert section in payload["metrics"]
+
+
+def test_admin_weekly_performance_html_has_key_sections(db_session):
+    admin = models.Member(
+        email="admin.weekly.html@fitlio.com",
+        hashed_password="x",
+        full_name="Weekly Html Admin",
+        role="admin",
+    )
+    db_session.add(admin)
+    db_session.commit()
+
+    app.dependency_overrides[get_db] = _override_db(db_session)
+    app.dependency_overrides[require_admin] = lambda: {"id": admin.id, "role": "admin"}
+    response = client.get("/admin/reports/weekly-performance")
+    app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    html = response.json()["html"]
+    assert "Revenue Summary" in html
+    assert "Member Growth and Retention" in html
+    assert "Class Occupancy Highlights" in html
+    assert "At-Risk Members" in html

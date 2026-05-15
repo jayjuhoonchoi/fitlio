@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>$report_title</title>
+</head>
+<body style="margin:0;padding:24px;background:#f5f7fb;font-family:Arial,sans-serif;color:#1f2937;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:680px;margin:0 auto;background:#ffffff;border-radius:10px;overflow:hidden;">
+    <tr>
+      <td style="background:#0f172a;color:#ffffff;padding:20px 24px;">
+        <h1 style="margin:0;font-size:22px;">$report_title</h1>
+        <p style="margin:8px 0 0;font-size:13px;opacity:0.9;">Scope: $scope_label</p>
+        <p style="margin:6px 0 0;font-size:13px;opacity:0.9;">Week: $period_start to $period_end</p>
+        <p style="margin:6px 0 0;font-size:12px;opacity:0.8;">Generated at $generated_at UTC</p>
+      </td>
+    </tr>
+    <tr>
+      <td style="padding:20px 24px 8px;">
+        <h2 style="margin:0 0 12px;font-size:18px;color:#111827;">Revenue Summary</h2>
+        <p style="margin:0 0 8px;font-size:14px;"><strong>Total Revenue:</strong> $revenue_total</p>
+        <p style="margin:0 0 8px;font-size:14px;"><strong>Week-over-Week:</strong> $revenue_delta_pct%</p>
+        <p style="margin:0 0 16px;font-size:13px;color:#4b5563;">$highlight_revenue</p>
+      </td>
+    </tr>
+    <tr>
+      <td style="padding:8px 24px;">
+        <h2 style="margin:0 0 12px;font-size:18px;color:#111827;">Member Growth and Retention</h2>
+        <p style="margin:0 0 8px;font-size:14px;"><strong>New Members:</strong> $member_new</p>
+        <p style="margin:0 0 8px;font-size:14px;"><strong>Member Base:</strong> $member_base</p>
+        <p style="margin:0 0 8px;font-size:14px;"><strong>Retention Rate:</strong> $retention_rate%</p>
+        <p style="margin:0 0 16px;font-size:13px;color:#4b5563;">$highlight_member</p>
+      </td>
+    </tr>
+    <tr>
+      <td style="padding:8px 24px;">
+        <h2 style="margin:0 0 12px;font-size:18px;color:#111827;">Class Occupancy Highlights</h2>
+        <p style="margin:0 0 8px;font-size:14px;"><strong>Classes Held:</strong> $classes_count</p>
+        <p style="margin:0 0 8px;font-size:14px;"><strong>Total Booked Seats:</strong> $booked_total</p>
+        <p style="margin:0 0 8px;font-size:14px;"><strong>Fill Rate:</strong> $fill_rate%</p>
+        <p style="margin:0 0 16px;font-size:13px;color:#4b5563;">$highlight_occupancy</p>
+      </td>
+    </tr>
+    <tr>
+      <td style="padding:8px 24px 24px;">
+        <h2 style="margin:0 0 12px;font-size:18px;color:#111827;">At-Risk Members</h2>
+        <p style="margin:0 0 8px;font-size:14px;"><strong>At-Risk Count:</strong> $at_risk_count</p>
+        <p style="margin:0 0 8px;font-size:14px;"><strong>Share of Active Members:</strong> $at_risk_pct%</p>
+        <p style="margin:0;font-size:13px;color:#4b5563;">$highlight_risk</p>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
