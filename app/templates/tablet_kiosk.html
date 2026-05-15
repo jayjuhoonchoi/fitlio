@@ -122,15 +122,35 @@
         <div class="sub" id="subtitle">휴대폰 뒷자리 4자리를 입력하세요</div>
       </div>
     </div>
-    <div class="display" id="display">----</div>
-    <div class="pad" id="pad"></div>
-    <div class="cta">
-      <button class="go" id="submitBtn">Check-in</button>
-      <button class="go" id="clearBtn" style="background:#4c5b53">Clear</button>
-    </div>
-    <div class="hint" id="hint">Enter 4 digits and tap Check-in.</div>
-    <div class="display" id="result" style="margin-top:12px"></div>
+  <div class="mode-bar" style="margin-bottom:14px;display:flex;gap:10px">
+    <button type="button" class="go" id="modePin">PIN</button>
+    <button type="button" class="go" id="modeQr" style="background:#4c5b53">QR</button>
   </div>
+  <div id="pinPanel">
+  <div class="display" id="display">----</div>
+  <div class="pad" id="pad"></div>
+  <div class="cta">
+    <button class="go" id="submitBtn">Check-in</button>
+    <button class="go" id="clearBtn" style="background:#4c5b53">Clear</button>
+  </div>
+  <div class="hint" id="hint">Enter 4 digits and tap Check-in.</div>
+  </div>
+  <div id="qrPanel" style="display:none">
+    <div class="sub" id="qrSub" style="margin-bottom:10px">Scan member QR from the Fitlio app</div>
+    <video id="qrVideo" playsinline muted style="width:100%;max-height:240px;border-radius:14px;background:#000"></video>
+    <canvas id="qrCanvas" style="display:none"></canvas>
+    <div class="cta">
+      <button class="go" id="startQrBtn">Start camera</button>
+      <button class="go" id="stopQrBtn" style="background:#4c5b53;display:none">Stop camera</button>
+    </div>
+    <div class="hint" id="qrPasteHint">Or paste token (staff testing)</div>
+    <textarea id="qrPaste" rows="2" style="width:100%;border-radius:12px;padding:10px;font-size:12px;border:1px solid rgba(255,255,255,.25);background:rgba(255,255,255,.08);color:#fff;margin-top:8px"></textarea>
+    <div class="cta"><button class="go" id="pasteQrBtn" style="background:#3e5c50">Use pasted code</button></div>
+    <div class="hint" id="qrScanStatus"></div>
+  </div>
+  <div class="display" id="result" style="margin-top:12px"></div>
+  </div>
+  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
   <script defer>
     const slug = location.pathname.split("/").pop();
     let pin = "";
@@ -227,8 +247,125 @@
       if(err.resultCode === "MEMBER_NOT_FOUND"){
         return "번호를 다시 확인한 뒤 재시도해 주세요.";
       }
+      if(err.resultCode === "INVALID_CHECKIN_QR"){
+        return "QR이 만료되었거나 잘못되었습니다. 회원에게 새로고침을 요청하세요.";
+      }
       return "번호를 확인한 뒤 다시 시도해 주세요.";
     }
+    function setFootHint(msg){
+      if($("pinPanel").style.display !== "none"){
+        $("hint").textContent = msg;
+      }else{
+        $("qrScanStatus").textContent = msg;
+      }
+    }
+    let qrStream = null;
+    let qrRaf = null;
+    function stopQrScan(){
+      if(qrRaf){
+        cancelAnimationFrame(qrRaf);
+        qrRaf = null;
+      }
+      if(qrStream){
+        qrStream.getTracks().forEach(t=>t.stop());
+        qrStream = null;
+      }
+      const v = $("qrVideo");
+      if(v){
+        v.srcObject = null;
+      }
+      $("startQrBtn").style.display = "";
+      $("stopQrBtn").style.display = "none";
+    }
+    async function submitQrPayload(rawToken){
+      const token = toText(rawToken);
+      if(token.length < 24){
+        setResult("유효한 코드가 아닙니다.", "error");
+        setFootHint("다시 시도해 주세요.");
+        return;
+      }
+      setFootHint("처리 중...");
+      setResult("체크인 요청을 확인하고 있습니다.", "pending");
+      try{
+        const r = await fetch("/centers/tablet/check-in-qr",{
+          method:"POST",
+          headers:{"Content-Type":"application/json"},
+          body:JSON.stringify({center_slug:slug,token}),
+        });
+        const d = await r.json().catch(()=>({}));
+        if(r.ok){
+          const resetAfterMs = Number.isFinite(d.reset_after_ms) ? d.reset_after_ms : DEFAULT_RESET_MS;
+          setResult(resultText(d, "체크인이 완료되었습니다."), "success");
+          setFootHint("완료되었습니다. 다음 회원을 준비해 주세요.");
+          resetInput({clearResult:false,restoreHint:false});
+          scheduleReset(resetAfterMs);
+          return;
+        }
+        const err = extractErrorData(r, d);
+        setResult(err.detail, err.uiState === "pending" ? "pending" : "error");
+        setFootHint(hintForError(err));
+      }catch(_e){
+        setResult("네트워크 연결을 확인해 주세요.", "error");
+        setFootHint("연결 상태를 확인한 뒤 다시 시도해 주세요.");
+      }
+    }
+    $("modePin").onclick=()=>{
+      stopQrScan();
+      $("pinPanel").style.display = "block";
+      $("qrPanel").style.display = "none";
+      $("subtitle").textContent = $("subtitle").dataset.defaultSub || DEFAULT_SUBTITLE;
+    };
+    $("modeQr").onclick=()=>{
+      stopQrScan();
+      $("pinPanel").style.display = "none";
+      $("qrPanel").style.display = "block";
+      $("subtitle").textContent = "회원 앱의 QR 코드를 스캔하세요";
+      $("qrScanStatus").textContent = "";
+      resetInput({clearResult:true,restoreHint:true});
+    };
+    $("startQrBtn").onclick=async()=>{
+      if(typeof jsQR === "undefined"){
+        setResult("QR 인식 모듈을 불러오지 못했습니다.", "error");
+        return;
+      }
+      try{
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video:{ facingMode:{ ideal:"environment" } },
+          audio:false,
+        });
+        qrStream = stream;
+        const video = $("qrVideo");
+        video.srcObject = stream;
+        await video.play();
+        $("startQrBtn").style.display = "none";
+        $("stopQrBtn").style.display = "";
+        const canvas = $("qrCanvas");
+        const ctx = canvas.getContext("2d");
+        function tick(){
+          if(!qrStream){
+            return;
+          }
+          if(video.readyState === video.HAVE_ENOUGH_DATA){
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const code = jsQR(imageData.data, imageData.width, imageData.height);
+            if(code && code.data){
+              stopQrScan();
+              submitQrPayload(code.data);
+              return;
+            }
+          }
+          qrRaf = requestAnimationFrame(tick);
+        }
+        tick();
+      }catch(_e){
+        setResult("카메라 권한이 필요합니다. 테스트 시 아래에 토큰을 붙여 넣을 수 있습니다.", "error");
+      }
+    };
+    $("stopQrBtn").onclick=()=>stopQrScan();
+    $("pasteQrBtn").onclick=()=>submitQrPayload($("qrPaste").value);
     async function loadCfg(){
       try{
         const r = await fetch("/centers/tablet/"+encodeURIComponent(slug));
@@ -238,7 +375,9 @@
         }
         const c = await r.json().catch(()=> ({}));
         $("title").textContent = toText(c.center_name) || DEFAULT_TITLE;
-        $("subtitle").textContent = toText(c.tablet_welcome_text) || DEFAULT_SUBTITLE;
+        const welcome = toText(c.tablet_welcome_text) || DEFAULT_SUBTITLE;
+        $("subtitle").textContent = welcome;
+        $("subtitle").dataset.defaultSub = welcome;
         const accent = toText(c.tablet_accent_color) || DEFAULT_ACCENT;
         document.documentElement.style.setProperty("--accent", accent);
         if(toText(c.tablet_background_url)){

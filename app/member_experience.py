@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from app.auth import create_checkin_qr_token
 from app.database import get_db
 from app.deps import get_current_user
 from app.payment_metadata import build_payment_metadata, payment_settlement_state
@@ -333,6 +334,28 @@ def member_home_data(db: Session = Depends(get_db), user: dict = Depends(get_cur
             }
         ),
         "centers": [{"id": c.id, "name": c.name, "slug": c.slug} for _, c in centers],
+    }
+
+
+@router.get("/checkin-qr")
+def member_checkin_qr_payload(
+    db: Session = Depends(get_db),
+    user: dict = Depends(get_current_user),
+):
+    if user.get("role") != "member":
+        raise HTTPException(status_code=403, detail="Member access required")
+    member = (
+        db.query(Member)
+        .filter(Member.id == user["id"], Member.is_active == True)
+        .first()
+    )
+    if not member:
+        raise HTTPException(status_code=404, detail="Member not found")
+    token, exp = create_checkin_qr_token(member.id)
+    return {
+        "token": token,
+        "expires_at": exp.isoformat() + "Z",
+        "expires_in_seconds": max(0, int((exp - datetime.utcnow()).total_seconds())),
     }
 
 

@@ -3013,3 +3013,92 @@ def test_admin_one_tap_attendance_requires_booking(db_session):
 
     assert response.status_code == 400
     assert "booking" in response.json()["detail"].lower()
+
+
+def test_member_checkin_qr_returns_short_lived_token(db_session):
+    member = models.Member(
+        email="member.qr@fitlio.com",
+        hashed_password="x",
+        full_name="QR Member",
+        role="member",
+        is_active=True,
+    )
+    db_session.add(member)
+    db_session.commit()
+
+    from app.deps import get_current_user
+
+    app.dependency_overrides[get_db] = _override_db(db_session)
+    app.dependency_overrides[get_current_user] = lambda: {"id": member.id, "role": "member"}
+    response = client.get("/member/checkin-qr")
+    app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert "token" in payload
+    assert len(payload["token"]) > 40
+    assert payload.get("expires_in_seconds", 0) > 0
+
+
+def test_tablet_check_in_qr_success(db_session):
+    from app.auth import create_checkin_qr_token
+
+    center = models.Center(name="QR Gym", slug="qr-gym")
+    member = models.Member(
+        email="tablet.qr.member@fitlio.com",
+        hashed_password="x",
+        full_name="Tablet QR Member",
+        role="member",
+        is_active=True,
+        phone="+82-10-1111-2222",
+    )
+    db_session.add(center)
+    db_session.add(member)
+    db_session.flush()
+    db_session.add(
+        models.CenterMembership(
+            center_id=center.id,
+            member_id=member.id,
+            role="member",
+            status="active",
+        )
+    )
+    db_session.add(
+        models.Membership(
+            member_id=member.id,
+            plan="monthly",
+            status="active",
+            monthly_limit=12,
+            end_date=datetime.utcnow() + timedelta(days=14),
+        )
+    )
+    db_session.commit()
+    token, _ = create_checkin_qr_token(member.id)
+
+    app.dependency_overrides[get_db] = _override_db(db_session)
+    response = client.post(
+        "/centers/tablet/check-in-qr",
+        json={"center_slug": "qr-gym", "token": token},
+    )
+    app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body.get("ok") is True
+    assert body.get("result_code") == "CHECK_IN_OK"
+
+
+def test_tablet_check_in_qr_rejects_bad_token(db_session):
+    center = models.Center(name="Bad QR", slug="bad-qr")
+    db_session.add(center)
+    db_session.commit()
+
+    app.dependency_overrides[get_db] = _override_db(db_session)
+    response = client.post(
+        "/centers/tablet/check-in-qr",
+        json={"center_slug": "bad-qr", "token": "not.a.valid.jwt.token.here"},
+    )
+    app.dependency_overrides.clear()
+
+    assert response.status_code == 401
+    assert response.headers.get("X-Tablet-Result-Code") == "INVALID_CHECKIN_QR"

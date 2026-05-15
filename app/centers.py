@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
+from app.auth import decode_checkin_qr_token
 from app.database import get_db
 from app.deps import get_current_user
 from app.models import (
@@ -238,6 +239,86 @@ def _tablet_checkin_error(
             "X-Tablet-Can-Retry": "true" if can_retry else "false",
         },
     )
+
+
+def _tablet_complete_daily_checkin(db: Session, center: Center, member: Member) -> dict:
+    """Shared finalize path for tablet PIN and QR check-in (same membership rules)."""
+    membership = (
+        db.query(Membership)
+        .filter(Membership.member_id == member.id, Membership.status == "active")
+        .order_by(Membership.end_date.desc())
+        .first()
+    )
+    if not membership:
+        _tablet_checkin_error(
+            http_status=400,
+            detail="No active membership",
+            result_code="NO_ACTIVE_MEMBERSHIP",
+            can_retry=False,
+        )
+    now = datetime.utcnow()
+    day_start = datetime(now.year, now.month, now.day)
+    exists = (
+        db.query(Attendance)
+        .filter(Attendance.member_id == member.id, Attendance.checked_in_at >= day_start)
+        .first()
+    )
+    if exists:
+        _tablet_checkin_error(
+            http_status=400,
+            detail="Already checked in today",
+            result_code="ALREADY_CHECKED_IN_TODAY",
+            can_retry=False,
+        )
+    month_start = datetime(now.year, now.month, 1)
+    usage = (
+        db.query(Attendance)
+        .filter(Attendance.member_id == member.id, Attendance.checked_in_at >= month_start)
+        .count()
+    )
+    if membership.monthly_limit is not None and usage >= membership.monthly_limit:
+        _tablet_checkin_error(
+            http_status=400,
+            detail="Monthly usage limit reached",
+            result_code="MONTHLY_USAGE_LIMIT_REACHED",
+            can_retry=False,
+        )
+    attendance = Attendance(member_id=member.id, class_id=0, status="present")
+    db.add(attendance)
+    db.commit()
+    usage_after = usage + 1
+    usage_limit = membership.monthly_limit
+    remaining_usage_count = (
+        max(0, usage_limit - usage_after) if usage_limit is not None else None
+    )
+    if membership.monthly_limit is not None:
+        remaining_text = f"{remaining_usage_count}/{membership.monthly_limit}"
+    else:
+        remaining_text = "unlimited"
+    days_left = max(0, (membership.end_date - now).days) if membership.end_date else None
+    return {
+        "ok": True,
+        "status_label": "success",
+        "severity": "success",
+        "result_code": "CHECK_IN_OK",
+        "ui_state": "success",
+        "can_retry": False,
+        "reset_after_ms": 2600,
+        "message": (
+            f"Welcome back, {member.full_name}! Remaining usage {remaining_text}."
+            if days_left is None
+            else f"Welcome back, {member.full_name}! Remaining usage {remaining_text}, {days_left} days left."
+        ),
+        "member_name": member.full_name,
+        "member_no": getattr(member, "member_no", None),
+        "remaining_usage": remaining_text,
+        "remaining_usage_count": remaining_usage_count,
+        "usage_limit": usage_limit,
+        "usage_used_this_month": usage_after,
+        "days_left": days_left,
+        "membership_status": membership.status,
+        "center_name": center.name,
+    }
 
 
 @router.post("", status_code=201)
@@ -790,79 +871,62 @@ def tablet_check_in(
             result_code="AMBIGUOUS_MEMBER_MATCH",
             can_retry=False,
         )
-    membership = (
-        db.query(Membership)
-        .filter(Membership.member_id == member.id, Membership.status == "active")
-        .order_by(Membership.end_date.desc())
+    return _tablet_complete_daily_checkin(db, center, member)
+
+
+class TabletCheckinQrBody(BaseModel):
+    center_slug: str
+    token: str = Field(..., min_length=24, max_length=4096)
+
+
+@router.post("/tablet/check-in-qr")
+def tablet_check_in_qr(
+    body: TabletCheckinQrBody,
+    db: Session = Depends(get_db),
+):
+    try:
+        member_id = decode_checkin_qr_token(body.token)
+    except ValueError:
+        _tablet_checkin_error(
+            http_status=401,
+            detail="Invalid or expired check-in code",
+            result_code="INVALID_CHECKIN_QR",
+            can_retry=True,
+        )
+    center = db.query(Center).filter(Center.slug == body.center_slug.strip().lower()).first()
+    if not center:
+        _tablet_checkin_error(
+            http_status=404,
+            detail="Center not found",
+            result_code="CENTER_NOT_FOUND",
+            can_retry=False,
+        )
+    member = (
+        db.query(Member)
+        .filter(Member.id == member_id, Member.is_active == True)
         .first()
     )
-    if not membership:
+    if not member:
         _tablet_checkin_error(
-            http_status=400,
-            detail="No active membership",
-            result_code="NO_ACTIVE_MEMBERSHIP",
+            http_status=404,
+            detail="Member not found",
+            result_code="MEMBER_NOT_FOUND",
             can_retry=False,
         )
-    now = datetime.utcnow()
-    day_start = datetime(now.year, now.month, now.day)
-    exists = (
-        db.query(Attendance)
-        .filter(Attendance.member_id == member.id, Attendance.checked_in_at >= day_start)
+    cm = (
+        db.query(CenterMembership)
+        .filter(
+            CenterMembership.center_id == center.id,
+            CenterMembership.member_id == member.id,
+            CenterMembership.status == "active",
+        )
         .first()
     )
-    if exists:
+    if not cm:
         _tablet_checkin_error(
-            http_status=400,
-            detail="Already checked in today",
-            result_code="ALREADY_CHECKED_IN_TODAY",
+            http_status=403,
+            detail="Member is not active in this center",
+            result_code="CENTER_MEMBERSHIP_INACTIVE",
             can_retry=False,
         )
-    month_start = datetime(now.year, now.month, 1)
-    usage = (
-        db.query(Attendance)
-        .filter(Attendance.member_id == member.id, Attendance.checked_in_at >= month_start)
-        .count()
-    )
-    if membership.monthly_limit is not None and usage >= membership.monthly_limit:
-        _tablet_checkin_error(
-            http_status=400,
-            detail="Monthly usage limit reached",
-            result_code="MONTHLY_USAGE_LIMIT_REACHED",
-            can_retry=False,
-        )
-    attendance = Attendance(member_id=member.id, class_id=0, status="present")
-    db.add(attendance)
-    db.commit()
-    usage_after = usage + 1
-    usage_limit = membership.monthly_limit
-    remaining_usage_count = (
-        max(0, usage_limit - usage_after) if usage_limit is not None else None
-    )
-    if membership.monthly_limit is not None:
-        remaining_text = f"{remaining_usage_count}/{membership.monthly_limit}"
-    else:
-        remaining_text = "unlimited"
-    days_left = max(0, (membership.end_date - now).days) if membership.end_date else None
-    return {
-        "ok": True,
-        "status_label": "success",
-        "severity": "success",
-        "result_code": "CHECK_IN_OK",
-        "ui_state": "success",
-        "can_retry": False,
-        "reset_after_ms": 2600,
-        "message": (
-            f"Welcome back, {member.full_name}! Remaining usage {remaining_text}."
-            if days_left is None
-            else f"Welcome back, {member.full_name}! Remaining usage {remaining_text}, {days_left} days left."
-        ),
-        "member_name": member.full_name,
-        "member_no": getattr(member, "member_no", None),
-        "remaining_usage": remaining_text,
-        "remaining_usage_count": remaining_usage_count,
-        "usage_limit": usage_limit,
-        "usage_used_this_month": usage_after,
-        "days_left": days_left,
-        "membership_status": membership.status,
-        "center_name": center.name,
-    }
+    return _tablet_complete_daily_checkin(db, center, member)
