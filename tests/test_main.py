@@ -904,3 +904,125 @@ def test_tablet_check_in_includes_days_left(db_session):
     assert "days_left" in payload
     assert payload["days_left"] is not None
     assert payload["days_left"] >= 0
+
+
+def test_quick_reserve_success_path(db_session):
+    member = models.Member(
+        email="quick.reserve.success@fitlio.com",
+        hashed_password="x",
+        full_name="Quick Reserve Success",
+        role="member",
+        is_active=True,
+    )
+    klass = models.FitnessClass(
+        name="Quick Reserve Yoga",
+        instructor="Coach Quick",
+        schedule=datetime.utcnow() + timedelta(hours=3),
+        capacity=2,
+        current_count=0,
+    )
+    db_session.add(member)
+    db_session.add(klass)
+    db_session.commit()
+
+    from app.deps import get_current_user
+
+    app.dependency_overrides[get_db] = _override_db(db_session)
+    app.dependency_overrides[get_current_user] = lambda: {"id": member.id, "role": "member"}
+    response = client.post(f"/member/classes/{klass.id}/quick-reserve")
+    app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == "confirmed"
+    assert payload["message"] == "Class reserved successfully."
+    booking = (
+        db_session.query(models.Booking)
+        .filter(models.Booking.class_id == klass.id, models.Booking.member_id == member.id)
+        .first()
+    )
+    db_session.refresh(klass)
+    assert booking is not None
+    assert booking.status == "confirmed"
+    assert klass.current_count == 1
+
+
+def test_quick_reserve_full_class_waitlist_path(db_session):
+    member = models.Member(
+        email="quick.reserve.waitlist@fitlio.com",
+        hashed_password="x",
+        full_name="Quick Reserve Waitlist",
+        role="member",
+        is_active=True,
+    )
+    klass = models.FitnessClass(
+        name="Quick Reserve Full",
+        instructor="Coach Full",
+        schedule=datetime.utcnow() + timedelta(hours=4),
+        capacity=1,
+        current_count=1,
+    )
+    db_session.add(member)
+    db_session.add(klass)
+    db_session.commit()
+
+    from app.deps import get_current_user
+
+    app.dependency_overrides[get_db] = _override_db(db_session)
+    app.dependency_overrides[get_current_user] = lambda: {"id": member.id, "role": "member"}
+    response = client.post(f"/member/classes/{klass.id}/quick-reserve")
+    app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == "waitlisted"
+    assert payload["waitlisted"] is True
+    assert payload["waitlist_position"] == 1
+    assert "waitlist" in payload["message"].lower()
+    booking = (
+        db_session.query(models.Booking)
+        .filter(models.Booking.class_id == klass.id, models.Booking.member_id == member.id)
+        .first()
+    )
+    db_session.refresh(klass)
+    assert booking is not None
+    assert booking.status == "waiting"
+    assert klass.current_count == 1
+
+
+def test_quick_reserve_duplicate_request_protection(db_session):
+    member = models.Member(
+        email="quick.reserve.duplicate@fitlio.com",
+        hashed_password="x",
+        full_name="Quick Reserve Duplicate",
+        role="member",
+        is_active=True,
+    )
+    klass = models.FitnessClass(
+        name="Quick Reserve Duplicate Class",
+        instructor="Coach Duplicate",
+        schedule=datetime.utcnow() + timedelta(hours=5),
+        capacity=3,
+        current_count=0,
+    )
+    db_session.add(member)
+    db_session.add(klass)
+    db_session.flush()
+    db_session.add(
+        models.Booking(
+            member_id=member.id,
+            class_id=klass.id,
+            status="confirmed",
+        )
+    )
+    db_session.commit()
+
+    from app.deps import get_current_user
+
+    app.dependency_overrides[get_db] = _override_db(db_session)
+    app.dependency_overrides[get_current_user] = lambda: {"id": member.id, "role": "member"}
+    response = client.post(f"/member/classes/{klass.id}/quick-reserve")
+    app.dependency_overrides.clear()
+
+    assert response.status_code == 409
+    assert response.json()["detail"] == "You already reserved this class."

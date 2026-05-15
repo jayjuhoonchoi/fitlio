@@ -14,6 +14,66 @@ class ClassCreate(BaseModel):
     schedule: datetime
     capacity: int = 20
 
+
+def _attempt_reserve(db: Session, class_id: int, member_id: int):
+    # Lock class row so concurrent requests cannot overshoot capacity.
+    fitness_class = (
+        db.query(FitnessClass)
+        .filter(FitnessClass.id == class_id)
+        .with_for_update()
+        .first()
+    )
+    if not fitness_class:
+        raise HTTPException(status_code=404, detail="Class not found")
+    existing = (
+        db.query(Booking)
+        .filter(
+            Booking.member_id == member_id,
+            Booking.class_id == class_id,
+            Booking.status != "cancelled",
+        )
+        .first()
+    )
+    if existing:
+        existing_detail = (
+            "You already reserved this class."
+            if existing.status == "confirmed"
+            else "You are already on the waitlist for this class."
+        )
+        raise HTTPException(status_code=409, detail=existing_detail)
+
+    class_is_full = fitness_class.current_count >= fitness_class.capacity
+    booking = Booking(
+        member_id=member_id,
+        class_id=class_id,
+        status="waiting" if class_is_full else "confirmed",
+    )
+    if not class_is_full:
+        fitness_class.current_count += 1
+    db.add(booking)
+    db.commit()
+    db.refresh(booking)
+
+    if class_is_full:
+        waitlist_position = (
+            db.query(Booking)
+            .filter(Booking.class_id == class_id, Booking.status == "waiting")
+            .count()
+        )
+        return {
+            "booking_id": booking.id,
+            "status": "waitlisted",
+            "message": "Class is full. You were added to the waitlist.",
+            "waitlist_position": waitlist_position,
+            "waitlisted": True,
+        }
+    return {
+        "booking_id": booking.id,
+        "status": "confirmed",
+        "message": "Class reserved successfully.",
+        "waitlisted": False,
+    }
+
 @router.get("/classes")
 def get_classes(db: Session = Depends(get_db)):
     classes = db.query(FitnessClass).all()
@@ -41,54 +101,38 @@ def book_class(
 ):
     if member_id != user["id"]:
         raise HTTPException(status_code=403, detail="Cannot book for another account")
-    # Lock the class row so concurrent bookings cannot overshoot capacity (PostgreSQL).
-    fitness_class = (
-        db.query(FitnessClass)
-        .filter(FitnessClass.id == class_id)
-        .with_for_update()
-        .first()
-    )
-    if not fitness_class:
-        raise HTTPException(status_code=404, detail="Class not found")
-    existing = (
-        db.query(Booking)
-        .filter(
-            Booking.member_id == member_id,
-            Booking.class_id == class_id,
-            Booking.status != "cancelled",
-        )
-        .first()
-    )
-    if existing:
-        raise HTTPException(status_code=400, detail="Already booked")
-    class_is_full = fitness_class.current_count >= fitness_class.capacity
-    booking = Booking(
-        member_id=member_id,
-        class_id=class_id,
-        status="waiting" if class_is_full else "confirmed",
-    )
-    if not class_is_full:
-        fitness_class.current_count += 1
-    db.add(booking)
-    db.commit()
-    db.refresh(booking)
-    if class_is_full:
-        waitlist_position = (
-            db.query(Booking)
-            .filter(Booking.class_id == class_id, Booking.status == "waiting")
-            .count()
-        )
-        return {
-            "message": "Class is full. Added to waitlist",
-            "booking_id": booking.id,
-            "waitlisted": True,
-            "waitlist_position": waitlist_position,
-        }
+    try:
+        result = _attempt_reserve(db, class_id=class_id, member_id=member_id)
+    except HTTPException as exc:
+        if exc.status_code == 409:
+            raise HTTPException(status_code=400, detail="Already booked")
+        raise
     return {
-        "message": "Class booked successfully",
-        "booking_id": booking.id,
-        "waitlisted": False,
+        "message": result["message"],
+        "booking_id": result["booking_id"],
+        "waitlisted": result["waitlisted"],
+        **(
+            {"waitlist_position": result["waitlist_position"]}
+            if "waitlist_position" in result
+            else {}
+        ),
     }
+
+
+@router.post("/member/classes/{class_id}/quick-reserve")
+def quick_reserve_class(
+    class_id: int,
+    db: Session = Depends(get_db),
+    user: dict = Depends(get_current_user),
+):
+    if user.get("role") != "member":
+        raise HTTPException(status_code=403, detail="Member access required")
+    member = db.query(Member).filter(Member.id == user["id"]).first()
+    if not member:
+        raise HTTPException(status_code=404, detail="Member not found")
+    if not member.is_active:
+        raise HTTPException(status_code=403, detail="Inactive member account")
+    return _attempt_reserve(db, class_id=class_id, member_id=member.id)
 
 
 @router.get("/bookings/{member_id}")
