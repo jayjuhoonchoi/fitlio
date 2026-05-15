@@ -342,7 +342,7 @@
       <div class="card">
         <div id="chatbox" class="msg-list">—</div>
         <div class="row" style="margin-top:.6rem">
-          <input id="chatInput" placeholder="Write a message" style="flex:1;min-width:220px">
+        <input id="chatInput" placeholder="Write a message" style="flex:1;min-width:220px">
           <button class="btn" id="chatSend">Send</button>
         </div>
       </div>
@@ -394,18 +394,234 @@
     </div>
     <p id="log"></p>
   </main>
-  <script>
+  <script defer>
     const token = localStorage.getItem("token");
     const memberId = localStorage.getItem("member_id");
     if (!token || !memberId) location.href = "/login/member";
     const auth = { Authorization: "Bearer " + token };
     const S = {
-      en: { mem:"Member", out:"Sign out", sum:"My summary", prof:"My profile", ph:"Payment history", renew:"Renew now", pay:"Pay membership", payd:"Creates active membership + payment.", m30:"Monthly", y365:"Yearly", cls:"Open classes", visits:"Visits this month", days:"Days left", none:"No active pass", book:"Book", booked:"Booked", fail:"Failed", load:"Loading…", myb:"My bookings", cancel:"Cancel", done:"Completed", ci:"Quick check-in", cid:"Find nearest class and check in with your phone last 4 digits.", cib:"Check in", chat:"Messages with admin", centerClass:"Center + level classes", insf:"Instructor profiles", sug:"Anonymous suggestion", comm:"Community", reserveConfirmed:"Reservation confirmed.", reserveWaitlisted:"Class is full. You are now waitlisted.", reserveDuplicate:"You already have this class reserved.", reserveFail:"Could not reserve class.", centerDiscovery:"Center discovery", search:"Search", refreshStatus:"Refresh status", centerStatusPending:"Pending approval", centerStatusActive:"Joined", centerStatusRejected:"Rejected", centerStatusNone:"Not joined", centerRequestJoin:"Request to join", centerAlreadyPending:"Request already pending.", centerAlreadyActive:"Already joined this center.", centerJoinSubmitted:"Join request submitted. Await admin approval.", centerJoinFailed:"Could not submit join request.", paymentPending:"Payment pending confirmation.", paymentFailedRetry:"Payment failed. Please retry now.", paymentCancelledRetry:"Payment was cancelled. Retry when ready.", renewalExpiredCta:"Your membership has expired. Renew now.", renewNow:"Renew now", retryPayment:"Retry payment", retryReady:"Retry available.", postNeedContent:"Add text or a media URL before posting.", postNeedMediaType:"Choose image/video to match the media URL.", postPosted:"Posted to community.", postHint:"Tip: only http/https links are accepted. image: .jpg/.jpeg/.png/.webp/.gif, video: .mp4/.webm/.mov/.m4v/.ogg", reportNeedReason:"Please enter a report reason.", reportSubmitted:"Report submitted. Moderators will review it.", reportFailed:"Could not submit report.", reportDuplicate:"This content was already reported." },
-      ko: { mem:"회원", out:"로그아웃", sum:"내 요약", prof:"내 프로필", ph:"결제 이력", renew:"만료/갱신 안내", pay:"이용권 결제", payd:"결제 시 이용권과 결제 내역이 생성됩니다.", m30:"월간", y365:"연간", cls:"수업 목록", visits:"이번 달 방문", days:"남은 일수", none:"이용권 없음", book:"예약", booked:"예약됨", fail:"실패", load:"불러오는 중…", myb:"내 예약", cancel:"취소", done:"완료", ci:"간편 출석", cid:"가장 가까운 수업을 확인하고 휴대폰 뒷자리 4개로 출석하세요.", cib:"출석 체크", chat:"관리자와 메세지", centerClass:"센터/레벨 수업", insf:"강사 프로필", sug:"익명 건의함", comm:"커뮤니티", reserveConfirmed:"예약이 확정되었습니다.", reserveWaitlisted:"정원이 가득 차 대기열에 등록되었습니다.", reserveDuplicate:"이미 예약(또는 대기)된 수업입니다.", reserveFail:"수업 예약에 실패했습니다.", centerDiscovery:"센터 찾기/가입", search:"검색", refreshStatus:"상태 새로고침", centerStatusPending:"승인 대기", centerStatusActive:"가입 완료", centerStatusRejected:"거절됨", centerStatusNone:"미가입", centerRequestJoin:"가입 요청", centerAlreadyPending:"이미 가입 요청 대기 중입니다.", centerAlreadyActive:"이미 가입된 센터입니다.", centerJoinSubmitted:"가입 요청이 접수되었습니다. 관리자 승인 대기 중입니다.", centerJoinFailed:"가입 요청에 실패했습니다.", paymentPending:"결제 확인 대기 중입니다.", paymentFailedRetry:"결제가 실패했습니다. 다시 시도해 주세요.", paymentCancelledRetry:"결제가 취소되었습니다. 다시 시도할 수 있습니다.", renewalExpiredCta:"이용권이 만료되었습니다. 지금 갱신하세요.", renewNow:"지금 갱신", retryPayment:"결제 재시도", retryReady:"재시도 가능 상태입니다.", postNeedContent:"게시하려면 텍스트 또는 미디어 URL이 필요합니다.", postNeedMediaType:"미디어 URL에 맞는 image/video 타입을 선택하세요.", postPosted:"커뮤니티에 게시되었습니다.", postHint:"안내: http/https 링크만 허용됩니다. image: .jpg/.jpeg/.png/.webp/.gif, video: .mp4/.webm/.mov/.m4v/.ogg", reportNeedReason:"신고 사유를 입력해 주세요.", reportSubmitted:"신고가 접수되었습니다. 운영진이 검토합니다.", reportFailed:"신고 접수에 실패했습니다.", reportDuplicate:"이미 신고된 콘텐츠입니다." }
+      en: {
+        mem: "Member",
+        out: "Sign out",
+        sum: "My summary",
+        prof: "My profile",
+        ph: "Payment history",
+        renew: "Renew now",
+        pay: "Pay membership",
+        payd: "Creates active membership + payment.",
+        m30: "Monthly",
+        y365: "Yearly",
+        cls: "Open classes",
+        visits: "Visits this month",
+        days: "Days left",
+        none: "No active pass",
+        book: "Book",
+        fail: "Action could not be completed.",
+        load: "Loading...",
+        myb: "My bookings",
+        cancel: "Cancel",
+        done: "Completed",
+        ci: "Quick check-in",
+        cid: "Find nearest class and check in with your phone last 4 digits.",
+        cib: "Check in",
+        chat: "Messages with admin",
+        centerClass: "Center + level classes",
+        insf: "Instructor profiles",
+        sug: "Anonymous suggestion",
+        comm: "Community",
+        reserveConfirmed: "Reservation confirmed.",
+        reserveWaitlisted: "Class is full. You are now waitlisted.",
+        reserveDuplicate: "You already have this class reserved.",
+        reserveFail: "Could not reserve class.",
+        centerDiscovery: "Center discovery",
+        search: "Search",
+        refreshStatus: "Refresh status",
+        centerStatusPending: "Pending approval",
+        centerStatusActive: "Joined",
+        centerStatusRejected: "Rejected",
+        centerStatusNone: "Not joined",
+        centerRequestJoin: "Request to join",
+        centerAlreadyPending: "Request already pending.",
+        centerAlreadyActive: "Already joined this center.",
+        centerJoinSubmitted: "Join request submitted. Await admin approval.",
+        centerJoinFailed: "Could not submit join request.",
+        centerEmpty: "No center memberships yet.",
+        centerSummary: "{active} active center(s), {pending} pending request(s)",
+        paymentPending: "Payment pending confirmation.",
+        paymentFailedRetry: "Payment failed. Please retry now.",
+        paymentCancelledRetry: "Payment was cancelled. Retry when ready.",
+        renewalExpiredCta: "Your membership has expired. Renew now.",
+        renewNow: "Renew now",
+        retryPayment: "Retry payment",
+        retryReady: "Retry available.",
+        remainingDays: "Days remaining: {days}",
+        remainingVisits: "Visits remaining: {count}",
+        unlimited: "Unlimited",
+        pendingLifecycle: "Pending",
+        successLifecycle: "Completed",
+        failedLifecycle: "Failed",
+        cancelledLifecycle: "Cancelled",
+        postNeedContent: "Add text or a media URL before posting.",
+        postNeedMediaType: "Choose image/video to match the media URL.",
+        postPosted: "Posted to community.",
+        postHint: "Tip: only http/https links are accepted. image: .jpg/.jpeg/.png/.webp/.gif, video: .mp4/.webm/.mov/.m4v/.ogg",
+        reportNeedReason: "Please enter a report reason.",
+        reportPrompt: "Enter a report reason",
+        reportSubmitted: "Report submitted. Moderators will review it.",
+        reportFailed: "Could not submit report.",
+        reportDuplicate: "This content was already reported.",
+        noClasses: "No open classes right now. Fresh schedule will appear soon.",
+        noPayments: "No payment history yet.",
+        noBookings: "No active bookings. Reserve a class to get started.",
+        noMessages: "No messages yet. Send a quick note to your admin anytime.",
+        noCenterClasses: "No classes match this filter yet.",
+        noCenterSearch: "No centers match your search.",
+        noInstructors: "No instructor profiles yet.",
+        noCommunity: "Be the first to share in the community.",
+        noComments: "No comments yet.",
+        like: "Like",
+        comment: "Comment",
+        report: "Report",
+        msgPlaceholder: "Write a message",
+        commentPlaceholder: "Write a comment",
+        postPlaceholder: "Share updates...",
+        profileName: "Name",
+        profileLevel: "Level",
+        profileAge: "Age",
+        profileBirth: "Birth",
+        profileMembership: "Membership",
+        profilePlan: "Plan",
+        profileEnds: "Ends",
+        suggestionReceived: "Your suggestion has been received."
+      },
+      ko: {
+        mem: "회원",
+        out: "로그아웃",
+        sum: "내 요약",
+        prof: "내 프로필",
+        ph: "결제 이력",
+        renew: "만료/갱신 안내",
+        pay: "이용권 결제",
+        payd: "결제 시 이용권과 결제 내역이 생성됩니다.",
+        m30: "월간",
+        y365: "연간",
+        cls: "수업 목록",
+        visits: "이번 달 방문",
+        days: "남은 일수",
+        none: "이용권 없음",
+        book: "예약",
+        fail: "요청을 완료하지 못했습니다.",
+        load: "불러오는 중...",
+        myb: "내 예약",
+        cancel: "취소",
+        done: "완료",
+        ci: "간편 출석",
+        cid: "가장 가까운 수업을 확인하고 휴대폰 뒷자리 4개로 출석하세요.",
+        cib: "출석 체크",
+        chat: "관리자와 메시지",
+        centerClass: "센터/레벨 수업",
+        insf: "강사 프로필",
+        sug: "익명 건의함",
+        comm: "커뮤니티",
+        reserveConfirmed: "예약이 확정되었습니다.",
+        reserveWaitlisted: "정원이 가득 차 대기열에 등록되었습니다.",
+        reserveDuplicate: "이미 예약(또는 대기)된 수업입니다.",
+        reserveFail: "수업 예약에 실패했습니다.",
+        centerDiscovery: "센터 찾기/가입",
+        search: "검색",
+        refreshStatus: "상태 새로고침",
+        centerStatusPending: "승인 대기",
+        centerStatusActive: "가입 완료",
+        centerStatusRejected: "거절됨",
+        centerStatusNone: "미가입",
+        centerRequestJoin: "가입 요청",
+        centerAlreadyPending: "이미 가입 요청 대기 중입니다.",
+        centerAlreadyActive: "이미 가입된 센터입니다.",
+        centerJoinSubmitted: "가입 요청이 접수되었습니다. 관리자 승인 대기 중입니다.",
+        centerJoinFailed: "가입 요청에 실패했습니다.",
+        centerEmpty: "참여 중인 센터가 없습니다.",
+        centerSummary: "참여 센터 {active}개, 승인 대기 {pending}개",
+        paymentPending: "결제 확인 대기 중입니다.",
+        paymentFailedRetry: "결제가 실패했습니다. 다시 시도해 주세요.",
+        paymentCancelledRetry: "결제가 취소되었습니다. 다시 시도할 수 있습니다.",
+        renewalExpiredCta: "이용권이 만료되었습니다. 지금 갱신하세요.",
+        renewNow: "지금 갱신",
+        retryPayment: "결제 재시도",
+        retryReady: "재시도 가능 상태입니다.",
+        remainingDays: "남은 일수: {days}",
+        remainingVisits: "남은 횟수: {count}",
+        unlimited: "무제한",
+        pendingLifecycle: "대기 중",
+        successLifecycle: "완료",
+        failedLifecycle: "실패",
+        cancelledLifecycle: "취소",
+        postNeedContent: "게시하려면 텍스트 또는 미디어 URL이 필요합니다.",
+        postNeedMediaType: "미디어 URL에 맞는 image/video 타입을 선택하세요.",
+        postPosted: "커뮤니티에 게시되었습니다.",
+        postHint: "안내: http/https 링크만 허용됩니다. image: .jpg/.jpeg/.png/.webp/.gif, video: .mp4/.webm/.mov/.m4v/.ogg",
+        reportNeedReason: "신고 사유를 입력해 주세요.",
+        reportPrompt: "신고 사유를 입력하세요",
+        reportSubmitted: "신고가 접수되었습니다. 운영진이 검토합니다.",
+        reportFailed: "신고 접수에 실패했습니다.",
+        reportDuplicate: "이미 신고된 콘텐츠입니다.",
+        noClasses: "현재 예약 가능한 수업이 없습니다. 곧 새 일정이 열립니다.",
+        noPayments: "아직 결제 내역이 없습니다.",
+        noBookings: "활성 예약이 없습니다. 수업을 예약해 시작해 보세요.",
+        noMessages: "아직 메시지가 없습니다. 관리자에게 편하게 남겨보세요.",
+        noCenterClasses: "조건에 맞는 수업이 아직 없습니다.",
+        noCenterSearch: "검색 결과가 없습니다.",
+        noInstructors: "강사 프로필이 아직 없습니다.",
+        noCommunity: "커뮤니티 첫 글을 남겨보세요.",
+        noComments: "아직 댓글이 없습니다.",
+        like: "좋아요",
+        comment: "댓글",
+        report: "신고",
+        msgPlaceholder: "메시지를 입력하세요",
+        commentPlaceholder: "댓글",
+        postPlaceholder: "근황을 공유해 보세요...",
+        profileName: "이름",
+        profileLevel: "레벨",
+        profileAge: "나이",
+        profileBirth: "생년월일",
+        profileMembership: "이용권 상태",
+        profilePlan: "플랜",
+        profileEnds: "만료일",
+        suggestionReceived: "건의사항이 접수되었습니다."
+      }
     };
     let lang = localStorage.getItem("fitlio_lang")||"ko";
+    let adminContactCache = null;
+    let memberChatPollingHandle = null;
     function t(k){ return S[lang][k]||k; }
-    function apply(){ document.querySelectorAll("[data-i18n]").forEach(el=>{el.textContent=t(el.getAttribute("data-i18n"));}); document.getElementById("ko").classList.toggle("on",lang==="ko"); document.getElementById("en").classList.toggle("on",lang==="en"); const hint=document.getElementById("postHint"); if(hint) hint.textContent=t("postHint"); loadSummary(); loadClasses(); loadBookings(); loadNearestClass(); loadMemberChat(); loadPaymentHistory(); loadMemberHome(); loadInstructorFeed(); loadCommunityFeed(); loadCenterDiscovery(); loadMyCenterMemberships(); }
+    function tf(k, values){
+      return t(k).replace(/\{(\w+)\}/g, (_, key)=>String(values && values[key] != null ? values[key] : ""));
+    }
+    function apply(){
+      document.querySelectorAll("[data-i18n]").forEach(el=>{el.textContent=t(el.getAttribute("data-i18n"));});
+      document.getElementById("ko").classList.toggle("on",lang==="ko");
+      document.getElementById("en").classList.toggle("on",lang==="en");
+      const hint=document.getElementById("postHint");
+      if(hint) hint.textContent=t("postHint");
+      const chatInput = document.getElementById("chatInput");
+      if(chatInput) chatInput.placeholder = t("msgPlaceholder");
+      const postText = document.getElementById("postText");
+      if(postText) postText.placeholder = t("postPlaceholder");
+      const sugInput = document.getElementById("sugInput");
+      if(sugInput && lang === "en") sugInput.placeholder = "Share your suggestion";
+      if(sugInput && lang === "ko") sugInput.placeholder = "건의사항을 남겨주세요";
+      loadSummary();
+      loadClasses();
+      loadBookings();
+      loadNearestClass();
+      loadMemberChat();
+      loadPaymentHistory();
+      loadMemberHome();
+      loadInstructorFeed();
+      loadCommunityFeed();
+      loadCenterDiscovery();
+      loadMyCenterMemberships();
+      ensureMemberChatPolling();
+    }
     document.getElementById("ko").onclick=()=>{lang="ko";localStorage.setItem("fitlio_lang",lang);apply();};
     document.getElementById("en").onclick=()=>{lang="en";localStorage.setItem("fitlio_lang",lang);apply();};
     document.getElementById("out").onclick=()=>{localStorage.clear();location.href="/login/member";};
@@ -419,14 +635,14 @@
       const member=d.member||{};
       const prof = document.getElementById("profile");
       if(prof){
-        prof.innerHTML = `<div class="meta">Name: <b>${escape(member.full_name||"—")}</b></div>
-          <div class="meta">Level: <b>${escape(member.level||"starter")}</b></div>
-          <div class="meta">Age: <b>${member.age ?? "—"}</b></div>
-          <div class="meta">Birth: <b>${member.birth_date ? String(member.birth_date).slice(0,10) : "—"}</b></div>
-          <div class="meta">Membership: <b>${m ? escape(m.status||"active") : "none"}</b></div>`;
+        prof.innerHTML = `<div class="meta">${t("profileName")}: <b>${escape(member.full_name||"—")}</b></div>
+          <div class="meta">${t("profileLevel")}: <b>${escape(member.level||"starter")}</b></div>
+          <div class="meta">${t("profileAge")}: <b>${member.age ?? "—"}</b></div>
+          <div class="meta">${t("profileBirth")}: <b>${member.birth_date ? String(member.birth_date).slice(0,10) : "—"}</b></div>
+          <div class="meta">${t("profileMembership")}: <b>${m ? escape(m.status||"active") : "none"}</b></div>`;
       }
       document.getElementById("summary").innerHTML = m
-        ? `<div class="stat">${d.member.full_name}</div><div class="meta">${t("days")}: <b>${m.days_left??"—"}</b></div><div class="meta">${t("visits")}: <b>${m.visits_this_month}</b>${m.monthly_limit!=null?` / ${m.monthly_limit}`:""}</div><div class="meta">plan: ${escape(m.plan)} · ends ${new Date(m.end_date).toLocaleString()}</div>`
+        ? `<div class="stat">${d.member.full_name}</div><div class="meta">${t("days")}: <b>${m.days_left??"—"}</b></div><div class="meta">${t("visits")}: <b>${m.visits_this_month}</b>${m.monthly_limit!=null?` / ${m.monthly_limit}`:""}</div><div class="meta">${t("profilePlan").toLowerCase()}: ${escape(m.plan)} · ${t("profileEnds").toLowerCase()} ${new Date(m.end_date).toLocaleString()}</div>`
         : `<div class="meta">${t("none")}</div>`;
     }
     async function loadMemberHome(){
@@ -463,9 +679,9 @@
         document.getElementById("quickMonthly").onclick=()=>purchaseNow("monthly");
         document.getElementById("quickYearly").onclick=()=>purchaseNow("yearly");
       }else{
-        box.innerHTML=`<div>남은 일수 <b>${m.days_left ?? "—"}</b>일</div><div>남은 횟수 <b>${m.visits_remaining ?? "unlimited"}</b></div>${paymentNotice ? `<div class="meta">${escape(paymentNotice)}</div>` : ""}`;
+        box.innerHTML=`<div>${tf("remainingDays",{days:m.days_left ?? "—"})}</div><div>${tf("remainingVisits",{count:m.visits_remaining ?? t("unlimited")})}</div>${paymentNotice ? `<div class="meta">${escape(paymentNotice)}</div>` : ""}`;
       }
-      cp.innerHTML = `<option value="">All centers</option>` + (d.centers||[]).map(c=>`<option value="${c.id}">${escape(c.name)}</option>`).join("");
+      cp.innerHTML = `<option value="">${lang==="ko" ? "전체 센터" : "All centers"}</option>` + (d.centers||[]).map(c=>`<option value="${c.id}">${escape(c.name)}</option>`).join("");
       loadCenterClasses();
     }
     async function purchaseNow(plan){
@@ -476,8 +692,17 @@
       log.classList.toggle("ok", !!r.ok);
       const lifecycle = String(d.payment_lifecycle || "").toLowerCase();
       const typeLabel = d.attempt_type === "retry" ? t("retryPayment") : t("renewNow");
+      const lifecycleLabel = lifecycle === "in_flight"
+        ? t("pendingLifecycle")
+        : lifecycle === "succeeded"
+          ? t("successLifecycle")
+          : lifecycle === "terminal_failed"
+            ? t("failedLifecycle")
+            : lifecycle === "terminal_cancelled"
+              ? t("cancelledLifecycle")
+              : lifecycle;
       log.textContent = r.ok
-        ? (d.message || `${typeLabel} 요청 완료 (${method})`) + (lifecycle ? ` [${lifecycle}]` : "")
+        ? (d.message || `${typeLabel} 요청 완료 (${method})`) + (lifecycleLabel ? ` [${lifecycleLabel}]` : "")
         : (d.detail||t("fail"));
       if(r.ok && d.checkout_url && method !== "bank_transfer"){
         window.open(d.checkout_url, "_blank");
@@ -493,9 +718,9 @@
       const r=await fetch(url,{headers:auth});
       if(!r.ok){ box.innerHTML='<div class="card">—</div>'; return; }
       const list=await r.json().catch(()=>[]);
-      if(!list.length){ box.innerHTML='<div class="card"><div class="empty-state">해당 조건 수업이 없습니다.</div></div>'; return; }
+      if(!list.length){ box.innerHTML=`<div class="card"><div class="empty-state">${t("noCenterClasses")}</div></div>`; return; }
       box.classList.add("stagger");
-      box.innerHTML=list.map(c=>`<div class="card"><strong>${escape(c.name)}</strong><div class="meta">${escape(c.instructor)}</div><div class="meta">level: ${escape(c.level_required||"starter")}</div><div class="meta">${new Date(c.schedule).toLocaleString()}</div><button class="btn" data-bid="${c.id}">${t("book")}</button></div>`).join("");
+      box.innerHTML=list.map(c=>`<div class="card"><strong>${escape(c.name)}</strong><div class="meta">${escape(c.instructor)}</div><div class="meta">${lang==="ko" ? "레벨" : "Level"}: ${escape(c.level_required||"starter")}</div><div class="meta">${new Date(c.schedule).toLocaleString()}</div><button class="btn" data-bid="${c.id}">${t("book")}</button></div>`).join("");
       box.querySelectorAll("[data-bid]").forEach(b=>b.onclick=()=>book(b.dataset.bid));
     }
     document.getElementById("refreshCenterClass").onclick=loadCenterClasses;
@@ -514,14 +739,14 @@
       const d=await r.json().catch(()=>({items:[]}));
       const items=d.items||[];
       if(!items.length){
-        list.innerHTML='<div class="card"><div class="empty-state">검색 결과가 없습니다.</div></div>';
+        list.innerHTML=`<div class="card"><div class="empty-state">${t("noCenterSearch")}</div></div>`;
         return;
       }
       list.classList.add("stagger");
       list.innerHTML=items.map(c=>{
         const disabled = !c.can_request ? "disabled" : "";
         const label = c.can_request ? t("centerRequestJoin") : statusText(c.membership_status);
-        return `<div class="card"><strong>${escape(c.name)}</strong><div class="meta">slug: ${escape(c.slug)}</div><div class="meta">status: <b>${escape(statusText(c.membership_status))}</b></div><button class="btn btn2" data-center-join="${escape(c.slug)}" ${disabled}>${escape(label)}</button></div>`;
+        return `<div class="card"><strong>${escape(c.name)}</strong><div class="meta">slug: ${escape(c.slug)}</div><div class="meta">${lang==="ko" ? "상태" : "Status"}: <b>${escape(statusText(c.membership_status))}</b></div><button class="btn btn2" data-center-join="${escape(c.slug)}" ${disabled}>${escape(label)}</button></div>`;
       }).join("");
       list.querySelectorAll("[data-center-join]").forEach(btn=>{
         btn.onclick=()=>requestCenterJoin(btn.dataset.centerJoin);
@@ -532,12 +757,10 @@
       const r=await fetch("/centers/my-memberships",{headers:auth});
       if(!r.ok){ box.textContent="—"; return; }
       const rows=await r.json().catch(()=>[]);
-      if(!rows.length){ box.textContent=lang==="ko" ? "참여 중인 센터 없음" : "No center memberships yet"; return; }
+      if(!rows.length){ box.textContent=t("centerEmpty"); return; }
       const active=rows.filter(x=>x.status==="active").length;
       const pending=rows.filter(x=>x.status==="pending").length;
-      box.textContent=(lang==="ko")
-        ? `참여 센터 ${active}개, 승인 대기 ${pending}개`
-        : `${active} active center(s), ${pending} pending request(s)`;
+      box.textContent=tf("centerSummary",{active,pending});
     }
     async function requestCenterJoin(centerSlug){
       const log=document.getElementById("log");
@@ -568,7 +791,7 @@
       const r=await fetch("/member/instructors",{headers:auth});
       if(!r.ok){ box.innerHTML='<div class="card">—</div>'; return; }
       const list=await r.json().catch(()=>[]);
-      if(!list.length){ box.innerHTML='<div class="card"><div class="empty-state">강사 프로필이 아직 없습니다.</div></div>'; return; }
+      if(!list.length){ box.innerHTML=`<div class="card"><div class="empty-state">${t("noInstructors")}</div></div>`; return; }
       box.classList.add("stagger");
       box.innerHTML=list.map(i=>`<div class="card feed-card">
         <div style="display:flex;align-items:center;margin-bottom:.3rem">
@@ -578,8 +801,8 @@
         <div class="meta">${escape(i.specialties||"")}</div>
         <div class="meta">${escape(i.bio||"")}</div>
         <div class="meta">❤️ ${i.likes}</div>
-        <div class="row"><button class="btn btn2" data-ilk="${i.id}">Like</button><input id="icom_${i.id}" placeholder="댓글"><button class="btn" data-icm="${i.id}">Comment</button></div>
-        <div class="meta">${(i.comments||[]).slice(0,3).map(c=>`• ${escape(c.content||"")}`).join("<br>") || "No comments yet."}</div>
+        <div class="row"><button class="btn btn2" data-ilk="${i.id}">${t("like")}</button><input id="icom_${i.id}" placeholder="${t("commentPlaceholder")}"><button class="btn" data-icm="${i.id}">${t("comment")}</button></div>
+        <div class="meta">${(i.comments||[]).slice(0,3).map(c=>`• ${escape(c.content||"")}`).join("<br>") || t("noComments")}</div>
       </div>`).join("");
       box.querySelectorAll("[data-ilk]").forEach(b=>b.onclick=async()=>{ await fetch("/member/instructors/"+b.dataset.ilk+"/like",{method:"POST",headers:auth}); loadInstructorFeed(); });
       box.querySelectorAll("[data-icm]").forEach(b=>b.onclick=async()=>{ const id=b.dataset.icm; const v=(document.getElementById("icom_"+id)||{}).value||""; if(!v.trim()) return; await fetch("/member/instructors/"+id+"/comments",{method:"POST",headers:{...auth,"Content-Type":"application/json"},body:JSON.stringify({instructor_id:+id,content:v})}); loadInstructorFeed(); });
@@ -591,7 +814,7 @@
       const r=await fetch("/member/suggestions",{method:"POST",headers:{...auth,"Content-Type":"application/json"},body:JSON.stringify({content:text,is_anonymous:anon})});
       const log=document.getElementById("log");
       log.classList.toggle("ok", !!r.ok);
-      log.textContent = r.ok ? "건의사항이 접수되었습니다." : t("fail");
+      log.textContent = r.ok ? t("suggestionReceived") : t("fail");
       if(r.ok) document.getElementById("sugInput").value="";
     };
     async function loadCommunityFeed(){
@@ -600,11 +823,11 @@
       const r=await fetch("/member/community/posts",{headers:auth});
       if(!r.ok){ box.innerHTML='<div class="card">—</div>'; return; }
       const list=await r.json().catch(()=>[]);
-      if(!list.length){ box.innerHTML='<div class="card"><div class="empty-state">커뮤니티 첫 글을 남겨보세요.</div></div>'; return; }
+      if(!list.length){ box.innerHTML=`<div class="card"><div class="empty-state">${t("noCommunity")}</div></div>`; return; }
       box.classList.add("stagger");
-      box.innerHTML=list.map(p=>`<div class="card feed-card"><strong>${escape(p.author_name||"Member")}</strong><div class="meta">${new Date(p.created_at).toLocaleString()}</div><div style="margin:.45rem 0">${escape(p.content||"")}</div>${mediaTag(p.media_url, p.media_type)}<div class="meta">❤️ ${p.likes}</div><div class="row"><button class="btn btn2" data-plk="${p.id}">Like</button><button class="btn btn2" data-prp="${p.id}">Report</button><input id="pcom_${p.id}" placeholder="댓글"><button class="btn" data-pcm="${p.id}">Comment</button></div><div class="meta">${(p.comments||[]).slice(-3).map(c=>`• ${escape(c.content||"")}`).join("<br>") || "No comments yet."}</div></div>`).join("");
+      box.innerHTML=list.map(p=>`<div class="card feed-card"><strong>${escape(p.author_name||"Member")}</strong><div class="meta">${new Date(p.created_at).toLocaleString()}</div><div style="margin:.45rem 0">${escape(p.content||"")}</div>${mediaTag(p.media_url, p.media_type)}<div class="meta">❤️ ${p.likes}</div><div class="row"><button class="btn btn2" data-plk="${p.id}">${t("like")}</button><button class="btn btn2" data-prp="${p.id}">${t("report")}</button><input id="pcom_${p.id}" placeholder="${t("commentPlaceholder")}"><button class="btn" data-pcm="${p.id}">${t("comment")}</button></div><div class="meta">${(p.comments||[]).slice(-3).map(c=>`• ${escape(c.content||"")}`).join("<br>") || t("noComments")}</div></div>`).join("");
       box.querySelectorAll("[data-plk]").forEach(b=>b.onclick=async()=>{ await fetch("/member/community/posts/"+b.dataset.plk+"/like",{method:"POST",headers:auth}); loadCommunityFeed(); });
-      box.querySelectorAll("[data-prp]").forEach(b=>b.onclick=async()=>{ const reason=prompt("신고 사유를 입력하세요","abuse"); const log=document.getElementById("log"); if(!reason||!reason.trim()){ log.classList.remove("ok"); log.textContent=t("reportNeedReason"); return; } const r=await fetch("/member/community/reports",{method:"POST",headers:{...auth,"Content-Type":"application/json"},body:JSON.stringify({target_type:"community_post",target_id:+b.dataset.prp,reason})}); const d=await r.json().catch(()=>({})); if(r.ok){ log.classList.add("ok"); log.textContent=d.message||t("reportSubmitted"); return; } log.classList.remove("ok"); log.textContent=r.status===409?t("reportDuplicate"):(d.detail||t("reportFailed")); });
+      box.querySelectorAll("[data-prp]").forEach(b=>b.onclick=async()=>{ const reason=prompt(t("reportPrompt"),"abuse"); const log=document.getElementById("log"); if(!reason||!reason.trim()){ log.classList.remove("ok"); log.textContent=t("reportNeedReason"); return; } const r=await fetch("/member/community/reports",{method:"POST",headers:{...auth,"Content-Type":"application/json"},body:JSON.stringify({target_type:"community_post",target_id:+b.dataset.prp,reason})}); const d=await r.json().catch(()=>({})); if(r.ok){ log.classList.add("ok"); log.textContent=d.message||t("reportSubmitted"); return; } log.classList.remove("ok"); log.textContent=r.status===409?t("reportDuplicate"):(d.detail||t("reportFailed")); });
       box.querySelectorAll("[data-pcm]").forEach(b=>b.onclick=async()=>{ const id=b.dataset.pcm; const text=(document.getElementById("pcom_"+id)||{}).value||""; if(!text.trim()) return; await fetch("/member/community/comments",{method:"POST",headers:{...auth,"Content-Type":"application/json"},body:JSON.stringify({post_id:+id,content:text})}); loadCommunityFeed(); });
     }
     document.getElementById("postSend").onclick=async()=>{
@@ -626,7 +849,7 @@
       const r=await fetch("/classes");
       if(!r.ok){ el.innerHTML='<div class="card">—</div>'; return; }
       const list=await r.json().catch(()=>[]);
-      if(!list.length){ el.innerHTML='<div class="card"><div class="empty-state">No open classes right now. Fresh schedule will appear soon.</div></div>'; return; }
+      if(!list.length){ el.innerHTML=`<div class="card"><div class="empty-state">${t("noClasses")}</div></div>`; return; }
       el.classList.add("stagger");
       el.innerHTML=list.map(c=>`<div class="card"><strong>${escape(c.name)}</strong><div class="meta">${escape(c.instructor)} · ${new Date(c.schedule).toLocaleString()}</div><div class="meta">${c.current_count}/${c.capacity}</div><button class="btn" data-bid="${c.id}">${t("book")}</button></div>`).join("");
       el.querySelectorAll("[data-bid]").forEach(b=>b.onclick=()=>book(b.dataset.bid));
@@ -696,9 +919,9 @@
       const r=await fetch("/payments/history/"+encodeURIComponent(memberId),{headers:auth});
       if(!r.ok){ box.innerHTML='<div class="card">—</div>'; return; }
       const list=await r.json().catch(()=>[]);
-      if(!list.length){ box.innerHTML='<div class="card"><div class="empty-state">No payment history yet.</div></div>'; return; }
+      if(!list.length){ box.innerHTML=`<div class="card"><div class="empty-state">${t("noPayments")}</div></div>`; return; }
       box.classList.add("stagger");
-      box.innerHTML=list.map(p=>`<div class="card"><strong>${p.amount} ${escape(p.currency||"aud")}</strong><div class="meta">status: ${escape(p.status||"completed")}</div><div class="meta">source: ${escape(p.source||"online")}</div><div class="meta">${new Date(p.created_at).toLocaleString()}</div>${p.memo?`<div class="meta">memo: ${escape(p.memo)}</div>`:""}</div>`).join("");
+      box.innerHTML=list.map(p=>`<div class="card"><strong>${p.amount} ${escape(p.currency||"aud")}</strong><div class="meta">${lang==="ko" ? "상태" : "Status"}: ${escape(p.status||"completed")}</div><div class="meta">${lang==="ko" ? "출처" : "Source"}: ${escape(p.source||"online")}</div><div class="meta">${new Date(p.created_at).toLocaleString()}</div>${p.memo?`<div class="meta">${lang==="ko" ? "메모" : "Memo"}: ${escape(p.memo)}</div>`:""}</div>`).join("");
     }
     async function loadBookings(){
       const box=document.getElementById("mybookings");
@@ -707,7 +930,7 @@
       const r=await fetch("/bookings/"+encodeURIComponent(memberId),{headers:auth});
       if(!r.ok){ box.innerHTML='<div class="card">—</div>'; return; }
       const list=await r.json().catch(()=>[]);
-      if(!list.length){ box.innerHTML='<div class="card"><div class="empty-state">No active bookings. Reserve a class to get started.</div></div>'; return; }
+      if(!list.length){ box.innerHTML=`<div class="card"><div class="empty-state">${t("noBookings")}</div></div>`; return; }
       box.classList.add("stagger");
       box.innerHTML=list.map(b=>`<div class="card"><strong>${escape(b.name)}</strong><div class="meta">${escape(b.instructor)} · ${new Date(b.schedule).toLocaleString()}</div><button class="btn btn2" data-cid="${b.class_id}">${t("cancel")}</button></div>`).join("");
       box.querySelectorAll("[data-cid]").forEach(b=>b.onclick=()=>cancelBooking(b.dataset.cid));
@@ -741,20 +964,24 @@
       log.textContent = r.ok ? (d.message||t("done")) : (d.detail||t("fail"));
       if(r.ok) loadSummary();
     };
-    async function getAdminId(){
+    async function getAdminId(forceRefresh){
+      if(!forceRefresh && adminContactCache){
+        return adminContactCache;
+      }
       const r = await fetch("/messages/admin-contact",{headers:auth});
       if(!r.ok) return null;
       const d = await r.json().catch(()=>null);
-      return d ? d.id : null;
+      adminContactCache = d ? d.id : null;
+      return adminContactCache;
     }
     async function loadMemberChat(){
       const box = document.getElementById("chatbox");
-      const adminId = await getAdminId();
+      const adminId = await getAdminId(false);
       if(!adminId){ box.textContent="—"; return; }
       const r = await fetch("/messages/thread/"+adminId,{headers:auth});
       if(!r.ok){ box.textContent="—"; return; }
       const rows = await r.json().catch(()=>[]);
-      if(!rows.length){ box.innerHTML='<div class="empty-state">No messages yet. Send a quick note to your admin anytime.</div>'; return; }
+      if(!rows.length){ box.innerHTML=`<div class="empty-state">${t("noMessages")}</div>`; return; }
       box.innerHTML = rows.map(m=>`<div class="msg-item ${m.sender_id==Number(memberId)?'me':'other'}"><div class="msg-meta">${new Date(m.created_at).toLocaleString()}</div><div>${escape(m.content)}</div></div>`).join("");
       box.scrollTop = box.scrollHeight;
     }
@@ -762,7 +989,7 @@
       const input = document.getElementById("chatInput");
       const text = input.value.trim();
       if(!text) return;
-      const adminId = await getAdminId();
+      const adminId = await getAdminId(false);
       if(!adminId) return;
       const r = await fetch("/messages",{method:"POST",headers:{...auth,"Content-Type":"application/json"},body:JSON.stringify({recipient_id:adminId,content:text})});
       const d = await r.json().catch(()=>({}));
@@ -774,7 +1001,12 @@
         loadMemberChat();
       }
     };
-    setInterval(()=>{ loadMemberChat(); }, 12000);
+    function ensureMemberChatPolling(){
+      if(memberChatPollingHandle){
+        return;
+      }
+      memberChatPollingHandle = setInterval(()=>{ loadMemberChat(); }, 12000);
+    }
     document.addEventListener("pointerdown",(e)=>{
       const b = e.target.closest(".btn");
       if(!b) return;

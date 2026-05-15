@@ -404,13 +404,13 @@
     <h1 id="title">Dashboard</h1>
     <div id="panel"></div>
   </main>
-  <script>
+  <script defer>
     const token = localStorage.getItem("token");
     if (!token || localStorage.getItem("user_role") !== "admin") location.href = "/admin-login";
     const H = { Authorization: "Bearer " + token };
     const S = {
       en: { t0:"Dashboard",t1:"Sales",t2:"Payments",t3:"Members",t4:"Classes",t5:"Instructors",t6:"Payroll",t7:"Notifications",t8:"Reports",t9:"Messages",t10:"Centers",out:"Sign out", dash:"Overview", sales:"Monthly sales", pay:"Recent payments", mem:"All members", cls:"Schedule + edit", ins:"Profiles + edit", sal:"Select instructor + month", not:"Queue + create", rep:"Retention reports", go:"Load", cr:"Create request", topic:"Topic", msg:"Message", mid:"Member id (opt)", addins:"Add instructor", name:"Display name", run:"Calculate payroll", del:"Delete", save:"Save", createClass:"Create class", className:"Class name", when:"Schedule(ISO)", cap:"Capacity", status:"Status", markSent:"Mark sent", markFail:"Mark failed", markPending:"Mark pending", trend:"Revenue trend", recent:"Last", months:"months", err:"Request failed", ok:"Saved", growth:"Member growth", retention:"Retention", util:"Class utilization", avgFill:"Avg fill" },
-      ko: { t0:"대시보드",t1:"매출",t2:"결제",t3:"회원",t4:"수업",t5:"강사",t6:"급여",t7:"알림",t8:"리포트",t9:"메세지",t10:"센터",out:"로그아웃", dash:"요약", sales:"월 매출", pay:"결제 목록", mem:"전체 회원", cls:"일정·수정", ins:"프로필·수정", sal:"강사+월 선택", not:"대기열·생성", rep:"리텐션 리포트", go:"불러오기", cr:"알림 요청", topic:"주제", msg:"내용", mid:"회원번호(선택)", addins:"강사 추가", name:"표시 이름", run:"급여 계산", del:"삭제", save:"저장", createClass:"수업 생성", className:"수업명", when:"일시(ISO)", cap:"정원", status:"상태", markSent:"전송 완료", markFail:"실패 처리", markPending:"대기 처리", trend:"매출 추이", recent:"최근", months:"개월", err:"요청 실패", ok:"저장됨", growth:"회원 성장", retention:"유지율", util:"수업 충원율", avgFill:"평균 충원율" }
+      ko: { t0:"대시보드",t1:"매출",t2:"결제",t3:"회원",t4:"수업",t5:"강사",t6:"급여",t7:"알림",t8:"리포트",t9:"메시지",t10:"센터",out:"로그아웃", dash:"요약", sales:"월 매출", pay:"결제 목록", mem:"전체 회원", cls:"일정·수정", ins:"프로필·수정", sal:"강사+월 선택", not:"대기열·생성", rep:"리텐션 리포트", go:"불러오기", cr:"알림 요청", topic:"주제", msg:"내용", mid:"회원번호(선택)", addins:"강사 추가", name:"표시 이름", run:"급여 계산", del:"삭제", save:"저장", createClass:"수업 생성", className:"수업명", when:"일시(ISO)", cap:"정원", status:"상태", markSent:"전송 완료", markFail:"실패 처리", markPending:"대기 처리", trend:"매출 추이", recent:"최근", months:"개월", err:"요청 실패", ok:"저장됨", growth:"회원 성장", retention:"유지율", util:"수업 충원율", avgFill:"평균 충원율" }
     };
     let lang = localStorage.getItem("fitlio_lang")||"ko";
     function t(k){ return S[lang][k]||k; }
@@ -508,8 +508,10 @@
       if(tab==="dash"){
         title.textContent=t("dash");
         try{
-          const stats = await apiJson("/admin/stats");
-          const trend = await apiJson("/admin/sales/trend?months=6");
+          const [stats, trend] = await Promise.all([
+            apiJson("/admin/stats"),
+            apiJson("/admin/sales/trend?months=6"),
+          ]);
           const maxAmt = Math.max(...trend.points.map(x=>x.total_amount), 1);
           p.innerHTML=`<div id="flash" class="flash"></div>
             <div class="stats stagger">
@@ -532,7 +534,12 @@
         document.getElementById("tg").onclick=async()=>{ try{ const months=+document.getElementById("tm").value||12; const data=await apiJson("/admin/sales/trend?months="+months); const maxAmt=Math.max(...data.points.map(x=>x.total_amount),1); document.getElementById("tx").innerHTML=`<div class="box"><div class="bar-wrap">${data.points.map(x=>`<div class="bar-row"><span>${x.label}</span><div class="bar"><i style="width:${Math.max(4,(x.total_amount/maxAmt)*100)}%"></i></div><span>$${x.total_amount.toLocaleString()}</span></div>`).join("")}</div></div>`; flash(""); }catch(e){ flash(e.message||t("err")); } };
         return;}
       if(tab==="pay"){ title.textContent=t("pay"); let j=[]; try{ j=await apiJson("/admin/payments"); }catch(e){ flash(e.message||t("err")); return; }
-        p.innerHTML=j.length?`<table class="table"><thead><tr><th>ID</th><th>Member</th><th>Amount</th><th>${t("status")}</th><th>Method</th><th>External Ref</th><th>At</th></tr></thead><tbody>${j.map(x=>`<tr><td>${x.id}</td><td>${x.member_id}</td><td>${x.amount} ${x.currency}</td><td>${statusChip(x.status)}</td><td>${esc(x.payment_method || "card")}</td><td>${esc(x.external_ref || "—")}</td><td>${new Date(x.created_at).toLocaleString()}</td></tr>`).join("")}</tbody></table>`:`<div class="empty-state">No payment records yet.</div>`; return;}
+        p.innerHTML=(j.length?`<div class="row"><button class="btn btn2" id="payExportCsv">Export CSV</button></div><table class="table"><thead><tr><th>ID</th><th>Member</th><th>Amount</th><th>${t("status")}</th><th>Method</th><th>Provider</th><th>Settlement</th><th>Fee Hint</th><th>Reference</th><th>At</th></tr></thead><tbody>${j.map(x=>`<tr><td>${x.id}</td><td>${x.member_id}</td><td>${x.amount} ${x.currency}<div style="font-size:.72rem;color:#5e7063">${Number(x.amount_cents||0).toLocaleString()} cents</div></td><td>${statusChip(x.status)}</td><td>${esc(x.payment_method || "card")}</td><td>${esc(x.provider || "card_gateway_sim")}</td><td>${statusChip(x.settlement_state || "awaiting_settlement")}</td><td>${Number(x.fee_hint_bps||0)/100}%</td><td>${esc(x.provider_reference || x.external_ref || "—")}</td><td>${new Date(x.created_at).toLocaleString()}</td></tr>`).join("")}</tbody></table>`:`<div class="empty-state">No payment records yet.</div>`);
+        const exportBtn = document.getElementById("payExportCsv");
+        if(exportBtn){
+          exportBtn.onclick=()=>{ window.open("/admin/payments?format=csv","_blank"); };
+        }
+        return;}
       if(tab==="mem"){ title.textContent=t("mem"); let j=[]; try{ j=await apiJson("/admin/members"); }catch(e){ flash(e.message||t("err")); return; }
         p.innerHTML=`<div id="flash" class="flash"></div>
         <table class="table"><thead><tr><th>ID</th><th>Member No</th><th>Name</th><th>Email</th><th>Phone</th><th>Birth</th><th>Level</th><th>Role</th><th>Active</th><th>Retention Risk</th><th></th></tr></thead><tbody>

@@ -131,13 +131,13 @@
     <div class="hint" id="hint">Enter 4 digits and tap Check-in.</div>
     <div class="display" id="result" style="margin-top:12px"></div>
   </div>
-  <script>
+  <script defer>
     const slug = location.pathname.split("/").pop();
     let pin = "";
     let resetTimer = null;
     const DEFAULT_TITLE = "Fitlio Check-in";
-    const DEFAULT_SUBTITLE = "휴대폰 뒷자리 4자리를 입력하세요";
-    const DEFAULT_HINT = "4자리를 입력한 뒤 Check-in을 누르세요.";
+    const DEFAULT_SUBTITLE = "휴대폰 번호 뒤 4자리를 입력하세요";
+    const DEFAULT_HINT = "4자리를 입력한 뒤 Check-in을 눌러 주세요.";
     const DEFAULT_ACCENT = "#2f855a";
     const DEFAULT_RESET_MS = 2600;
     const $ = (id)=>document.getElementById(id);
@@ -217,17 +217,17 @@
         safe.can_retry || resp.headers.get("X-Tablet-Can-Retry")
       ).toLowerCase();
       const canRetry = canRetryRaw === "true" || canRetryRaw === "1" || canRetryRaw === "yes";
-      const detail = toText(safe.detail) || "Check-in failed. Please ask staff for help.";
+      const detail = toText(safe.detail) || "Check-in could not be completed. Please contact staff.";
       return {resultCode, statusLabel, uiState, canRetry, detail};
     }
     function hintForError(err){
       if(!err.canRetry){
-        return "프론트 데스크에 문의해 주세요.";
+        return "프런트 데스크로 문의해 주세요.";
       }
       if(err.resultCode === "MEMBER_NOT_FOUND"){
         return "번호를 다시 확인한 뒤 재시도해 주세요.";
       }
-      return "번호를 확인하고 다시 시도해 주세요.";
+      return "번호를 확인한 뒤 다시 시도해 주세요.";
     }
     async function loadCfg(){
       try{
@@ -289,7 +289,7 @@
       if(pin.length!==4) return;
       clearResetTimer();
       $("submitBtn").disabled = true;
-      $("hint").textContent = "처리 중입니다...";
+      $("hint").textContent = "요청을 처리하고 있습니다...";
       setResult("체크인 요청을 확인하고 있습니다.", "pending");
       try{
         const r = await fetch("/centers/tablet/check-in",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({center_slug:slug,phone_last4:pin})});
