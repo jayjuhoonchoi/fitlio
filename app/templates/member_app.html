@@ -356,6 +356,16 @@
       <div class="grid" id="centerClasses"></div>
     </div>
     <div class="mini">
+      <h2 data-i18n="centerDiscovery">Center discovery</h2>
+      <div class="row">
+        <input id="centerSearch" placeholder="Search center name or slug" style="min-width:220px">
+        <button class="btn btn2" id="centerSearchBtn" data-i18n="search">Search</button>
+        <button class="btn btn2" id="centerMembershipRefresh" data-i18n="refreshStatus">Refresh status</button>
+      </div>
+      <div id="centerStatusSummary" class="meta">—</div>
+      <div class="grid" id="centerDiscoveryList"></div>
+    </div>
+    <div class="mini">
       <h2 data-i18n="insf">Instructor profiles</h2>
       <div class="grid" id="instructorFeed"></div>
     </div>
@@ -389,12 +399,12 @@
     if (!token || !memberId) location.href = "/login/member";
     const auth = { Authorization: "Bearer " + token };
     const S = {
-      en: { mem:"Member", out:"Sign out", sum:"My summary", prof:"My profile", ph:"Payment history", renew:"Renew now", pay:"Pay membership", payd:"Creates active membership + payment.", m30:"Monthly", y365:"Yearly", cls:"Open classes", visits:"Visits this month", days:"Days left", none:"No active pass", book:"Book", booked:"Booked", fail:"Failed", load:"Loading…", myb:"My bookings", cancel:"Cancel", done:"Completed", ci:"Quick check-in", cid:"Find nearest class and check in with your phone last 4 digits.", cib:"Check in", chat:"Messages with admin", centerClass:"Center + level classes", insf:"Instructor profiles", sug:"Anonymous suggestion", comm:"Community", reserveConfirmed:"Reservation confirmed.", reserveWaitlisted:"Class is full. You are now waitlisted.", reserveDuplicate:"You already have this class reserved.", reserveFail:"Could not reserve class." },
-      ko: { mem:"회원", out:"로그아웃", sum:"내 요약", prof:"내 프로필", ph:"결제 이력", renew:"만료/갱신 안내", pay:"이용권 결제", payd:"결제 시 이용권과 결제 내역이 생성됩니다.", m30:"월간", y365:"연간", cls:"수업 목록", visits:"이번 달 방문", days:"남은 일수", none:"이용권 없음", book:"예약", booked:"예약됨", fail:"실패", load:"불러오는 중…", myb:"내 예약", cancel:"취소", done:"완료", ci:"간편 출석", cid:"가장 가까운 수업을 확인하고 휴대폰 뒷자리 4개로 출석하세요.", cib:"출석 체크", chat:"관리자와 메세지", centerClass:"센터/레벨 수업", insf:"강사 프로필", sug:"익명 건의함", comm:"커뮤니티", reserveConfirmed:"예약이 확정되었습니다.", reserveWaitlisted:"정원이 가득 차 대기열에 등록되었습니다.", reserveDuplicate:"이미 예약(또는 대기)된 수업입니다.", reserveFail:"수업 예약에 실패했습니다." }
+      en: { mem:"Member", out:"Sign out", sum:"My summary", prof:"My profile", ph:"Payment history", renew:"Renew now", pay:"Pay membership", payd:"Creates active membership + payment.", m30:"Monthly", y365:"Yearly", cls:"Open classes", visits:"Visits this month", days:"Days left", none:"No active pass", book:"Book", booked:"Booked", fail:"Failed", load:"Loading…", myb:"My bookings", cancel:"Cancel", done:"Completed", ci:"Quick check-in", cid:"Find nearest class and check in with your phone last 4 digits.", cib:"Check in", chat:"Messages with admin", centerClass:"Center + level classes", insf:"Instructor profiles", sug:"Anonymous suggestion", comm:"Community", reserveConfirmed:"Reservation confirmed.", reserveWaitlisted:"Class is full. You are now waitlisted.", reserveDuplicate:"You already have this class reserved.", reserveFail:"Could not reserve class.", centerDiscovery:"Center discovery", search:"Search", refreshStatus:"Refresh status", centerStatusPending:"Pending approval", centerStatusActive:"Joined", centerStatusRejected:"Rejected", centerStatusNone:"Not joined", centerRequestJoin:"Request to join", centerAlreadyPending:"Request already pending.", centerAlreadyActive:"Already joined this center.", centerJoinSubmitted:"Join request submitted. Await admin approval.", centerJoinFailed:"Could not submit join request." },
+      ko: { mem:"회원", out:"로그아웃", sum:"내 요약", prof:"내 프로필", ph:"결제 이력", renew:"만료/갱신 안내", pay:"이용권 결제", payd:"결제 시 이용권과 결제 내역이 생성됩니다.", m30:"월간", y365:"연간", cls:"수업 목록", visits:"이번 달 방문", days:"남은 일수", none:"이용권 없음", book:"예약", booked:"예약됨", fail:"실패", load:"불러오는 중…", myb:"내 예약", cancel:"취소", done:"완료", ci:"간편 출석", cid:"가장 가까운 수업을 확인하고 휴대폰 뒷자리 4개로 출석하세요.", cib:"출석 체크", chat:"관리자와 메세지", centerClass:"센터/레벨 수업", insf:"강사 프로필", sug:"익명 건의함", comm:"커뮤니티", reserveConfirmed:"예약이 확정되었습니다.", reserveWaitlisted:"정원이 가득 차 대기열에 등록되었습니다.", reserveDuplicate:"이미 예약(또는 대기)된 수업입니다.", reserveFail:"수업 예약에 실패했습니다.", centerDiscovery:"센터 찾기/가입", search:"검색", refreshStatus:"상태 새로고침", centerStatusPending:"승인 대기", centerStatusActive:"가입 완료", centerStatusRejected:"거절됨", centerStatusNone:"미가입", centerRequestJoin:"가입 요청", centerAlreadyPending:"이미 가입 요청 대기 중입니다.", centerAlreadyActive:"이미 가입된 센터입니다.", centerJoinSubmitted:"가입 요청이 접수되었습니다. 관리자 승인 대기 중입니다.", centerJoinFailed:"가입 요청에 실패했습니다." }
     };
     let lang = localStorage.getItem("fitlio_lang")||"ko";
     function t(k){ return S[lang][k]||k; }
-    function apply(){ document.querySelectorAll("[data-i18n]").forEach(el=>{el.textContent=t(el.getAttribute("data-i18n"));}); document.getElementById("ko").classList.toggle("on",lang==="ko"); document.getElementById("en").classList.toggle("on",lang==="en"); loadSummary(); loadClasses(); loadBookings(); loadNearestClass(); loadMemberChat(); loadPaymentHistory(); loadMemberHome(); loadInstructorFeed(); loadCommunityFeed(); }
+    function apply(){ document.querySelectorAll("[data-i18n]").forEach(el=>{el.textContent=t(el.getAttribute("data-i18n"));}); document.getElementById("ko").classList.toggle("on",lang==="ko"); document.getElementById("en").classList.toggle("on",lang==="en"); loadSummary(); loadClasses(); loadBookings(); loadNearestClass(); loadMemberChat(); loadPaymentHistory(); loadMemberHome(); loadInstructorFeed(); loadCommunityFeed(); loadCenterDiscovery(); loadMyCenterMemberships(); }
     document.getElementById("ko").onclick=()=>{lang="ko";localStorage.setItem("fitlio_lang",lang);apply();};
     document.getElementById("en").onclick=()=>{lang="en";localStorage.setItem("fitlio_lang",lang);apply();};
     document.getElementById("out").onclick=()=>{localStorage.clear();location.href="/login/member";};
@@ -471,6 +481,69 @@
       box.querySelectorAll("[data-bid]").forEach(b=>b.onclick=()=>book(b.dataset.bid));
     }
     document.getElementById("refreshCenterClass").onclick=loadCenterClasses;
+    function statusText(status){
+      if(status==="pending") return t("centerStatusPending");
+      if(status==="active") return t("centerStatusActive");
+      if(status==="rejected") return t("centerStatusRejected");
+      return t("centerStatusNone");
+    }
+    async function loadCenterDiscovery(){
+      const list=document.getElementById("centerDiscoveryList");
+      const query=(document.getElementById("centerSearch")||{}).value||"";
+      list.classList.remove("stagger");
+      const r=await fetch("/centers/discover?query="+encodeURIComponent(query),{headers:auth});
+      if(!r.ok){ list.innerHTML='<div class="card">—</div>'; return; }
+      const d=await r.json().catch(()=>({items:[]}));
+      const items=d.items||[];
+      if(!items.length){
+        list.innerHTML='<div class="card"><div class="empty-state">검색 결과가 없습니다.</div></div>';
+        return;
+      }
+      list.classList.add("stagger");
+      list.innerHTML=items.map(c=>{
+        const disabled = !c.can_request ? "disabled" : "";
+        const label = c.can_request ? t("centerRequestJoin") : statusText(c.membership_status);
+        return `<div class="card"><strong>${escape(c.name)}</strong><div class="meta">slug: ${escape(c.slug)}</div><div class="meta">status: <b>${escape(statusText(c.membership_status))}</b></div><button class="btn btn2" data-center-join="${escape(c.slug)}" ${disabled}>${escape(label)}</button></div>`;
+      }).join("");
+      list.querySelectorAll("[data-center-join]").forEach(btn=>{
+        btn.onclick=()=>requestCenterJoin(btn.dataset.centerJoin);
+      });
+    }
+    async function loadMyCenterMemberships(){
+      const box=document.getElementById("centerStatusSummary");
+      const r=await fetch("/centers/my-memberships",{headers:auth});
+      if(!r.ok){ box.textContent="—"; return; }
+      const rows=await r.json().catch(()=>[]);
+      if(!rows.length){ box.textContent=lang==="ko" ? "참여 중인 센터 없음" : "No center memberships yet"; return; }
+      const active=rows.filter(x=>x.status==="active").length;
+      const pending=rows.filter(x=>x.status==="pending").length;
+      box.textContent=(lang==="ko")
+        ? `참여 센터 ${active}개, 승인 대기 ${pending}개`
+        : `${active} active center(s), ${pending} pending request(s)`;
+    }
+    async function requestCenterJoin(centerSlug){
+      const log=document.getElementById("log");
+      const r=await fetch("/centers/join-request",{method:"POST",headers:{...auth,"Content-Type":"application/json"},body:JSON.stringify({center_slug:centerSlug})});
+      const d=await r.json().catch(()=>({}));
+      if(r.ok){
+        log.classList.add("ok");
+        log.textContent=d.message || t("centerJoinSubmitted");
+        loadCenterDiscovery();
+        loadMyCenterMemberships();
+        return;
+      }
+      log.classList.remove("ok");
+      if(r.status===409){
+        if(String(d.detail||"").toLowerCase().includes("pending")) log.textContent=t("centerAlreadyPending");
+        else log.textContent=t("centerAlreadyActive");
+        loadCenterDiscovery();
+        loadMyCenterMemberships();
+        return;
+      }
+      log.textContent=d.detail || t("centerJoinFailed");
+    }
+    document.getElementById("centerSearchBtn").onclick=loadCenterDiscovery;
+    document.getElementById("centerMembershipRefresh").onclick=()=>{ loadCenterDiscovery(); loadMyCenterMemberships(); };
     async function loadInstructorFeed(){
       const box=document.getElementById("instructorFeed");
       box.classList.remove("stagger");

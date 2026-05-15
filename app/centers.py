@@ -1,7 +1,8 @@
 from datetime import date, datetime
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -60,6 +61,15 @@ class JoinByEmailBody(BaseModel):
 
 class JoinRequestBody(BaseModel):
     center_slug: str
+
+
+class CenterDiscoverItem(BaseModel):
+    center_id: int
+    name: str
+    slug: str
+    membership_status: str
+    membership_role: str | None = None
+    can_request: bool
 
 
 class ApproveJoinBody(BaseModel):
@@ -220,11 +230,94 @@ def request_join_center(
             status="pending",
         )
         db.add(row)
+    elif row.status == "pending":
+        raise HTTPException(status_code=409, detail="Join request already pending")
+    elif row.status == "active":
+        raise HTTPException(status_code=409, detail="Already joined this center")
     else:
         row.status = "pending"
+        row.role = "member" if row.role != "admin" else "admin"
         row.updated_at = datetime.utcnow()
     db.commit()
-    return {"center_id": center.id, "member_id": user["id"], "status": "pending"}
+    return {
+        "center_id": center.id,
+        "member_id": user["id"],
+        "status": "pending",
+        "message": "Join request submitted",
+    }
+
+
+@router.get("/discover")
+def discover_centers(
+    query: str = Query(default="", max_length=128),
+    limit: int = Query(default=30, ge=1, le=100),
+    db: Session = Depends(get_db),
+    user: dict = Depends(get_current_user),
+):
+    term = query.strip()
+    q = db.query(Center).filter(Center.is_active == True)
+    if term:
+        like = f"%{term.lower()}%"
+        q = q.filter(
+            or_(
+                Center.name.ilike(like),
+                Center.slug.ilike(like),
+            )
+        )
+    centers = q.order_by(Center.name.asc()).limit(limit).all()
+    if not centers:
+        return {"items": [], "total": 0}
+
+    center_ids = [c.id for c in centers]
+    memberships = (
+        db.query(CenterMembership)
+        .filter(
+            CenterMembership.member_id == user["id"],
+            CenterMembership.center_id.in_(center_ids),
+        )
+        .all()
+    )
+    membership_by_center = {m.center_id: m for m in memberships}
+    items: list[CenterDiscoverItem] = []
+    for center in centers:
+        membership = membership_by_center.get(center.id)
+        status = membership.status if membership else "none"
+        items.append(
+            CenterDiscoverItem(
+                center_id=center.id,
+                name=center.name,
+                slug=center.slug,
+                membership_status=status,
+                membership_role=membership.role if membership else None,
+                can_request=status in ("none", "rejected"),
+            )
+        )
+    return {"items": [item.model_dump() for item in items], "total": len(items)}
+
+
+@router.get("/my-memberships")
+def my_center_memberships(
+    db: Session = Depends(get_db),
+    user: dict = Depends(get_current_user),
+):
+    rows = (
+        db.query(CenterMembership, Center)
+        .join(Center, Center.id == CenterMembership.center_id)
+        .filter(CenterMembership.member_id == user["id"])
+        .order_by(Center.name.asc())
+        .all()
+    )
+    return [
+        {
+            "center_id": center.id,
+            "center_name": center.name,
+            "center_slug": center.slug,
+            "role": cm.role,
+            "status": cm.status,
+            "updated_at": cm.updated_at,
+        }
+        for cm, center in rows
+    ]
 
 
 @router.post("/join-approval")

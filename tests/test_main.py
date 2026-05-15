@@ -1060,6 +1060,171 @@ def test_tablet_check_in_includes_days_left(db_session):
     assert payload["days_left"] >= 0
 
 
+def test_center_discover_response_shape(db_session):
+    center_a = models.Center(name="Gangnam Prime", slug="gangnam-prime", is_active=True)
+    center_b = models.Center(name="Mapo Move", slug="mapo-move", is_active=True)
+    member = models.Member(
+        email="discover.member@fitlio.com",
+        hashed_password="x",
+        full_name="Discover Member",
+        role="member",
+    )
+    db_session.add(center_a)
+    db_session.add(center_b)
+    db_session.add(member)
+    db_session.flush()
+    db_session.add(
+        models.CenterMembership(
+            center_id=center_a.id,
+            member_id=member.id,
+            role="member",
+            status="pending",
+        )
+    )
+    db_session.commit()
+
+    from app.deps import get_current_user
+
+    app.dependency_overrides[get_db] = _override_db(db_session)
+    app.dependency_overrides[get_current_user] = lambda: {"id": member.id, "role": "member"}
+    response = client.get("/centers/discover?query=mapo")
+    app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert "items" in payload
+    assert "total" in payload
+    assert payload["total"] == 1
+    row = payload["items"][0]
+    for key in (
+        "center_id",
+        "name",
+        "slug",
+        "membership_status",
+        "membership_role",
+        "can_request",
+    ):
+        assert key in row
+    assert row["slug"] == "mapo-move"
+    assert row["membership_status"] == "none"
+    assert row["can_request"] is True
+
+
+def test_center_join_request_success(db_session):
+    center = models.Center(name="Join Center", slug="join-center", is_active=True)
+    member = models.Member(
+        email="join.success@fitlio.com",
+        hashed_password="x",
+        full_name="Join Success",
+        role="member",
+    )
+    db_session.add(center)
+    db_session.add(member)
+    db_session.commit()
+
+    from app.deps import get_current_user
+
+    app.dependency_overrides[get_db] = _override_db(db_session)
+    app.dependency_overrides[get_current_user] = lambda: {"id": member.id, "role": "member"}
+    response = client.post("/centers/join-request", json={"center_slug": "join-center"})
+    app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == "pending"
+    assert payload["center_id"] == center.id
+    row = (
+        db_session.query(models.CenterMembership)
+        .filter(
+            models.CenterMembership.center_id == center.id,
+            models.CenterMembership.member_id == member.id,
+        )
+        .first()
+    )
+    assert row is not None
+    assert row.status == "pending"
+
+
+def test_center_join_request_duplicate_pending_protection(db_session):
+    center = models.Center(name="Dup Center", slug="dup-center", is_active=True)
+    member = models.Member(
+        email="join.dup@fitlio.com",
+        hashed_password="x",
+        full_name="Join Dup",
+        role="member",
+    )
+    db_session.add(center)
+    db_session.add(member)
+    db_session.flush()
+    db_session.add(
+        models.CenterMembership(
+            center_id=center.id,
+            member_id=member.id,
+            role="member",
+            status="pending",
+        )
+    )
+    db_session.commit()
+
+    from app.deps import get_current_user
+
+    app.dependency_overrides[get_db] = _override_db(db_session)
+    app.dependency_overrides[get_current_user] = lambda: {"id": member.id, "role": "member"}
+    response = client.post("/centers/join-request", json={"center_slug": "dup-center"})
+    app.dependency_overrides.clear()
+
+    assert response.status_code == 409
+    assert response.json()["detail"] == "Join request already pending"
+
+
+def test_center_membership_status_visibility(db_session):
+    center_pending = models.Center(name="Pending Hub", slug="pending-hub", is_active=True)
+    center_active = models.Center(name="Active Hub", slug="active-hub", is_active=True)
+    member = models.Member(
+        email="status.member@fitlio.com",
+        hashed_password="x",
+        full_name="Status Member",
+        role="member",
+    )
+    db_session.add(center_pending)
+    db_session.add(center_active)
+    db_session.add(member)
+    db_session.flush()
+    db_session.add(
+        models.CenterMembership(
+            center_id=center_pending.id,
+            member_id=member.id,
+            role="member",
+            status="pending",
+        )
+    )
+    db_session.add(
+        models.CenterMembership(
+            center_id=center_active.id,
+            member_id=member.id,
+            role="member",
+            status="active",
+        )
+    )
+    db_session.commit()
+
+    from app.deps import get_current_user
+
+    app.dependency_overrides[get_db] = _override_db(db_session)
+    app.dependency_overrides[get_current_user] = lambda: {"id": member.id, "role": "member"}
+    response = client.get("/centers/my-memberships")
+    app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    rows = response.json()
+    assert len(rows) == 2
+    by_slug = {row["center_slug"]: row for row in rows}
+    assert by_slug["pending-hub"]["status"] == "pending"
+    assert by_slug["active-hub"]["status"] == "active"
+    for key in ("center_id", "center_name", "center_slug", "role", "status", "updated_at"):
+        assert key in by_slug["active-hub"]
+
+
 def test_quick_reserve_success_path(db_session):
     member = models.Member(
         email="quick.reserve.success@fitlio.com",
