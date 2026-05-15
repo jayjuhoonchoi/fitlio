@@ -83,3 +83,15 @@ Admin notification operations:
 - `POST /admin/notifications/dispatch/run` process pending notifications
 - `GET /admin/notifications?status=&channel=` filter queue
 - `GET /admin/notifications/summary` queue KPI snapshot
+
+## Sprint smoke helpers
+
+- Core local smoke:
+  - `./scripts/smoke_core.sh`
+  - or custom base URL: `./scripts/smoke_core.sh https://fitlio-jay.duckdns.org`
+
+- QA checklist:
+  - `docs/today-qa-checklist.md`
+
+- Next-session kickoff:
+  - `docs/tomorrow-first-hour.md`
