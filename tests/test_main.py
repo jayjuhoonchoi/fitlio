@@ -73,6 +73,20 @@ def test_admin_login_page():
     assert "Admin" in response.text
 
 
+def test_luxury_tokens_css_cache_headers_and_conditional_get():
+    first = client.get("/assets/luxury_tokens.css")
+    assert first.status_code == 200
+    assert "public, max-age=3600" in first.headers.get("Cache-Control", "")
+    assert "stale-while-revalidate" in first.headers.get("Cache-Control", "")
+    assert "ETag" in first.headers
+    etag = first.headers["ETag"]
+
+    second = client.get("/assets/luxury_tokens.css", headers={"If-None-Match": etag})
+    assert second.status_code == 304
+    assert second.text == ""
+    assert second.headers.get("ETag") == etag
+
+
 def test_admin_occupancy_trend_requires_auth():
     response = client.get("/admin/reports/occupancy-trend?months=6")
     assert response.status_code == 401
@@ -915,6 +929,10 @@ def test_member_purchase_starts_pending_and_returns_checkout(db_session):
     assert payload["payment_status"] == "pending"
     assert payload["checkout_url"].startswith("https://pay.fitlio.local/checkout/")
     assert payload["external_ref"]
+    assert "payment_metadata" in payload
+    assert payload["payment_metadata"]["provider"] == "card_gateway_sim"
+    assert payload["payment_metadata"]["provider_reference"] == payload["external_ref"]
+    assert payload["payment_metadata"]["settlement_state"] == "awaiting_settlement"
     payment = db_session.query(models.Payment).filter(models.Payment.id == payload["payment_id"]).first()
     membership = db_session.query(models.Membership).filter(models.Membership.id == payload["membership_id"]).first()
     assert payment is not None
@@ -969,6 +987,8 @@ def test_payment_webhook_duplicate_is_idempotent(db_session):
     assert second.status_code == 200
     assert first.json()["duplicate"] is False
     assert second.json()["duplicate"] is True
+    assert first.json()["payment_metadata"]["settlement_state"] == "settled"
+    assert second.json()["settlement_state"] == "settled"
     db_session.refresh(payment)
     db_session.refresh(membership)
     assert payment.status == "completed"
@@ -1020,10 +1040,66 @@ def test_payment_webhook_failed_transitions_membership_to_failed(db_session):
 
     assert res.status_code == 200
     assert res.json()["processed"] is True
+    assert res.json()["payment_metadata"]["provider"] == "card_gateway_sim"
+    assert res.json()["payment_metadata"]["settlement_state"] == "settlement_failed"
     db_session.refresh(payment)
     db_session.refresh(membership)
     assert payment.status == "failed"
     assert membership.status == "failed"
+
+
+def test_payment_webhook_rejects_invalid_secret_when_configured(db_session, monkeypatch):
+    member = models.Member(
+        email="member.webhook.secret@fitlio.com",
+        hashed_password="x",
+        full_name="Webhook Secret Member",
+        role="member",
+    )
+    db_session.add(member)
+    db_session.flush()
+    membership = models.Membership(
+        member_id=member.id,
+        plan="monthly",
+        status="pending",
+        end_date=datetime.utcnow() + timedelta(days=30),
+    )
+    db_session.add(membership)
+    db_session.flush()
+    payment = models.Payment(
+        member_id=member.id,
+        membership_id=membership.id,
+        amount=5000,
+        currency="aud",
+        status="pending",
+        source="online",
+        payment_method="card",
+        external_ref="card_secret_check_20260101010101",
+    )
+    db_session.add(payment)
+    db_session.commit()
+
+    import app.member_experience as member_experience
+
+    monkeypatch.setattr(member_experience, "PAYMENT_WEBHOOK_SECRET", "top-secret")
+    app.dependency_overrides[get_db] = _override_db(db_session)
+    body = {
+        "provider": "card",
+        "event_type": "payment.updated",
+        "external_ref": payment.external_ref,
+        "status": "completed",
+        "payload": {"trace": "secret-check"},
+    }
+    res = client.post(
+        "/member/payments/webhook",
+        json=body,
+        headers={"X-Webhook-Secret": "wrong-secret"},
+    )
+    app.dependency_overrides.clear()
+
+    assert res.status_code == 401
+    assert res.json()["detail"] == "Invalid webhook secret"
+    db_session.refresh(payment)
+    assert payment.status == "pending"
 
 
 def test_retry_after_failure_purchase_reuses_membership(db_session):
@@ -1073,6 +1149,8 @@ def test_retry_after_failure_purchase_reuses_membership(db_session):
     assert payload["membership_id"] == failed_membership.id
     assert payload["payment_status"] == "pending"
     assert payload["payment_lifecycle"] == "in_flight"
+    assert payload["payment_metadata"]["provider"] == "card_gateway_sim"
+    assert payload["payment_metadata"]["settlement_state"] == "awaiting_settlement"
     db_session.refresh(failed_membership)
     assert failed_membership.status == "pending"
 
@@ -1085,6 +1163,162 @@ def test_retry_after_failure_purchase_reuses_membership(db_session):
         .all()
     )
     assert len(pending_payments) == 1
+
+
+@pytest.mark.parametrize(
+    "method,provider,settlement_state",
+    [
+        ("paypal", "paypal", "awaiting_settlement"),
+        ("naverpay", "naverpay", "awaiting_settlement"),
+        ("kakaopay", "kakaopay", "awaiting_settlement"),
+        ("payco", "payco", "awaiting_settlement"),
+        ("bank_transfer", "bank_transfer", "awaiting_deposit"),
+        ("card", "card_gateway_sim", "awaiting_settlement"),
+    ],
+)
+def test_purchase_method_specific_metadata_contract(
+    db_session, method, provider, settlement_state
+):
+    member = models.Member(
+        email=f"purchase.meta.{method}@fitlio.com",
+        hashed_password="x",
+        full_name=f"Purchase Meta {method}",
+        role="member",
+    )
+    db_session.add(member)
+    db_session.commit()
+
+    from app.deps import get_current_user
+
+    app.dependency_overrides[get_db] = _override_db(db_session)
+    app.dependency_overrides[get_current_user] = lambda: {"id": member.id, "role": "member"}
+    response = client.post(
+        "/member/purchase",
+        json={"plan": "monthly", "payment_method": method},
+    )
+    app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["payment_method"] == method
+    assert payload["payment_metadata"]["provider"] == provider
+    assert payload["payment_metadata"]["provider_reference"] == payload["external_ref"]
+    assert payload["payment_metadata"]["settlement_state"] == settlement_state
+    assert "fee_hint_bps" in payload["payment_metadata"]
+    assert "settlement_mode" in payload["payment_metadata"]
+
+
+def test_webhook_bank_transfer_completed_returns_manual_settlement_state(db_session):
+    member = models.Member(
+        email="member.webhook.bank.completed@fitlio.com",
+        hashed_password="x",
+        full_name="Webhook Bank Completed",
+        role="member",
+    )
+    db_session.add(member)
+    db_session.flush()
+    membership = models.Membership(
+        member_id=member.id,
+        plan="monthly",
+        status="pending",
+        end_date=datetime.utcnow() + timedelta(days=30),
+    )
+    db_session.add(membership)
+    db_session.flush()
+    payment = models.Payment(
+        member_id=member.id,
+        membership_id=membership.id,
+        amount=5000,
+        currency="aud",
+        status="pending",
+        source="online",
+        payment_method="bank_transfer",
+        external_ref="bank_transfer_20260101010101_abcdff11",
+    )
+    db_session.add(payment)
+    db_session.commit()
+
+    app.dependency_overrides[get_db] = _override_db(db_session)
+    body = {
+        "provider": "bank_transfer",
+        "payment_method": "bank_transfer",
+        "event_type": "payment.updated",
+        "external_ref": payment.external_ref,
+        "status": "completed",
+        "payload": {"trace": "bank-complete"},
+    }
+    res = client.post("/member/payments/webhook", json=body)
+    app.dependency_overrides.clear()
+
+    assert res.status_code == 200
+    payload = res.json()
+    assert payload["processed"] is True
+    assert payload["payment_metadata"]["provider"] == "bank_transfer"
+    assert payload["payment_metadata"]["settlement_state"] == "settled_manual"
+    db_session.refresh(payment)
+    db_session.refresh(membership)
+    assert payment.status == "completed"
+    assert membership.status == "active"
+
+
+def test_admin_payments_list_includes_reconciliation_metadata_and_csv_export(db_session):
+    admin = models.Member(
+        email="admin.payments.meta@fitlio.com",
+        hashed_password="x",
+        full_name="Admin Payments Meta",
+        role="admin",
+    )
+    member = models.Member(
+        email="member.payments.meta@fitlio.com",
+        hashed_password="x",
+        full_name="Member Payments Meta",
+        role="member",
+    )
+    db_session.add(admin)
+    db_session.add(member)
+    db_session.flush()
+    membership = models.Membership(
+        member_id=member.id,
+        plan="monthly",
+        status="active",
+        end_date=datetime.utcnow() + timedelta(days=30),
+    )
+    db_session.add(membership)
+    db_session.flush()
+    payment = models.Payment(
+        member_id=member.id,
+        membership_id=membership.id,
+        amount=5000,
+        currency="aud",
+        status="completed",
+        source="online",
+        payment_method="paypal",
+        external_ref="paypal_20260101010101_abc12121",
+    )
+    db_session.add(payment)
+    db_session.commit()
+
+    app.dependency_overrides[get_db] = _override_db(db_session)
+    app.dependency_overrides[require_admin] = lambda: {"id": admin.id, "role": "admin"}
+    response = client.get("/admin/payments")
+    csv_response = client.get("/admin/payments?format=csv")
+    app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    rows = response.json()
+    assert len(rows) >= 1
+    target = next(row for row in rows if row["id"] == payment.id)
+    assert target["provider"] == "paypal"
+    assert target["provider_reference"] == payment.external_ref
+    assert target["settlement_state"] == "settled"
+    assert target["fee_hint_bps"] > 0
+    assert target["amount_cents"] == 5000
+
+    assert csv_response.status_code == 200
+    assert csv_response.headers["content-type"].startswith("text/csv")
+    csv_body = csv_response.text
+    assert "provider,external_ref,provider_reference,fee_hint_bps,settlement_state" in csv_body
+    assert "paypal_20260101010101_abc12121" in csv_body
 
 
 def test_member_home_expired_failed_payment_payload(db_session):
@@ -1133,6 +1367,7 @@ def test_member_home_expired_failed_payment_payload(db_session):
     assert m["renewal_prompt"] == "retry_payment"
     assert m["latest_payment_status"] == "failed"
     assert m["payment_state"]["status"] == "failed"
+    assert m["payment_state"]["severity"] == "error"
     assert m["payment_state"]["retry_ready"] is True
 
 
@@ -1370,6 +1605,174 @@ def test_report_and_moderation_state_transitions(db_session):
     assert db_report.status == "rejected"
 
 
+def test_center_member_cannot_interact_with_other_center_post(db_session):
+    center_a = models.Center(name="Center A", slug="center-a", is_active=True)
+    center_b = models.Center(name="Center B", slug="center-b", is_active=True)
+    actor = models.Member(
+        email="center.scope.actor@fitlio.com",
+        hashed_password="x",
+        full_name="Center Scope Actor",
+        role="member",
+    )
+    author = models.Member(
+        email="center.scope.author@fitlio.com",
+        hashed_password="x",
+        full_name="Center Scope Author",
+        role="member",
+    )
+    db_session.add(center_a)
+    db_session.add(center_b)
+    db_session.add(actor)
+    db_session.add(author)
+    db_session.flush()
+    db_session.add(
+        models.CenterMembership(
+            center_id=center_a.id,
+            member_id=actor.id,
+            role="member",
+            status="active",
+        )
+    )
+    db_session.add(
+        models.CenterMembership(
+            center_id=center_b.id,
+            member_id=author.id,
+            role="member",
+            status="active",
+        )
+    )
+    post = models.CommunityPost(
+        author_member_id=author.id,
+        center_id=center_b.id,
+        content="B-only post",
+        is_hidden=False,
+    )
+    db_session.add(post)
+    db_session.commit()
+
+    from app.deps import get_current_user
+
+    app.dependency_overrides[get_db] = _override_db(db_session)
+    app.dependency_overrides[get_current_user] = lambda: {"id": actor.id, "role": "member"}
+    like_res = client.post(f"/member/community/posts/{post.id}/like")
+    report_res = client.post(
+        "/member/community/reports",
+        json={"target_type": "community_post", "target_id": post.id, "reason": "abuse"},
+    )
+    app.dependency_overrides.clear()
+
+    assert like_res.status_code == 403
+    assert report_res.status_code == 403
+
+
+def test_member_cannot_post_to_unjoined_center(db_session):
+    center = models.Center(name="Locked Center", slug="locked-center", is_active=True)
+    member = models.Member(
+        email="center.post.denied@fitlio.com",
+        hashed_password="x",
+        full_name="Center Post Denied",
+        role="member",
+    )
+    db_session.add(center)
+    db_session.add(member)
+    db_session.commit()
+
+    from app.deps import get_current_user
+
+    app.dependency_overrides[get_db] = _override_db(db_session)
+    app.dependency_overrides[get_current_user] = lambda: {"id": member.id, "role": "member"}
+    response = client.post(
+        "/member/community/posts",
+        json={"center_id": center.id, "content": "hello locked center"},
+    )
+    app.dependency_overrides.clear()
+
+    assert response.status_code == 403
+    assert response.json()["detail"] == "Not allowed to post to this center"
+
+
+def test_staff_cannot_moderate_other_center_content(db_session):
+    center_a = models.Center(name="Mod Center A", slug="mod-center-a", is_active=True)
+    center_b = models.Center(name="Mod Center B", slug="mod-center-b", is_active=True)
+    staff = models.Member(
+        email="moderation.staff@fitlio.com",
+        hashed_password="x",
+        full_name="Moderation Staff",
+        role="member",
+    )
+    author = models.Member(
+        email="moderation.author@fitlio.com",
+        hashed_password="x",
+        full_name="Moderation Author",
+        role="member",
+    )
+    reporter = models.Member(
+        email="moderation.reporter@fitlio.com",
+        hashed_password="x",
+        full_name="Moderation Reporter",
+        role="member",
+    )
+    db_session.add(center_a)
+    db_session.add(center_b)
+    db_session.add(staff)
+    db_session.add(author)
+    db_session.add(reporter)
+    db_session.flush()
+    db_session.add(
+        models.CenterMembership(
+            center_id=center_a.id,
+            member_id=staff.id,
+            role="staff",
+            status="active",
+        )
+    )
+    db_session.add(
+        models.CenterMembership(
+            center_id=center_b.id,
+            member_id=author.id,
+            role="member",
+            status="active",
+        )
+    )
+    post = models.CommunityPost(
+        author_member_id=author.id,
+        center_id=center_b.id,
+        content="center-b content",
+        is_hidden=False,
+    )
+    db_session.add(post)
+    db_session.flush()
+    report = models.ContentReport(
+        reporter_member_id=reporter.id,
+        target_type="community_post",
+        target_id=post.id,
+        reason="abuse",
+        status="open",
+    )
+    db_session.add(report)
+    db_session.commit()
+
+    from app.deps import get_current_user
+
+    app.dependency_overrides[get_db] = _override_db(db_session)
+    app.dependency_overrides[get_current_user] = lambda: {"id": staff.id, "role": "member"}
+    hide_res = client.post(
+        "/member/moderation/hide",
+        json={"target_type": "community_post", "target_id": post.id, "hide": True},
+    )
+    status_res = client.post(
+        "/member/moderation/reports/status",
+        json={"report_id": report.id, "status": "resolved"},
+    )
+    reports_res = client.get("/member/moderation/reports")
+    app.dependency_overrides.clear()
+
+    assert hide_res.status_code == 403
+    assert status_res.status_code == 403
+    assert reports_res.status_code == 200
+    assert all(item["id"] != report.id for item in reports_res.json())
+
+
 def test_admin_class_create_supports_center_and_level(db_session):
     admin = models.Member(
         email="admin.class@fitlio.com",
@@ -1546,6 +1949,7 @@ def test_tablet_check_in_contract_additive_fields(db_session):
     payload = response.json()
     assert payload["ok"] is True
     assert payload["status_label"] == "success"
+    assert payload["severity"] == "success"
     assert payload["result_code"] == "CHECK_IN_OK"
     assert payload["ui_state"] == "success"
     assert payload["can_retry"] is False
@@ -1614,6 +2018,7 @@ def test_tablet_check_in_duplicate_returns_contract_headers(db_session):
     assert response.headers["X-Tablet-Result-Code"] == "ALREADY_CHECKED_IN_TODAY"
     assert response.headers["X-Tablet-Status-Label"] == "error"
     assert response.headers["X-Tablet-UI-State"] == "error"
+    assert response.headers["X-Tablet-Severity"] == "error"
     assert response.headers["X-Tablet-Can-Retry"] == "false"
 
 
@@ -1635,7 +2040,111 @@ def test_tablet_check_in_member_not_found_has_retry_header(db_session):
     assert response.status_code == 404
     assert response.json()["detail"] == "Member not found"
     assert response.headers["X-Tablet-Result-Code"] == "MEMBER_NOT_FOUND"
+    assert response.headers["X-Tablet-Severity"] == "error"
     assert response.headers["X-Tablet-Can-Retry"] == "true"
+
+
+def test_payments_membership_state_includes_severity(db_session):
+    member = models.Member(
+        email="payments.severity@fitlio.com",
+        hashed_password="x",
+        full_name="Payments Severity",
+        role="member",
+    )
+    db_session.add(member)
+    db_session.commit()
+
+    from app.deps import get_current_user
+
+    app.dependency_overrides[get_db] = _override_db(db_session)
+    app.dependency_overrides[get_current_user] = lambda: {"id": member.id, "role": "member"}
+    response = client.post(
+        f"/payments/membership?member_id={member.id}",
+        json={"plan": "monthly", "payment_method": "card"},
+    )
+    app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["payment"]["state"]["status"] == "completed"
+    assert payload["payment"]["state"]["severity"] == "success"
+
+
+def test_tablet_check_in_rejects_nondigit_phone_last4(db_session):
+    center = models.Center(
+        name="Tablet Validation Center",
+        slug="tablet-validation-center",
+    )
+    db_session.add(center)
+    db_session.commit()
+
+    app.dependency_overrides[get_db] = _override_db(db_session)
+    response = client.post(
+        "/centers/tablet/check-in",
+        json={"center_slug": "tablet-validation-center", "phone_last4": "12x4"},
+    )
+    app.dependency_overrides.clear()
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "phone_last4 must contain only digits"
+    assert response.headers["X-Tablet-Result-Code"] == "INVALID_PHONE_LAST4"
+
+
+def test_tablet_check_in_rejects_ambiguous_member_match(db_session):
+    center = models.Center(
+        name="Tablet Ambiguous Center",
+        slug="tablet-ambiguous-center",
+    )
+    member_one = models.Member(
+        email="tablet.ambiguous.one@fitlio.com",
+        hashed_password="x",
+        full_name="Tablet Ambiguous One",
+        phone="+82-10-1111-1234",
+        role="member",
+        is_active=True,
+    )
+    member_two = models.Member(
+        email="tablet.ambiguous.two@fitlio.com",
+        hashed_password="x",
+        full_name="Tablet Ambiguous Two",
+        phone="+82-10-2222-1234",
+        role="member",
+        is_active=True,
+    )
+    db_session.add(center)
+    db_session.add(member_one)
+    db_session.add(member_two)
+    db_session.flush()
+    for member in (member_one, member_two):
+        db_session.add(
+            models.CenterMembership(
+                center_id=center.id,
+                member_id=member.id,
+                role="member",
+                status="active",
+            )
+        )
+        db_session.add(
+            models.Membership(
+                member_id=member.id,
+                plan="monthly",
+                status="active",
+                monthly_limit=12,
+                end_date=datetime.utcnow() + timedelta(days=10),
+            )
+        )
+    db_session.commit()
+
+    app.dependency_overrides[get_db] = _override_db(db_session)
+    response = client.post(
+        "/centers/tablet/check-in",
+        json={"center_slug": "tablet-ambiguous-center", "phone_last4": "1234"},
+    )
+    app.dependency_overrides.clear()
+
+    assert response.status_code == 409
+    assert response.json()["detail"] == "Multiple members match phone suffix"
+    assert response.headers["X-Tablet-Result-Code"] == "AMBIGUOUS_MEMBER_MATCH"
 
 
 def test_center_discover_response_shape(db_session):

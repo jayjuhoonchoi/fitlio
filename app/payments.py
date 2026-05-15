@@ -23,6 +23,7 @@ def _payment_state(status: str | None) -> dict:
     if normalized == "completed":
         return {
             "status": "completed",
+            "severity": "success",
             "lifecycle": "succeeded",
             "is_terminal": True,
             "can_retry": False,
@@ -30,6 +31,7 @@ def _payment_state(status: str | None) -> dict:
     if normalized == "failed":
         return {
             "status": "failed",
+            "severity": "error",
             "lifecycle": "terminal_failed",
             "is_terminal": True,
             "can_retry": True,
@@ -37,12 +39,14 @@ def _payment_state(status: str | None) -> dict:
     if normalized == "cancelled":
         return {
             "status": "cancelled",
+            "severity": "warning",
             "lifecycle": "terminal_cancelled",
             "is_terminal": True,
             "can_retry": True,
         }
     return {
         "status": "pending",
+        "severity": "pending",
         "lifecycle": "in_flight",
         "is_terminal": False,
         "can_retry": False,

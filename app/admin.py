@@ -1,16 +1,19 @@
 from calendar import monthrange
 from datetime import date, datetime, timedelta
 from html import escape
+import io
 from pathlib import Path
 from string import Template
+import csv
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel, Field
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.deps import require_admin
+from app.payment_metadata import build_payment_metadata
 from app.models import (
     Attendance,
     Booking,
@@ -918,29 +921,78 @@ def get_members(
 @router.get("/payments")
 def list_payments(
     limit: int = 100,
+    format: str | None = None,
     db: Session = Depends(get_db),
     _: dict = Depends(require_admin),
 ):
     rows = (
         db.query(Payment).order_by(Payment.created_at.desc()).limit(min(limit, 500)).all()
     )
-    return [
-        {
+    data = []
+    for p in rows:
+        metadata = build_payment_metadata(
+            method=getattr(p, "payment_method", "card"),
+            status=p.status,
+            external_ref=getattr(p, "external_ref", None),
+        )
+        data.append(
+            {
             "id": p.id,
             "member_id": p.member_id,
             "membership_id": p.membership_id,
             "amount": p.amount / 100.0,
+            "amount_cents": p.amount,
             "currency": p.currency,
             "status": p.status,
             "source": getattr(p, "source", "online"),
             "payment_method": getattr(p, "payment_method", "card"),
             "external_ref": getattr(p, "external_ref", None),
+            "provider": metadata["provider"],
+            "provider_reference": metadata["provider_reference"],
+            "fee_hint_bps": metadata["fee_hint_bps"],
+            "settlement_state": metadata["settlement_state"],
             "center_id": getattr(p, "center_id", None),
             "memo": getattr(p, "memo", None),
             "created_at": p.created_at,
-        }
-        for p in rows
-    ]
+            }
+        )
+    if (format or "").strip().lower() != "csv":
+        return data
+    buffer = io.StringIO()
+    writer = csv.DictWriter(
+        buffer,
+        fieldnames=[
+            "id",
+            "member_id",
+            "membership_id",
+            "amount",
+            "amount_cents",
+            "currency",
+            "status",
+            "source",
+            "payment_method",
+            "provider",
+            "external_ref",
+            "provider_reference",
+            "fee_hint_bps",
+            "settlement_state",
+            "center_id",
+            "memo",
+            "created_at",
+        ],
+    )
+    writer.writeheader()
+    for row in data:
+        csv_row = row.copy()
+        csv_row["created_at"] = (
+            csv_row["created_at"].isoformat() if csv_row.get("created_at") else ""
+        )
+        writer.writerow(csv_row)
+    return Response(
+        content=buffer.getvalue(),
+        media_type="text/csv",
+        headers={"Content-Disposition": 'attachment; filename="payments_export.csv"'},
+    )
 
 
 @router.get("/classes")

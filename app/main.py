@@ -1,6 +1,8 @@
+from email.utils import formatdate
+from hashlib import sha256
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 
 from app.database import engine
@@ -26,22 +28,49 @@ from app.seed import seed_database
 seed_database()
 
 TEMPLATES = Path(__file__).resolve().parent / "templates"
+_HTML_CACHE = {
+    path.name: path.read_text(encoding="utf-8")
+    for path in TEMPLATES.glob("*.html")
+}
+_LUXURY_TOKENS_PATH = TEMPLATES / "assets" / "luxury_tokens.css"
+_LUXURY_TOKENS_BYTES = _LUXURY_TOKENS_PATH.read_bytes()
+_LUXURY_TOKENS_ETAG = f"\"{sha256(_LUXURY_TOKENS_BYTES).hexdigest()}\""
+_LUXURY_TOKENS_LAST_MODIFIED = formatdate(
+    _LUXURY_TOKENS_PATH.stat().st_mtime, usegmt=True
+)
 
 
 def _html(name: str) -> HTMLResponse:
-    body = (TEMPLATES / name).read_text(encoding="utf-8")
+    body = _HTML_CACHE.get(name)
+    if body is None:
+        body = (TEMPLATES / name).read_text(encoding="utf-8")
+        _HTML_CACHE[name] = body
     return HTMLResponse(
         content=body,
         headers={"Cache-Control": "no-store, no-cache, must-revalidate, max-age=0"},
     )
 
 
-def _css_asset(name: str) -> Response:
-    body = (TEMPLATES / "assets" / name).read_text(encoding="utf-8")
+def _css_asset(name: str, request: Request) -> Response:
+    if name != "luxury_tokens.css":
+        body = (TEMPLATES / "assets" / name).read_text(encoding="utf-8")
+        return Response(
+            content=body,
+            media_type="text/css; charset=utf-8",
+            headers={"Cache-Control": "public, max-age=300"},
+        )
+
+    headers = {
+        "Cache-Control": "public, max-age=3600, stale-while-revalidate=86400",
+        "ETag": _LUXURY_TOKENS_ETAG,
+        "Last-Modified": _LUXURY_TOKENS_LAST_MODIFIED,
+    }
+    if request.headers.get("if-none-match") == _LUXURY_TOKENS_ETAG:
+        return Response(status_code=304, headers=headers)
     return Response(
-        content=body,
+        content=_LUXURY_TOKENS_BYTES,
         media_type="text/css; charset=utf-8",
-        headers={"Cache-Control": "no-store, no-cache, must-revalidate, max-age=0"},
+        headers=headers,
     )
 
 
@@ -110,8 +139,8 @@ def center_landing_page(center_slug: str):
 
 
 @app.get("/assets/luxury_tokens.css")
-def luxury_tokens_css():
-    return _css_asset("luxury_tokens.css")
+def luxury_tokens_css(request: Request):
+    return _css_asset("luxury_tokens.css", request)
 
 
 @app.get("/legacy")

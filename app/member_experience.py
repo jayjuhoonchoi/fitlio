@@ -1,14 +1,16 @@
 from datetime import datetime, timedelta
 
 import json
+import os
 from urllib.parse import urlsplit, urlunsplit
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.deps import get_current_user
+from app.payment_metadata import build_payment_metadata, payment_settlement_state
 from app.models import (
     Attendance,
     Center,
@@ -35,6 +37,7 @@ PAYMENT_TERMINAL_STATUSES = {"completed", "failed", "cancelled"}
 COMMUNITY_MEDIA_TYPES = {"image", "video"}
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
 VIDEO_EXTENSIONS = {".mp4", ".webm", ".mov", ".m4v", ".ogg"}
+PAYMENT_WEBHOOK_SECRET = (os.getenv("PAYMENT_WEBHOOK_SECRET") or "").strip()
 
 
 def _normalize_payment_status(status: str | None) -> str:
@@ -47,6 +50,7 @@ def _payment_state(status: str | None) -> dict:
     if normalized == "completed":
         return {
             "status": "completed",
+            "severity": "success",
             "phase": "succeeded",
             "is_terminal": True,
             "retry_ready": False,
@@ -55,6 +59,7 @@ def _payment_state(status: str | None) -> dict:
     if normalized == "failed":
         return {
             "status": "failed",
+            "severity": "error",
             "phase": "terminal_failed",
             "is_terminal": True,
             "retry_ready": True,
@@ -63,6 +68,7 @@ def _payment_state(status: str | None) -> dict:
     if normalized == "cancelled":
         return {
             "status": "cancelled",
+            "severity": "warning",
             "phase": "terminal_cancelled",
             "is_terminal": True,
             "retry_ready": True,
@@ -70,6 +76,7 @@ def _payment_state(status: str | None) -> dict:
         }
     return {
         "status": "pending",
+        "severity": "pending",
         "phase": "in_flight",
         "is_terminal": False,
         "retry_ready": False,
@@ -118,11 +125,12 @@ class ModeratorHideBody(BaseModel):
 
 
 class PaymentWebhookBody(BaseModel):
-    provider: str
-    event_type: str
-    external_ref: str | None = None
+    provider: str = Field(..., min_length=1, max_length=32)
+    event_type: str = Field(..., min_length=1, max_length=64)
+    external_ref: str | None = Field(default=None, max_length=128)
     status: str | None = None
     payload: dict | None = None
+    payment_method: str | None = None
 
 
 class ModeratorDecisionBody(BaseModel):
@@ -197,6 +205,45 @@ def _is_admin_or_staff(db: Session, member_id: int) -> bool:
         .first()
     )
     return bool(row)
+
+
+def _is_platform_admin(db: Session, member_id: int) -> bool:
+    member = db.query(Member).filter(Member.id == member_id).first()
+    return bool(member and getattr(member, "role", "member") == "admin")
+
+
+def _is_staff_for_center(db: Session, member_id: int, center_id: int | None) -> bool:
+    if center_id is None:
+        return False
+    row = (
+        db.query(CenterMembership)
+        .filter(
+            CenterMembership.member_id == member_id,
+            CenterMembership.center_id == center_id,
+            CenterMembership.status == "active",
+            CenterMembership.role.in_(["admin", "staff"]),
+        )
+        .first()
+    )
+    return bool(row)
+
+
+def _assert_member_can_access_post(db: Session, *, member_id: int, post: CommunityPost) -> None:
+    if post.is_hidden:
+        raise HTTPException(status_code=404, detail="Post not found")
+    if post.center_id is None:
+        return
+    row = (
+        db.query(CenterMembership)
+        .filter(
+            CenterMembership.center_id == post.center_id,
+            CenterMembership.member_id == member_id,
+            CenterMembership.status == "active",
+        )
+        .first()
+    )
+    if not row:
+        raise HTTPException(status_code=403, detail="Not allowed to access this center post")
 
 
 def _this_month_attendance_count(db: Session, member_id: int) -> int:
@@ -510,6 +557,11 @@ def purchase_membership(
         "attempt_type": "retry" if is_retry else "new_purchase",
         "checkout_url": intent.checkout_url,
         "external_ref": intent.external_ref,
+        "payment_metadata": build_payment_metadata(
+            method=body.payment_method,
+            status=payment.status,
+            external_ref=intent.external_ref,
+        ),
         "message": message,
     }
 
@@ -588,6 +640,18 @@ def create_community_post(
     media_url, media_type = _normalize_post_media(body.media_url, body.media_type)
     if not content and not media_url:
         raise HTTPException(status_code=400, detail="Post content or media required")
+    if body.center_id is not None:
+        center_member = (
+            db.query(CenterMembership)
+            .filter(
+                CenterMembership.center_id == body.center_id,
+                CenterMembership.member_id == user["id"],
+                CenterMembership.status == "active",
+            )
+            .first()
+        )
+        if not center_member:
+            raise HTTPException(status_code=403, detail="Not allowed to post to this center")
     row = CommunityPost(
         author_member_id=user["id"],
         center_id=body.center_id,
@@ -606,8 +670,7 @@ def like_post(post_id: int, db: Session = Depends(get_db), user: dict = Depends(
     post = db.query(CommunityPost).filter(CommunityPost.id == post_id).first()
     if not post:
         raise HTTPException(status_code=404, detail="Post not found")
-    if post.is_hidden:
-        raise HTTPException(status_code=404, detail="Post not found")
+    _assert_member_can_access_post(db, member_id=user["id"], post=post)
     existing = (
         db.query(CommunityReaction)
         .filter(
@@ -633,8 +696,7 @@ def comment_post(
     post = db.query(CommunityPost).filter(CommunityPost.id == body.post_id).first()
     if not post:
         raise HTTPException(status_code=404, detail="Post not found")
-    if post.is_hidden:
-        raise HTTPException(status_code=404, detail="Post not found")
+    _assert_member_can_access_post(db, member_id=user["id"], post=post)
     db.add(
         CommunityReaction(
             post_id=body.post_id,
@@ -658,12 +720,17 @@ def report_content(
         raise HTTPException(status_code=400, detail="Report reason required")
     if body.target_type == "community_post":
         target = db.query(CommunityPost).filter(CommunityPost.id == body.target_id).first()
-        if not target or target.is_hidden:
+        if not target:
             raise HTTPException(status_code=404, detail="Target content not found")
+        _assert_member_can_access_post(db, member_id=user["id"], post=target)
     else:
         target = db.query(CommunityReaction).filter(CommunityReaction.id == body.target_id).first()
         if not target or target.type != "comment" or target.is_hidden:
             raise HTTPException(status_code=404, detail="Target content not found")
+        parent_post = db.query(CommunityPost).filter(CommunityPost.id == target.post_id).first()
+        if not parent_post:
+            raise HTTPException(status_code=404, detail="Target content not found")
+        _assert_member_can_access_post(db, member_id=user["id"], post=parent_post)
     row = ContentReport(
         reporter_member_id=user["id"],
         target_type=body.target_type,
@@ -684,7 +751,26 @@ def moderation_reports(
 ):
     if not _is_admin_or_staff(db, user["id"]):
         raise HTTPException(status_code=403, detail="Moderator access required")
-    rows = db.query(ContentReport).order_by(ContentReport.created_at.desc()).limit(200).all()
+    all_rows = db.query(ContentReport).order_by(ContentReport.created_at.desc()).limit(400).all()
+    is_admin = _is_platform_admin(db, user["id"])
+    rows: list[ContentReport] = []
+    for report in all_rows:
+        if is_admin:
+            rows.append(report)
+            continue
+        if report.target_type == "community_post":
+            post = db.query(CommunityPost).filter(CommunityPost.id == report.target_id).first()
+        else:
+            comment = db.query(CommunityReaction).filter(CommunityReaction.id == report.target_id).first()
+            post = (
+                db.query(CommunityPost).filter(CommunityPost.id == comment.post_id).first()
+                if comment
+                else None
+            )
+        if post and _is_staff_for_center(db, user["id"], getattr(post, "center_id", None)):
+            rows.append(report)
+        if len(rows) >= 200:
+            break
     return [
         {
             "id": r.id,
@@ -706,16 +792,24 @@ def moderation_hide(
 ):
     if not _is_admin_or_staff(db, user["id"]):
         raise HTTPException(status_code=403, detail="Moderator access required")
+    is_admin = _is_platform_admin(db, user["id"])
     if body.target_type == "community_post":
         row = db.query(CommunityPost).filter(CommunityPost.id == body.target_id).first()
         if not row:
             raise HTTPException(status_code=404, detail="Post not found")
+        if not is_admin and not _is_staff_for_center(db, user["id"], row.center_id):
+            raise HTTPException(status_code=403, detail="Moderator center scope mismatch")
         row.is_hidden = body.hide
         row.hidden_reason = (body.reason or "").strip() or None
     else:
         row = db.query(CommunityReaction).filter(CommunityReaction.id == body.target_id).first()
         if not row:
             raise HTTPException(status_code=404, detail="Comment not found")
+        post = db.query(CommunityPost).filter(CommunityPost.id == row.post_id).first()
+        if not post:
+            raise HTTPException(status_code=404, detail="Post not found")
+        if not is_admin and not _is_staff_for_center(db, user["id"], post.center_id):
+            raise HTTPException(status_code=403, detail="Moderator center scope mismatch")
         row.is_hidden = body.hide
     db.commit()
     return {"ok": True, "hidden": body.hide}
@@ -732,6 +826,18 @@ def moderation_report_status(
     report = db.query(ContentReport).filter(ContentReport.id == body.report_id).first()
     if not report:
         raise HTTPException(status_code=404, detail="Report not found")
+    if not _is_platform_admin(db, user["id"]):
+        if report.target_type == "community_post":
+            post = db.query(CommunityPost).filter(CommunityPost.id == report.target_id).first()
+        else:
+            comment = db.query(CommunityReaction).filter(CommunityReaction.id == report.target_id).first()
+            post = (
+                db.query(CommunityPost).filter(CommunityPost.id == comment.post_id).first()
+                if comment
+                else None
+            )
+        if not post or not _is_staff_for_center(db, user["id"], post.center_id):
+            raise HTTPException(status_code=403, detail="Moderator center scope mismatch")
     report.status = body.status
     db.commit()
     return {"id": report.id, "status": report.status}
@@ -741,8 +847,15 @@ def moderation_report_status(
 def payment_webhook(
     body: PaymentWebhookBody,
     db: Session = Depends(get_db),
+    webhook_secret: str | None = Header(default=None, alias="X-Webhook-Secret"),
 ):
+    if PAYMENT_WEBHOOK_SECRET and (webhook_secret or "").strip() != PAYMENT_WEBHOOK_SECRET:
+        raise HTTPException(status_code=401, detail="Invalid webhook secret")
     payload_raw = json.dumps(body.payload or {}, ensure_ascii=True)[:3800]
+    event_settlement_state = payment_settlement_state(
+        body.payment_method or body.provider,
+        body.status,
+    )
     duplicate = (
         db.query(PaymentWebhookEvent)
         .filter(
@@ -754,7 +867,12 @@ def payment_webhook(
         .first()
     )
     if duplicate:
-        return {"ok": True, "processed": bool(duplicate.processed), "duplicate": True}
+        return {
+            "ok": True,
+            "processed": bool(duplicate.processed),
+            "duplicate": True,
+            "settlement_state": event_settlement_state,
+        }
 
     event = PaymentWebhookEvent(
         provider=body.provider,
@@ -781,4 +899,18 @@ def payment_webhook(
                     membership.status = "cancelled"
             event.processed = True
     db.commit()
-    return {"ok": True, "processed": event.processed, "duplicate": False}
+    resolved_method = getattr(payment, "payment_method", None) if body.external_ref else None
+    return {
+        "ok": True,
+        "processed": event.processed,
+        "duplicate": False,
+        "payment_metadata": build_payment_metadata(
+            method=resolved_method or body.payment_method or body.provider,
+            status=body.status,
+            external_ref=body.external_ref,
+        ),
+        "settlement_state": payment_settlement_state(
+            resolved_method or body.payment_method or body.provider,
+            body.status,
+        ),
+    }

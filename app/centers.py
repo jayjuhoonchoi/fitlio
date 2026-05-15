@@ -234,6 +234,7 @@ def _tablet_checkin_error(
             "X-Tablet-Result-Code": result_code,
             "X-Tablet-Status-Label": "error",
             "X-Tablet-UI-State": "error",
+            "X-Tablet-Severity": "error",
             "X-Tablet-Can-Retry": "true" if can_retry else "false",
         },
     )
@@ -726,6 +727,13 @@ def tablet_check_in(
     body: TabletCheckinBody,
     db: Session = Depends(get_db),
 ):
+    if not body.phone_last4.isdigit():
+        _tablet_checkin_error(
+            http_status=400,
+            detail="phone_last4 must contain only digits",
+            result_code="INVALID_PHONE_LAST4",
+            can_retry=True,
+        )
     center = db.query(Center).filter(Center.slug == body.center_slug.strip().lower()).first()
     if not center:
         _tablet_checkin_error(
@@ -737,6 +745,7 @@ def tablet_check_in(
     member = (
         db.query(Member)
         .filter(Member.phone.endswith(body.phone_last4), Member.is_active == True)
+        .order_by(Member.id.asc())
         .first()
     )
     if not member:
@@ -760,6 +769,25 @@ def tablet_check_in(
             http_status=403,
             detail="Member is not active in this center",
             result_code="CENTER_MEMBERSHIP_INACTIVE",
+            can_retry=False,
+        )
+    duplicates = (
+        db.query(Member.id)
+        .join(
+            CenterMembership,
+            (CenterMembership.member_id == Member.id)
+            & (CenterMembership.center_id == center.id)
+            & (CenterMembership.status == "active"),
+        )
+        .filter(Member.phone.endswith(body.phone_last4), Member.is_active == True)
+        .limit(2)
+        .all()
+    )
+    if len(duplicates) > 1:
+        _tablet_checkin_error(
+            http_status=409,
+            detail="Multiple members match phone suffix",
+            result_code="AMBIGUOUS_MEMBER_MATCH",
             can_retry=False,
         )
     membership = (
@@ -818,6 +846,7 @@ def tablet_check_in(
     return {
         "ok": True,
         "status_label": "success",
+        "severity": "success",
         "result_code": "CHECK_IN_OK",
         "ui_state": "success",
         "can_retry": False,
