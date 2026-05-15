@@ -2862,3 +2862,154 @@ def test_admin_weekly_performance_html_has_key_sections(db_session):
     assert "Member Growth and Retention" in html
     assert "Class Occupancy Highlights" in html
     assert "At-Risk Members" in html
+
+
+def test_admin_class_roster_lists_confirmed_bookings(db_session):
+    admin = models.Member(
+        email="admin.roster@fitlio.com",
+        hashed_password="x",
+        full_name="Roster Admin",
+        role="admin",
+    )
+    member = models.Member(
+        email="member.roster@fitlio.com",
+        hashed_password="x",
+        full_name="Roster Member",
+        role="member",
+        phone="+1-555-000-1234",
+    )
+    instructor = models.InstructorProfile(
+        display_name="Coach Roster",
+        hourly_rate_cents=1000,
+        pay_per_class_cents=2000,
+    )
+    db_session.add(admin)
+    db_session.add(member)
+    db_session.add(instructor)
+    db_session.flush()
+    klass = models.FitnessClass(
+        name="HIIT Roster",
+        instructor="Coach Roster",
+        schedule=datetime.utcnow() + timedelta(hours=2),
+        capacity=12,
+    )
+    db_session.add(klass)
+    db_session.flush()
+    db_session.add(
+        models.Booking(member_id=member.id, class_id=klass.id, status="confirmed")
+    )
+    db_session.commit()
+
+    app.dependency_overrides[require_admin] = lambda: {"id": admin.id, "role": "admin"}
+    app.dependency_overrides[get_db] = _override_db(db_session)
+    response = client.get(f"/admin/classes/{klass.id}/roster")
+    app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["class"]["name"] == "HIIT Roster"
+    assert len(payload["roster"]) == 1
+    row = payload["roster"][0]
+    assert row["member_id"] == member.id
+    assert row["checked_in_today"] is False
+    assert row["phone_last4"] == "1234"
+
+
+def test_admin_one_tap_attendance_success_and_duplicate(db_session):
+    admin = models.Member(
+        email="admin.attend@fitlio.com",
+        hashed_password="x",
+        full_name="Attend Admin",
+        role="admin",
+    )
+    member = models.Member(
+        email="member.attend@fitlio.com",
+        hashed_password="x",
+        full_name="Attend Member",
+        role="member",
+        phone="+1-555-000-9876",
+        is_active=True,
+    )
+    instructor = models.InstructorProfile(
+        display_name="Coach Attend",
+        hourly_rate_cents=1000,
+        pay_per_class_cents=2000,
+    )
+    db_session.add(admin)
+    db_session.add(member)
+    db_session.add(instructor)
+    db_session.flush()
+    klass = models.FitnessClass(
+        name="Flow Attend",
+        instructor="Coach Attend",
+        schedule=datetime.utcnow() + timedelta(hours=3),
+        capacity=10,
+    )
+    db_session.add(klass)
+    db_session.flush()
+    db_session.add(
+        models.Booking(member_id=member.id, class_id=klass.id, status="confirmed")
+    )
+    db_session.add(
+        models.Membership(
+            member_id=member.id,
+            plan="monthly",
+            status="active",
+            monthly_limit=20,
+            end_date=datetime.utcnow() + timedelta(days=30),
+        )
+    )
+    db_session.commit()
+
+    app.dependency_overrides[require_admin] = lambda: {"id": admin.id, "role": "admin"}
+    app.dependency_overrides[get_db] = _override_db(db_session)
+    first = client.post(f"/admin/classes/{klass.id}/attendance/{member.id}")
+    second = client.post(f"/admin/classes/{klass.id}/attendance/{member.id}")
+    app.dependency_overrides.clear()
+
+    assert first.status_code == 200
+    body = first.json()
+    assert body["member_name"] == "Attend Member"
+    assert "celebration" in body
+    assert second.status_code == 400
+
+
+def test_admin_one_tap_attendance_requires_booking(db_session):
+    admin = models.Member(
+        email="admin.nobook@fitlio.com",
+        hashed_password="x",
+        full_name="No Book Admin",
+        role="admin",
+    )
+    member = models.Member(
+        email="member.nobook@fitlio.com",
+        hashed_password="x",
+        full_name="No Book Member",
+        role="member",
+        is_active=True,
+    )
+    instructor = models.InstructorProfile(
+        display_name="Coach NoBook",
+        hourly_rate_cents=1000,
+        pay_per_class_cents=2000,
+    )
+    db_session.add(admin)
+    db_session.add(member)
+    db_session.add(instructor)
+    db_session.flush()
+    klass = models.FitnessClass(
+        name="Solo NoBook",
+        instructor="Coach NoBook",
+        schedule=datetime.utcnow() + timedelta(hours=1),
+        capacity=8,
+    )
+    db_session.add(klass)
+    db_session.commit()
+
+    app.dependency_overrides[require_admin] = lambda: {"id": admin.id, "role": "admin"}
+    app.dependency_overrides[get_db] = _override_db(db_session)
+    response = client.post(f"/admin/classes/{klass.id}/attendance/{member.id}")
+    app.dependency_overrides.clear()
+
+    assert response.status_code == 400
+    assert "booking" in response.json()["detail"].lower()

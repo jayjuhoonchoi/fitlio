@@ -30,6 +30,7 @@ from app.models import (
 from app.reminders import queue_membership_expiry_reminders
 from app.notification_dispatch import process_pending_notifications
 from app.bookings import promote_waitlist_for_available_seats
+from app.attendance import get_this_month_usage
 
 router = APIRouter(prefix="/admin")
 TEMPLATES_DIR = Path(__file__).resolve().parent / "templates"
@@ -1011,6 +1012,166 @@ def list_classes_admin(db: Session = Depends(get_db), _: dict = Depends(require_
         }
         for c in classes
     ]
+
+
+def _celebration_hint(db: Session, member_id: int) -> str | None:
+    """Lightweight positive feedback after check-in (visits in trailing 7 days)."""
+    since = datetime.utcnow() - timedelta(days=7)
+    n = (
+        db.query(func.count(Attendance.id))
+        .filter(
+            Attendance.member_id == member_id,
+            Attendance.checked_in_at >= since,
+        )
+        .scalar()
+    )
+    if n and int(n) >= 4:
+        return "Perfect streak!"
+    if n and int(n) >= 3:
+        return "Strong week — keep the rhythm!"
+    return None
+
+
+@router.get("/classes/{class_id}/roster")
+def get_class_roster(
+    class_id: int,
+    db: Session = Depends(get_db),
+    _: dict = Depends(require_admin),
+):
+    fitness_class = db.query(FitnessClass).filter(FitnessClass.id == class_id).first()
+    if not fitness_class:
+        raise HTTPException(status_code=404, detail="Class not found")
+    today = datetime.utcnow().date()
+    day_start = datetime(today.year, today.month, today.day)
+    pairs = (
+        db.query(Booking, Member)
+        .join(Member, Member.id == Booking.member_id)
+        .filter(Booking.class_id == class_id, Booking.status == "confirmed")
+        .order_by(Member.full_name.asc())
+        .all()
+    )
+    roster = []
+    for booking, member in pairs:
+        attended = (
+            db.query(Attendance)
+            .filter(
+                Attendance.member_id == member.id,
+                Attendance.class_id == class_id,
+                Attendance.checked_in_at >= day_start,
+            )
+            .first()
+        )
+        phone = member.phone or ""
+        roster.append(
+            {
+                "booking_id": booking.id,
+                "member_id": member.id,
+                "full_name": member.full_name,
+                "member_level": getattr(member, "member_level", "starter"),
+                "phone_last4": phone[-4:] if len(phone) >= 4 else None,
+                "checked_in_today": attended is not None,
+            }
+        )
+    return {
+        "class": {
+            "id": fitness_class.id,
+            "name": fitness_class.name,
+            "instructor": fitness_class.instructor,
+            "schedule": fitness_class.schedule,
+            "capacity": fitness_class.capacity,
+            "current_count": fitness_class.current_count,
+        },
+        "roster": roster,
+    }
+
+
+@router.post("/classes/{class_id}/attendance/{member_id}")
+def admin_mark_class_attendance(
+    class_id: int,
+    member_id: int,
+    db: Session = Depends(get_db),
+    _: dict = Depends(require_admin),
+):
+    member = (
+        db.query(Member)
+        .filter(Member.id == member_id, Member.is_active == True)
+        .first()
+    )
+    if not member:
+        raise HTTPException(status_code=404, detail="Member not found")
+    fitness_class = db.query(FitnessClass).filter(FitnessClass.id == class_id).first()
+    if not fitness_class:
+        raise HTTPException(status_code=404, detail="Class not found")
+    booking = (
+        db.query(Booking)
+        .filter(
+            Booking.member_id == member_id,
+            Booking.class_id == class_id,
+            Booking.status == "confirmed",
+        )
+        .first()
+    )
+    if not booking:
+        raise HTTPException(
+            status_code=400,
+            detail="Confirmed booking required before check-in",
+        )
+    today = datetime.utcnow().date()
+    day_start = datetime(today.year, today.month, today.day)
+    existing = (
+        db.query(Attendance)
+        .filter(
+            Attendance.member_id == member_id,
+            Attendance.class_id == class_id,
+            Attendance.checked_in_at >= day_start,
+        )
+        .first()
+    )
+    if existing:
+        raise HTTPException(status_code=400, detail="Already checked in today")
+    membership = (
+        db.query(Membership)
+        .filter(Membership.member_id == member_id, Membership.status == "active")
+        .first()
+    )
+    if membership and membership.monthly_limit:
+        used = get_this_month_usage(db, member_id)
+        if used >= membership.monthly_limit:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Monthly limit reached ({used}/{membership.monthly_limit})",
+            )
+    attendance = Attendance(member_id=member_id, class_id=class_id, status="present")
+    db.add(attendance)
+    db.commit()
+    db.refresh(attendance)
+
+    membership_info = None
+    if membership:
+        used = get_this_month_usage(db, member_id)
+        if membership.monthly_limit:
+            membership_info = {
+                "plan": membership.plan,
+                "used": used,
+                "limit": membership.monthly_limit,
+                "remaining": max(0, membership.monthly_limit - used),
+            }
+        else:
+            membership_info = {
+                "plan": "unlimited",
+                "used": used,
+                "limit": None,
+                "remaining": None,
+            }
+
+    return {
+        "message": f"{member.full_name} checked in successfully",
+        "member_name": member.full_name,
+        "class_name": fitness_class.name,
+        "checked_in_at": attendance.checked_in_at,
+        "membership": membership_info,
+        "celebration": _celebration_hint(db, member_id),
+    }
 
 
 class InstructorCreate(BaseModel):
