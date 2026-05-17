@@ -40,8 +40,8 @@ jobs:
             cd ~/fitlio
             git fetch origin main
             git reset --hard origin/main
-            docker-compose down
-            docker-compose up -d --build
+            docker compose down
+            docker compose up -d --build
 
       - name: Notify Slack on success
         if: success()

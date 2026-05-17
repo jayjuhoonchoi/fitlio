@@ -5,9 +5,11 @@ services:
     image: nginx:latest
     environment:
       FITLIO_DOMAIN: fitlio-jay.duckdns.org
+    # Host 80/443 are often taken by Kubernetes (k3s) on the same node; map to high ports.
+    # Open these in the EC2 security group. Site URL: http://<host>:8080  https://<host>:8443
     ports:
-      - "80:80"
-      - "443:443"
+      - "8080:80"
+      - "8443:443"
     volumes:
       - ./nginx/default.http.conf:/etc/nginx/templates/default.http.conf:ro
       - ./nginx/default.https.conf:/etc/nginx/templates/default.https.conf:ro
