@@ -108,3 +108,25 @@ Admin notification operations:
   - `docs/tomorrow-first-hour.md`
 - **Confirming what changed after a pull:**
   - `docs/verify-changes.md`
+
+
+## Current Port Configuration (as of 2026-05-17)
+
+Nginx is published on host ports 8080/8443 (not 80/443).
+
+| Service | External Port | Internal Port |
+|---|---|---|
+| Nginx HTTP | 8080 | 80 |
+| Nginx HTTPS | 8443 | 443 |
+| FastAPI | 8000 | 8000 |
+| Grafana | 3000 | 3000 |
+| Prometheus | 9090 | 9090 |
+
+### Health Check (run from external network only)
+```bash
+curl -v --max-time 10 http://fitlio-jay.duckdns.org:8080/health
+```
+
+> ⚠️ Do not run health checks from inside EC2 using its own public IP.
+> Hairpin NAT may cause false timeout/refused results.
+> Always verify from an external network (e.g. your laptop or LTE).
