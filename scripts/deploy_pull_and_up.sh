@@ -16,6 +16,12 @@ fi
 # shellcheck source=/dev/null
 source "${ROOT}/scripts/_fitlio_compose.sh"
 fitlio_compose_set_args "$(pwd)"
+# Persist overlay choice for later deploys / CI (gitignored marker on disk).
+if [[ "${FITLIO_COMPOSE_USE_ALT:-0}" -eq 1 ]]; then
+  fitlio_compose_sync_marker "$(pwd)" 1
+else
+  fitlio_compose_sync_marker "$(pwd)" 0
+fi
 
 echo "[fitlio-deploy] compose: ${FITLIO_COMPOSE_ARGS[*]}"
 docker compose "${FITLIO_COMPOSE_ARGS[@]}" down
