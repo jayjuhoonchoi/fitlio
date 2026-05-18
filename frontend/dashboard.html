@@ -156,7 +156,10 @@
 </div>
 
 <script>
-  const API = 'https://fitlio-jay.duckdns.org';
+  const API =
+      window.location.protocol === "file:"
+          ? "http://127.0.0.1:8000"
+          : window.location.origin;
   const token = localStorage.getItem('fitlio_token');
   const memberId = localStorage.getItem('fitlio_member_id');
   const username = localStorage.getItem('fitlio_username');

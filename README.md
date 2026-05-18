@@ -56,17 +56,33 @@ From `terraform/`:
 
 ## HTTPS one-shot fix
 
-When HTTPS is flaky, use the one-shot script to enforce a stable sequence:
+When HTTPS is flaky, use the one-shot script:
 
 1. Validate DNS A record matches current public IP.
-2. Bring stack up in HTTP fallback mode (service stays available).
-3. Request/renew certificate through webroot challenge.
+2. `docker compose up -d --build`.
+3. Certificate:
+   - **Recommended if port 80 is blocked** (e.g. k8s on the node):  
+     `export DUCKDNS_TOKEN='<your DuckDNS v3 token>'`  
+     then the script uses **DNS-01** via DuckDNS TXT (no public HTTP needed).
+   - **Otherwise**: HTTP-01 **webroot** (public internet must reach `http://<domain>/.well-known/...` on **port 80**).
 4. Restart nginx so HTTPS template is auto-selected.
-5. Verify `https://<domain>/health`.
+5. Verify `https://<domain>/health` (or loopback on `:8443` when using alt ports — see script output).
+6. **CI/CD:** `scripts/deploy_pull_and_up.sh` respects `.fitlio-k8s-alt-ports` so pushes do not drop the overlay.
 
 Run:
 
-`./scripts/fix_https.sh fitlio-jay.duckdns.org jayjuhoonchoi@gmail.com ~/fitlio`
+```bash
+./scripts/fix_https.sh fitlio-jay.duckdns.org jayjuhoonchoi@gmail.com ~/fitlio
+```
+
+**Alt ports (8080/8443) one-liner on EC2** (real DuckDNS token):
+
+```bash
+export DUCKDNS_TOKEN='…' FITLIO_HTTPS_VERIFY_PORT=8443
+./scripts/fix_https.sh fitlio-jay.duckdns.org jayjuhoonchoi@gmail.com ~/fitlio
+```
+
+After deploy, **from EC2** use `./scripts/ec2_probe_local.sh` (loopback only). **From laptop** use `curl https://<domain>:8443/health` when SG allows **TCP 8443**.
 
 If DNS is wrong, the script exits early with the exact expected IP.
 
@@ -110,21 +126,30 @@ Admin notification operations:
   - `docs/verify-changes.md`
 
 
-## Current Port Configuration (as of 2026-05-17)
+## Nginx ports (production default)
 
-Nginx is published on host ports 8080/8443 (not 80/443).
+By default, **docker-compose.yml** publishes **80→HTTP** and **443→HTTPS**. Open these in the security group for public access and for **Let’s Encrypt HTTP-01** (unless you use DNS-01).
 
+If **Kubernetes or another process already binds host 80/443**, use the overlay file:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.k8s-alt-ports.yml up -d
+```
+
+That maps **8080/8443** on the host and sets `FITLIO_PORT_IN_REDIRECT` so HTTP→HTTPS redirects use `:8443`. Use **DNS-01** for certs (`export DUCKDNS_TOKEN=...` before `scripts/fix_https.sh`).
 | Service | External Port | Internal Port |
 |---|---|---|
-| Nginx HTTP | 8080 | 80 |
-| Nginx HTTPS | 8443 | 443 |
+| Nginx HTTP | 80 (or 8080 with k8s overlay) | 80 |
+| Nginx HTTPS | 443 (or 8443 with k8s overlay) | 443 |
 | FastAPI | 8000 | 8000 |
 | Grafana | 3000 | 3000 |
 | Prometheus | 9090 | 9090 |
 
 ### Health Check (run from external network only)
 ```bash
-curl -v --max-time 10 http://fitlio-jay.duckdns.org:8080/health
+curl -fsS -o /dev/null -w "%{http_code}\n" https://fitlio-jay.duckdns.org/health
+# With k8s-alt-ports overlay:
+# curl -fsS -o /dev/null -w "%{http_code}\n" https://fitlio-jay.duckdns.org:8443/health
 ```
 
 > ⚠️ Do not run health checks from inside EC2 using its own public IP.

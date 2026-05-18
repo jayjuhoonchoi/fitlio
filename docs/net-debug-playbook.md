@@ -16,7 +16,7 @@
 
 ## 진단 순서 (고정)
 
-1. 외부(맥/LTE)에서 `curl -v --max-time 10 http://<도메인>:<포트>/health`
+1. 외부(맥/LTE)에서 `curl -v --max-time 10 https://<도메인>/health` (프로덕션 기본 443) 또는 `http://...` / `:8443` 등 실제 공개 URL
 2. EC2: `docker ps` + `ss -tlnp | grep <포트>`
 3. AWS 콘솔 → 인스턴스 → Security 탭 → **인스턴스에 붙은 SG 전체** 인바운드 확인
 4. EC2: `sudo timeout 20 tcpdump -n -i eth0 tcp port <포트>` (동시에 외부 curl)
@@ -30,12 +30,18 @@
 - 맥에서 systemctl/iptables 실행 (맥에는 없음)
 
 ## tcpdump 명령 (복붙용)
+**프로덕션 기본(80/443):**
 ```bash
 # 터미널 A (EC2)
-sudo timeout 20 tcpdump -n -i eth0 'tcp port 8080 or tcp port 8443'
+sudo timeout 20 tcpdump -n -i eth0 'tcp port 80 or tcp port 443'
 
 # 터미널 B (맥) — 동시에
-curl -v --max-time 15 http://fitlio-jay.duckdns.org:8080/health
+curl -v --max-time 15 https://fitlio-jay.duckdns.org/health
+```
+**k8s-alt-ports(8080/8443) 오버레이를 쓰는 경우:**
+```bash
+sudo timeout 20 tcpdump -n -i eth0 'tcp port 8080 or tcp port 8443'
+curl -v --max-time 15 https://fitlio-jay.duckdns.org:8443/health
 ```
 
 ## 실제 사례

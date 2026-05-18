@@ -1,0 +1,10 @@
+# Use only when port 80/443 on the host is taken by Kubernetes (k3s) or another stack.
+# Run: docker compose -f docker-compose.yml -f docker-compose.k8s-alt-ports.yml up -d
+# SG: open TCP 8080 and 8443 instead of 80/443. Cert issuance: ./scripts/fix_https.sh (DNS via DUCKDNS_TOKEN).
+services:
+  nginx:
+    environment:
+      FITLIO_PORT_IN_REDIRECT: ":8443"
+    ports:
+      - "8080:80"
+      - "8443:443"

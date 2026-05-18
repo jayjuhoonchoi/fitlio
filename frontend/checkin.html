@@ -191,7 +191,11 @@
     </div>
 
     <script>
-        const API = 'https://fitlio-jay.duckdns.org';
+        // Same-origin as nginx/FastAPI when served over HTTPS (or HTTP). file:// fallback for local dev.
+        const API =
+            window.location.protocol === "file:"
+                ? "http://127.0.0.1:8000"
+                : window.location.origin;
         let currentLang = 'en';
 
         const i18n = {

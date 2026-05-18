@@ -42,5 +42,8 @@ Objective: start with confidence and release readiness.
 
 ## HTTPS deterministic recovery (EC2)
 1. `./scripts/preflight_env.sh http://127.0.0.1:8000 fitlio-jay.duckdns.org`
-2. `./scripts/fix_https.sh fitlio-jay.duckdns.org jayjuhoonchoi@gmail.com ~/fitlio`
-3. `curl -fsS -I https://fitlio-jay.duckdns.org/health`
+2. **Port 80이 k8s 등으로 막혀 있으면:** `export DUCKDNS_TOKEN='…'` (DuckDNS v3 토큰) 후 같은 스크립트 → **DNS-01**
+3. `./scripts/fix_https.sh fitlio-jay.duckdns.org jayjuhoonchoi@gmail.com ~/fitlio`
+4. **`docker-compose.k8s-alt-ports.yml` 사용 중이면:** `export FITLIO_HTTPS_VERIFY_PORT=8443` 로 2~3번 실행 후 확인
+5. 외부(맥/LTE): `curl -fsS -I https://fitlio-jay.duckdns.org/health` (또는 `:8443`)
+6. (선택, 한 번만) `sudo FITLIO_DIR=$HOME/fitlio ./scripts/install_letsencrypt_deploy_hook.sh` — `certbot renew` 후 nginx 자동 reload

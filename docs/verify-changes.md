@@ -39,6 +39,13 @@ Start the stack (Docker or local uvicorn per your usual workflow), then:
 
 For production/staging, pass that base URL instead of localhost.
 
+**HTTPS prod quick check (from laptop/LTE, not from the same EC2):**
+
+```bash
+curl -fsS -o /dev/null -w "%{http_code}\n" https://fitlio-jay.duckdns.org/health
+./scripts/healthcheck.sh   # or FITLIO_HEALTH_URL=https://...:8443/health for k8s-alt overlay
+```
+
 **Smoke now covers:** health, member/admin auth gates, tablet 404/contract, quick-reserve reachability, weekly report gate, center discover gate, **member `/member/checkin-qr` gate**, **tablet `/centers/tablet/check-in-qr` invalid-token 401**, **admin roster gate**, **premium overview gate**.
 
 ## 4. Quick UI smoke (manual)
