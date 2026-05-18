@@ -42,3 +42,6 @@
 
 
 - 요청 흐름: curl → DNS → nginx → api → code
+
+
+- Day 2: pytest 80 passed — nginx routing + auth login end-to-end traced
