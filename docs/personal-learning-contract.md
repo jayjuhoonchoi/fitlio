@@ -45,3 +45,7 @@
 
 
 - Day 2: pytest 80 passed — nginx routing + auth login end-to-end traced
+
+## 기술 부채 (Technical Debt)
+- [ ] app/auth.py line 5: SECRET_KEY hardcoded — move to environment variable
+- [ ] datetime.utcnow() deprecated in Python 3.14 — replace with datetime.now(datetime.UTC)
