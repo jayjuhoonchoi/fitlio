@@ -75,3 +75,32 @@ client → nginx (location /auth/) → api:8000/auth/login
 ## Known Technical Debt
 - app/auth.py line 5: SECRET_KEY hardcoded → move to environment variable
 - datetime.utcnow() used in multiple files → deprecated in Python 3.14
+
+
+
+## Database Models (18 tables)
+
+| Model | Table | Description |
+|---|---|---|
+| Member | members | User accounts, login, role (member/admin) |
+| FitnessClass | fitness_classes | Class schedule, capacity |
+| Booking | bookings | Member-class reservation |
+| Membership | memberships | Plan, expiry, auto-renew |
+| Payment | payments | Payment records |
+| Attendance | attendance | Check-in records |
+| InstructorProfile | instructor_profiles | Instructor info |
+| NotificationRequest | notification_requests | Notification queue |
+| Center | centers | Facility info |
+| CenterMembership | center_memberships | Center-plan mapping |
+| DirectMessage | direct_messages | Messaging |
+| NotificationDeliveryAttempt | notification_delivery_attempts | Delivery log |
+| InstructorReaction | instructor_reactions | Reactions |
+| Suggestion | suggestions | User suggestions |
+| CommunityPost | community_posts | Community feed |
+| CommunityReaction | community_reactions | Post reactions |
+| ContentReport | content_reports | Content moderation |
+| PaymentWebhookEvent | payment_webhook_events | Webhook log |
+
+## Known Technical Debt
+- app/auth.py line 5: SECRET_KEY hardcoded → move to environment variable
+- datetime.utcnow() used in multiple files → deprecated in Python 3.14
