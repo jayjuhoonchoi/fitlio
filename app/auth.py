@@ -2,7 +2,8 @@ from passlib.context import CryptContext
 from jose import JWTError, jwt
 from datetime import datetime, timedelta
 
-SECRET_KEY = "fitlio-secret-key-change-in-production"
+import os
+SECRET_KEY = os.getenv("SECRET_KEY", "fitlio-secret-key-change-in-production")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24
 CHECKIN_QR_TOKEN_EXPIRE_MINUTES = 45

@@ -9,8 +9,8 @@ services:
       FITLIO_PORT_IN_REDIRECT: ""
     # Production: bind host 80/443 (SG must allow). If k3s steals 80, use -f docker-compose.k8s-alt-ports.yml
     ports:
-      - "80:80"
-      - "443:443"
+      - "8080:80"
+      - "8443:443"
     volumes:
       - ./nginx/default.http.conf:/etc/nginx/templates/default.http.conf:ro
       - ./nginx/default.https.conf:/etc/nginx/templates/default.https.conf:ro
@@ -28,7 +28,7 @@ services:
       - "0.0.0.0:8000:8000"
     environment:
       DATABASE_URL: postgresql://fitlio:fitlio123@db:5432/fitlio
-    depends_on:
+      SECRET_KEY: ${SECRET_KEY:-fitlio-secret-key-change-in-production}
       db:
         condition: service_healthy
     restart: unless-stopped
