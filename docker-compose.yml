@@ -29,6 +29,7 @@ services:
     environment:
       DATABASE_URL: postgresql://fitlio:fitlio123@db:5432/fitlio
       SECRET_KEY: ${SECRET_KEY:-fitlio-secret-key-change-in-production}
+    depends_on:
       db:
         condition: service_healthy
     restart: unless-stopped
