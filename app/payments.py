@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timezone, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
@@ -72,10 +72,10 @@ def create_membership(
         raise HTTPException(status_code=403, detail="Cannot purchase for another account")
     # 기간 설정
     if data.plan == "monthly":
-        end_date = datetime.utcnow() + timedelta(days=30)
+        end_date = datetime.now(timezone.utc) + timedelta(days=30)
         amount = 5000  # $50.00 AUD
     elif data.plan == "yearly":
-        end_date = datetime.utcnow() + timedelta(days=365)
+        end_date = datetime.now(timezone.utc) + timedelta(days=365)
         amount = 50000  # $500.00 AUD
     else:
         raise HTTPException(status_code=400, detail="Invalid plan")

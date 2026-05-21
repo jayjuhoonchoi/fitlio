@@ -1,6 +1,6 @@
 import os
 import threading
-from datetime import datetime, timedelta
+from datetime import datetime, timezone, timedelta
 
 from sqlalchemy.orm import Session
 
@@ -34,7 +34,7 @@ def _build_professional_message(
 def queue_membership_expiry_reminders(
     db: Session, reference_time: datetime | None = None
 ) -> dict:
-    now = reference_time or datetime.utcnow()
+    now = reference_time or datetime.now(timezone.utc)
     today = now.date()
     day_start = datetime(today.year, today.month, today.day)
     day_end = day_start + timedelta(days=1)
@@ -91,7 +91,7 @@ def maybe_queue_membership_expiry_reminders() -> dict:
     global _last_run_at
     if os.getenv("PYTEST_CURRENT_TEST"):
         return {"status": "skipped", "reason": "test_env"}
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     with _lock:
         if _last_run_at and (now - _last_run_at).total_seconds() < _MIN_RUN_INTERVAL_SECONDS:
             return {"status": "skipped", "reason": "interval"}

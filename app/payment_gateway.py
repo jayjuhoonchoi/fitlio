@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 import uuid
 
 from app.payment_metadata import payment_method_profile
@@ -24,7 +24,7 @@ def create_payment_intent(method: str, amount_cents: int, currency: str = "aud")
         raise ValueError("Unsupported payment method")
     # Adapter-ready structure. Real SDK calls can replace this later.
     profile = payment_method_profile(method)
-    rid = f"{method}_{datetime.utcnow().strftime('%Y%m%d%H%M%S')}_{uuid.uuid4().hex[:8]}"
+    rid = f"{method}_{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}_{uuid.uuid4().hex[:8]}"
     return PaymentIntent(
         provider=profile["provider"],
         provider_display=profile["provider_display"],

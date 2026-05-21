@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import Attendance, Member, FitnessClass, Membership, Booking
 from pydantic import BaseModel
-from datetime import datetime, timedelta
+from datetime import datetime, timezone, timedelta
 from app.deps import get_current_user
 
 router = APIRouter()
@@ -13,7 +13,7 @@ class CheckInRequest(BaseModel):
     phone_last4: str
 
 def get_this_month_usage(db, member_id):
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     month_start = datetime(now.year, now.month, 1)
     return db.query(Attendance).filter(
         Attendance.member_id == member_id,
@@ -21,7 +21,7 @@ def get_this_month_usage(db, member_id):
     ).count()
 
 def get_nearest_class(db):
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     return db.query(FitnessClass).filter(
         FitnessClass.schedule >= now
     ).order_by(FitnessClass.schedule.asc()).first()
@@ -60,7 +60,7 @@ def check_in(request: CheckInRequest, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Class not found")
 
     # 오늘 이미 체크인했는지 확인
-    today = datetime.utcnow().date()
+    today = datetime.now(timezone.utc).date()
     existing = db.query(Attendance).filter(
         Attendance.member_id == member.id,
         Attendance.class_id == request.class_id,
@@ -155,7 +155,7 @@ def class_check_in_for_member(
     )
     if not booking:
         raise HTTPException(status_code=400, detail="Confirmed booking required before check-in")
-    today = datetime.utcnow().date()
+    today = datetime.now(timezone.utc).date()
     existing = (
         db.query(Attendance)
         .filter(

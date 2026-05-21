@@ -1,6 +1,6 @@
 import os
 import threading
-from datetime import datetime, timedelta
+from datetime import datetime, timezone, timedelta
 
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
@@ -41,7 +41,7 @@ def _dispatch_row(row: NotificationRequest, member: Member | None) -> DispatchRe
 
 
 def process_pending_notifications(db: Session, limit: int = 100) -> dict:
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     rows = (
         db.query(NotificationRequest)
         .filter(
@@ -103,7 +103,7 @@ def maybe_process_pending_notifications() -> dict:
     global _last_run_at
     if os.getenv("PYTEST_CURRENT_TEST"):
         return {"status": "skipped", "reason": "test_env"}
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     with _lock:
         if _last_run_at and (now - _last_run_at).total_seconds() < _MIN_RUN_INTERVAL_SECONDS:
             return {"status": "skipped", "reason": "interval"}
