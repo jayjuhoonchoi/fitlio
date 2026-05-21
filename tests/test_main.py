@@ -3132,3 +3132,5 @@ def test_admin_class_roster_requires_auth():
 def test_premium_overview_requires_auth():
     response = client.get("/admin/reports/premium-overview?months=6")
     assert response.status_code == 401
+
+    assert response.status_code == 401
