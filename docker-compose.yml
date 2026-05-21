@@ -5,9 +5,7 @@ services:
     image: nginx:latest
     environment:
       FITLIO_DOMAIN: fitlio-jay.duckdns.org
-      # Empty for normal HTTPS on https://<domain>/ ; use ":8443" only with docker-compose.k8s-alt-ports.yml
       FITLIO_PORT_IN_REDIRECT: ""
-    # Production: bind host 80/443 (SG must allow). If k3s steals 80, use -f docker-compose.k8s-alt-ports.yml
     ports:
       - "8080:80"
       - "8443:443"
@@ -45,7 +43,7 @@ services:
     image: postgres:15
     environment:
       POSTGRES_USER: fitlio
-      POSTGRES_PASSWORD: fitlio123
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-fitlio123}
       POSTGRES_DB: fitlio
     ports:
       - "5432:5432"
@@ -72,7 +70,7 @@ services:
     ports:
       - "3000:3000"
     environment:
-      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_SECURITY_ADMIN_PASSWORD: ${GF_SECURITY_ADMIN_PASSWORD:-admin}
     depends_on:
       - prometheus
     restart: unless-stopped
