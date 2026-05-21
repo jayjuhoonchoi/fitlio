@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timezone, timedelta
 
 import json
 import os
@@ -355,7 +355,7 @@ def member_checkin_qr_payload(
     return {
         "token": token,
         "expires_at": exp.isoformat() + "Z",
-        "expires_in_seconds": max(0, int((exp - datetime.utcnow()).total_seconds())),
+        "expires_in_seconds": max(0, int((exp - datetime.now(timezone.utc)).total_seconds())),
     }
 
 

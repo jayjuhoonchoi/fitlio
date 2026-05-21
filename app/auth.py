@@ -1,6 +1,6 @@
 from passlib.context import CryptContext
 from jose import JWTError, jwt
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import os
 SECRET_KEY = os.getenv("SECRET_KEY", "fitlio-secret-key-change-in-production")
@@ -18,14 +18,14 @@ def verify_password(plain: str, hashed: str) -> bool:
 
 def create_access_token(data: dict) -> str:
     to_encode = data.copy()
-    expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    expire = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     to_encode.update({"exp": expire})
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
 
 def create_checkin_qr_token(member_id: int) -> tuple[str, datetime]:
     """Short-lived JWT for member phone QR; front desk scans into tablet check-in."""
-    expire = datetime.utcnow() + timedelta(minutes=CHECKIN_QR_TOKEN_EXPIRE_MINUTES)
+    expire = datetime.now(timezone.utc) + timedelta(minutes=CHECKIN_QR_TOKEN_EXPIRE_MINUTES)
     to_encode = {
         "sub": str(member_id),
         "typ": "checkin_qr",
