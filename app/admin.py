@@ -1,5 +1,5 @@
 from calendar import monthrange
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from html import escape
 import io
 from pathlib import Path
@@ -99,7 +99,7 @@ def _build_member_risk_rows(
     days: int,
     threshold_pct: float,
 ) -> list[dict]:
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     since = now - timedelta(days=days)
     classes_count = (
         db.query(FitnessClass)
@@ -182,7 +182,7 @@ def _build_member_risk_rows(
 @router.get("/stats")
 def get_stats(db: Session = Depends(get_db), _: dict = Depends(require_admin)):
     total_members = db.query(Member).count()
-    today = datetime.utcnow().date()
+    today = datetime.now(timezone.utc).date()
     today_start = datetime(today.year, today.month, today.day)
     today_attendance = (
         db.query(Attendance)
@@ -192,7 +192,7 @@ def get_stats(db: Session = Depends(get_db), _: dict = Depends(require_admin)):
     total_classes = db.query(FitnessClass).count()
     active_memberships = (
         db.query(Membership)
-        .filter(Membership.status == "active", Membership.end_date >= datetime.utcnow())
+        .filter(Membership.status == "active", Membership.end_date >= datetime.now(timezone.utc))
         .count()
     )
     pending_notifications = (
@@ -201,8 +201,8 @@ def get_stats(db: Session = Depends(get_db), _: dict = Depends(require_admin)):
     upcoming_7d_classes = (
         db.query(FitnessClass)
         .filter(
-            FitnessClass.schedule >= datetime.utcnow(),
-            FitnessClass.schedule <= datetime.utcnow() + timedelta(days=7),
+            FitnessClass.schedule >= datetime.now(timezone.utc),
+            FitnessClass.schedule <= datetime.now(timezone.utc) + timedelta(days=7),
         )
         .count()
     )
@@ -223,7 +223,7 @@ def sales_summary(
     db: Session = Depends(get_db),
     _: dict = Depends(require_admin),
 ):
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     y = year or now.year
     m = month or now.month
     if m < 1 or m > 12:
@@ -266,7 +266,7 @@ def sales_trend(
 ):
     if months < 1 or months > 24:
         raise HTTPException(status_code=400, detail="Months must be between 1 and 24")
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     y = now.year
     m = now.month
     points = []
@@ -318,7 +318,7 @@ def member_growth_report(
 ):
     if months < 1 or months > 36:
         raise HTTPException(status_code=400, detail="Months must be between 1 and 36")
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     y = now.year
     m = now.month
     points = []
@@ -357,7 +357,7 @@ def retention_report(
 ):
     if months < 1 or months > 36:
         raise HTTPException(status_code=400, detail="Months must be between 1 and 36")
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     y = now.year
     m = now.month
     points = []
@@ -401,7 +401,7 @@ def occupancy_trend_report(
 ):
     if months < 1 or months > 24:
         raise HTTPException(status_code=400, detail="Months must be between 1 and 24")
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     y = now.year
     m = now.month
     points = []
@@ -466,7 +466,7 @@ def class_utilization_report(
 ):
     if days < 1 or days > 180:
         raise HTTPException(status_code=400, detail="Days must be between 1 and 180")
-    start = datetime.utcnow() - timedelta(days=days)
+    start = datetime.now(timezone.utc) - timedelta(days=days)
     classes = (
         db.query(FitnessClass)
         .filter(FitnessClass.schedule >= start)
@@ -549,8 +549,8 @@ def premium_overview_report(
         db.query(func.count(func.distinct(Membership.member_id)))
         .filter(
             Membership.status == "active",
-            Membership.start_date <= datetime.utcnow(),
-            Membership.end_date >= datetime.utcnow(),
+            Membership.start_date <= datetime.now(timezone.utc),
+            Membership.end_date >= datetime.now(timezone.utc),
         )
         .scalar()
     ) or 0
@@ -626,7 +626,7 @@ def weekly_performance_report(
     db: Session = Depends(get_db),
     _: dict = Depends(require_admin),
 ):
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     week_end = datetime(now.year, now.month, now.day, 23, 59, 59)
     week_start = week_end - timedelta(days=6)
     prev_week_end = week_start - timedelta(seconds=1)
@@ -1016,7 +1016,7 @@ def list_classes_admin(db: Session = Depends(get_db), _: dict = Depends(require_
 
 def _celebration_hint(db: Session, member_id: int) -> str | None:
     """Lightweight positive feedback after check-in (visits in trailing 7 days)."""
-    since = datetime.utcnow() - timedelta(days=7)
+    since = datetime.now(timezone.utc) - timedelta(days=7)
     n = (
         db.query(func.count(Attendance.id))
         .filter(
@@ -1041,7 +1041,7 @@ def get_class_roster(
     fitness_class = db.query(FitnessClass).filter(FitnessClass.id == class_id).first()
     if not fitness_class:
         raise HTTPException(status_code=404, detail="Class not found")
-    today = datetime.utcnow().date()
+    today = datetime.now(timezone.utc).date()
     day_start = datetime(today.year, today.month, today.day)
     pairs = (
         db.query(Booking, Member)
@@ -1116,7 +1116,7 @@ def admin_mark_class_attendance(
             status_code=400,
             detail="Confirmed booking required before check-in",
         )
-    today = datetime.utcnow().date()
+    today = datetime.now(timezone.utc).date()
     day_start = datetime(today.year, today.month, today.day)
     existing = (
         db.query(Attendance)
@@ -1322,7 +1322,7 @@ def delete_instructor(
         db.query(FitnessClass)
         .filter(
             FitnessClass.instructor == row.display_name,
-            FitnessClass.schedule >= datetime.utcnow(),
+            FitnessClass.schedule >= datetime.now(timezone.utc),
         )
         .first()
     )
@@ -1342,7 +1342,7 @@ def create_class_admin(
     db: Session = Depends(get_db),
     _: dict = Depends(require_admin),
 ):
-    if body.schedule <= datetime.utcnow():
+    if body.schedule.replace(tzinfo=timezone.utc) <= datetime.now(timezone.utc):
         raise HTTPException(status_code=400, detail="Class schedule must be in the future")
     has_instructor_profiles = db.query(InstructorProfile).count() > 0
     if has_instructor_profiles:
@@ -1385,7 +1385,7 @@ def update_class_admin(
     if body.instructor is not None:
         row.instructor = body.instructor.strip()
     if body.schedule is not None:
-        if body.schedule <= datetime.utcnow():
+        if body.schedule.replace(tzinfo=timezone.utc) <= datetime.now(timezone.utc):
             raise HTTPException(
                 status_code=400, detail="Class schedule must be in the future"
             )

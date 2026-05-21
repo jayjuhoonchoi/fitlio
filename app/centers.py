@@ -1,4 +1,4 @@
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 import json
 import re
 from urllib.parse import urlparse
@@ -389,7 +389,7 @@ def grant_center_admin(
         row.role = "admin"
         row.status = "active"
         row.invited_by_member_id = user["id"]
-        row.updated_at = datetime.utcnow()
+        row.updated_at = datetime.now(timezone.utc)
     db.commit()
     return {"center_id": body.center_id, "member_id": member.id, "role": "admin"}
 
@@ -425,7 +425,7 @@ def join_center_by_email(
         row.status = "active"
         row.role = "member" if row.role != "admin" else "admin"
         row.invited_by_member_id = user["id"]
-        row.updated_at = datetime.utcnow()
+        row.updated_at = datetime.now(timezone.utc)
     db.commit()
     return {"center_id": center.id, "member_id": member.id, "status": "active"}
 
@@ -459,7 +459,7 @@ def request_join_center(
     else:
         row.status = "pending"
         row.role = "member" if row.role != "admin" else "admin"
-        row.updated_at = datetime.utcnow()
+        row.updated_at = datetime.now(timezone.utc)
     db.commit()
     return {
         "center_id": center.id,
@@ -557,7 +557,7 @@ def approve_join_request(
     if not row:
         raise HTTPException(status_code=404, detail="Join request not found")
     row.status = "active" if body.approve else "rejected"
-    row.updated_at = datetime.utcnow()
+    row.updated_at = datetime.now(timezone.utc)
     db.commit()
     return {"center_id": body.center_id, "member_id": body.member_id, "status": row.status}
 
@@ -583,7 +583,7 @@ def center_members(
             .order_by(Membership.end_date.desc())
             .first()
         )
-        today = datetime.utcnow()
+        today = datetime.now(timezone.utc)
         month_start = datetime(today.year, today.month, 1)
         usage = (
             db.query(Attendance)
