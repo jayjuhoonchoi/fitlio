@@ -69,5 +69,5 @@
 | PaymentWebhookEvent | payment_webhook_events | Webhook log |
 
 ## Known Technical Debt
-- [ ] datetime.utcnow() deprecated in Python 3.14 → replace with datetime.now(datetime.UTC)
+- [x] datetime.utcnow() deprecated in Python 3.14 → fixed in app code (DB schema still naive)
 - [ ] POSTGRES_PASSWORD hardcoded in docker-compose.yml → move to .env
