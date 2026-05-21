@@ -32,6 +32,9 @@
 - 장애 나면 순서대로 본다: 1) 앱 살아있나 2) 포트 열렸나 3) AWS가 막고있나
 - SG 인바운드에 8080이 없으면 앱이 정상이어도 외부에서 timeout 난다
 - k3s가 꺼져있어도(inactive) enabled면 재부팅 시 자동으로 켜진다
+- datetime.utcnow()는 Python 3.14에서 사라진다. timezone.utc로 바꿨다
+- 비밀번호 같은 민감한 값은 코드에 쓰지 않고 .env 파일에 따로 관리한다
+- 장애 기록 2개 추가, 이력서 초안 작성
 
 (오늘 장애에서 직접 배운 것, 본인 말로 3줄 이상)
 
@@ -49,3 +52,5 @@
 ## 기술 부채 (Technical Debt)
 - [ ] app/auth.py line 5: SECRET_KEY hardcoded — move to environment variable
 - [ ] datetime.utcnow() deprecated in Python 3.14 — replace with datetime.now(datetime.UTC)
+
+
