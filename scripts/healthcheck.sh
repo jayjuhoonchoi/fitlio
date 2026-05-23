@@ -3,7 +3,7 @@
 # FITLIO_HEALTH_URL overrides default (HTTPS prod).
 set -euo pipefail
 
-URL="https://fitlio-jay.duckdns.org:8443/health"
+URL="https://fitlio-jay.duckdns.org/health"
 EXPECTED="${FITLIO_HEALTH_EXPECT:-200}"
 
 STATUS="$(curl -sS -o /dev/null -w "%{http_code}" --max-time 15 "$URL" || echo 000)"
