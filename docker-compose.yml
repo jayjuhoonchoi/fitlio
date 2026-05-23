@@ -5,7 +5,7 @@ services:
     image: nginx:latest
     environment:
       FITLIO_DOMAIN: fitlio-jay.duckdns.org
-      FITLIO_PORT_IN_REDIRECT: ""
+      FITLIO_PORT_IN_REDIRECT: ":8443"
     ports:
       - "8080:80"
       - "8443:443"
