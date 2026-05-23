@@ -7,8 +7,8 @@ services:
       FITLIO_DOMAIN: fitlio-jay.duckdns.org
       FITLIO_PORT_IN_REDIRECT: ":8443"
     ports:
-      - "8080:80"
-      - "8443:443"
+      - "80:80"
+      - "443:443"
     volumes:
       - ./nginx/default.http.conf:/etc/nginx/templates/default.http.conf:ro
       - ./nginx/default.https.conf:/etc/nginx/templates/default.https.conf:ro
