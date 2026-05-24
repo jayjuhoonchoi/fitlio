@@ -71,3 +71,33 @@
 ## Known Technical Debt
 - [x] datetime.utcnow() deprecated in Python 3.14 → fixed in app code (DB schema still naive)
 - [ ] POSTGRES_PASSWORD hardcoded in docker-compose.yml → move to .env
+
+
+
+## 보안 그룹 (fitlio-sg) 인바운드 (2026-05-24 기준)
+
+| 포트 | 용도 |
+|---|---|
+| 22 | SSH |
+| 80 | HTTP (HTTPS 리다이렉트 + certbot) |
+| 443 | HTTPS |
+
+## 포트 격리 정책
+- nginx만 외부 포트(80/443) 바인딩
+- api, db, prometheus, grafana, node-exporter는 Docker 내부 네트워크만 사용
+- 외부에서 DB, 모니터링 도구 직접 접근 불가
+
+
+## Security Group (fitlio-sg) Inbound Rules (as of 2026-05-24)
+
+| Port | Purpose |
+|---|---|
+| 22 | SSH access |
+| 80 | HTTP (HTTPS redirect + certbot renewal) |
+| 443 | HTTPS |
+
+## Port Isolation Policy
+- Only nginx binds to external ports (80/443)
+- api, db, prometheus, grafana, node-exporter communicate via Docker internal network only
+- Direct external access to DB and monitoring tools is blocked
+- Principle of least privilege: expose only what is necessary
