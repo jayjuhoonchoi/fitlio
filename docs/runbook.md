@@ -71,3 +71,23 @@ docker logs fitlio-api-1 --tail 20
 - Expires: 2026-08-21
 - Auto-renewal: enabled via certbot
 - Manual renewal: `sudo certbot renew`
+
+
+## Monitoring & Alerting
+
+### Grafana
+- Access: SSH tunnel required (port not exposed externally)
+```bash
+  ssh -i ~/.ssh/id_ed25519 -L 3001:172.18.0.5:3000 ubuntu@52.64.121.214 -N &
+  # Then open http://localhost:3001
+```
+- Login: admin / (see GF_SECURITY_ADMIN_PASSWORD in .env)
+
+### Alert Rules
+- **Fitlio API Down**: fires when `up{job="fitlio-api"}` is below 1 for 2 minutes
+- Notification: email via Gmail SMTP
+- Evaluation: every 1 minute
+
+### Prometheus
+- Scrape interval: 15s
+- Targets: prometheus, fitlio-api, node-exporter
