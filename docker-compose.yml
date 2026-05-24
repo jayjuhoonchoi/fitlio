@@ -64,7 +64,7 @@ services:
       GF_SMTP_ENABLED: "true"
       GF_SMTP_HOST: "smtp.gmail.com:587"
       GF_SMTP_USER: "jayjuhoonchoi@gmail.com"
-      GF_SMTP_PASSWORD: "pymt rrqa izbb nsav"
+      GF_SMTP_PASSWORD: "pymtrrqaizbbnsav"
       GF_SMTP_FROM_ADDRESS: "jayjuhoonchoi@gmail.com"
       GF_SMTP_FROM_NAME: "Fitlio Grafana"
     depends_on:
