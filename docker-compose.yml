@@ -67,6 +67,8 @@ services:
       GF_SMTP_PASSWORD: "pymtrrqaizbbnsav"
       GF_SMTP_FROM_ADDRESS: "jayjuhoonchoi@gmail.com"
       GF_SMTP_FROM_NAME: "Fitlio Grafana"
+    volumes:
+      - grafana_data:/var/lib/grafana  
     depends_on:
       - prometheus
     restart: unless-stopped
@@ -77,3 +79,4 @@ services:
 
 volumes:
   postgres_data:
+  grafana_data:
