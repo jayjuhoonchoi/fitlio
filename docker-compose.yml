@@ -1,11 +1,9 @@
-# DB credentials are fixed here so the stack starts without a .env file.
-# To use your own password, edit below or use docker-compose.override.yml.
 services:
   nginx:
     image: nginx:latest
     environment:
       FITLIO_DOMAIN: fitlio-jay.duckdns.org
-      FITLIO_PORT_IN_REDIRECT: ":8443"
+      FITLIO_PORT_IN_REDIRECT: ""
     ports:
       - "80:80"
       - "443:443"
@@ -22,8 +20,6 @@ services:
 
   api:
     build: .
-    ports:
-      - "0.0.0.0:8000:8000"
     environment:
       DATABASE_URL: postgresql://fitlio:fitlio123@db:5432/fitlio
       SECRET_KEY: ${SECRET_KEY:-fitlio-secret-key-change-in-production}
@@ -45,8 +41,6 @@ services:
       POSTGRES_USER: fitlio
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-fitlio123}
       POSTGRES_DB: fitlio
-    ports:
-      - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     restart: unless-stopped
@@ -61,14 +55,10 @@ services:
     image: prom/prometheus:latest
     volumes:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
-    ports:
-      - "9090:9090"
     restart: unless-stopped
 
   grafana:
     image: grafana/grafana:latest
-    ports:
-      - "3000:3000"
     environment:
       GF_SECURITY_ADMIN_PASSWORD: ${GF_SECURITY_ADMIN_PASSWORD:-admin}
     depends_on:
@@ -77,8 +67,6 @@ services:
 
   node-exporter:
     image: prom/node-exporter:latest
-    ports:
-      - "9100:9100"
     restart: unless-stopped
 
 volumes:
