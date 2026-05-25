@@ -7,6 +7,7 @@ import { ActionButton } from "@/components/atoms/action-button";
 import { Badge } from "@/components/atoms/badge";
 import { classSlots, waitlistEntries } from "@/lib/mock-data";
 import { apiFetch } from "@/lib/api";
+import { getMemberId, readSession, SESSION_CHANGED_EVENT } from "@/lib/session";
 import type { ClassSlot, LiveClassSlot } from "@/types/domain";
 
 type QuickReserveModalProps = {
@@ -29,9 +30,10 @@ export function QuickReserveModal({
   const [flash, setFlash] = useState<string>("");
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    const storedMemberId = window.localStorage.getItem("member_id") ?? "";
-    setMemberId(storedMemberId);
+    setMemberId(getMemberId());
+    const onSession = (): void => setMemberId(getMemberId());
+    window.addEventListener(SESSION_CHANGED_EVENT, onSession);
+    return () => window.removeEventListener(SESSION_CHANGED_EVENT, onSession);
   }, []);
 
   useEffect(() => {
@@ -84,8 +86,13 @@ export function QuickReserveModal({
   }, [open, selectedClassId, full]);
 
   async function handleConfirm(): Promise<void> {
-    if (!memberId) {
-      setFlash("Login required to reserve.");
+    const session = readSession();
+    if (!session) {
+      setFlash("Sign in as a member to reserve.");
+      return;
+    }
+    if (session.role !== "member") {
+      setFlash("Quick Reserve is for member accounts only. Sign out and use a member login.");
       return;
     }
     if (!selectedClassId) {
@@ -99,7 +106,7 @@ export function QuickReserveModal({
         message: string;
         waitlisted?: boolean;
         waitlist_position?: number;
-      }>(`/classes/${selectedClassId}/book?member_id=${memberId}`, { method: "POST" });
+      }>(`/member/classes/${selectedClassId}/quick-reserve`, { method: "POST" });
       if (result.waitlisted) {
         setFlash(`${result.message} (#${result.waitlist_position ?? "-"})`);
       } else {
@@ -168,11 +175,9 @@ export function QuickReserveModal({
                         </p>
                       </div>
                       {isFull ? (
-                        <Badge tone="danger">Full · Waitlist {slot.waitlist}</Badge>
+                        <Badge tone="danger">{`Full · Waitlist ${slot.waitlist}`}</Badge>
                       ) : (
-                        <Badge tone="accent">
-                          {slot.booked}/{slot.capacity}
-                        </Badge>
+                        <Badge tone="accent">{`${slot.booked}/${slot.capacity}`}</Badge>
                       )}
                     </div>
                   </button>
@@ -195,7 +200,15 @@ export function QuickReserveModal({
                   <p className="mb-2 text-xs text-muted">Current waitlist snapshot</p>
                   <ul className="space-y-1 text-xs text-silver">
                     {(waitlistLive.length > 0 ? waitlistLive : waitlistEntries).map((entry, index) => (
-                      <li key={entry.booking_id ?? entry.id}>
+                      <li
+                        key={
+                          "booking_id" in entry
+                            ? String(entry.booking_id)
+                            : "id" in entry
+                              ? entry.id
+                              : `waitlist-${index}`
+                        }
+                      >
                         {"member_name" in entry
                           ? `${entry.member_no ?? "—"} · ${entry.member_name} · waiting`
                           : `${entry.memberNo} · ${entry.memberName} · ${entry.status}`}

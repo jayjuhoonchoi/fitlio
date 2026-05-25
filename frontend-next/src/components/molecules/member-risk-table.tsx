@@ -40,6 +40,7 @@ export function MemberRiskTable(): JSX.Element {
         Array<{
           member_id: number;
           attendance_rate: number;
+          booked_count?: number;
         }>
       >("/admin/reports/member-risk")
     ])

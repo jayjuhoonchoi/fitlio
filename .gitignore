@@ -24,3 +24,8 @@ k8s/promtail-secret.yaml
 # Test coverage
 .coverage
 htmlcov/
+
+# Next.js
+frontend-next/node_modules/
+frontend-next/.next/
+frontend-next/tsconfig.tsbuildinfo

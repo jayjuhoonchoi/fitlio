@@ -103,26 +103,98 @@ def seed_members(db: Session) -> list:
 
 def seed_classes(db: Session) -> list:
     classes_data = [
-        {"name": "BJJ Fundamentals", "schedule": datetime.now() + timedelta(days=1, hours=10), "capacity": 20},
-        {"name": "Wrestling", "schedule": datetime.now() + timedelta(days=2, hours=10), "capacity": 15},
-        {"name": "Advanced Grappling", "schedule": datetime.now() + timedelta(days=3, hours=10), "capacity": 10},
-        {"name": "Open Mat", "schedule": datetime.now() + timedelta(days=4, hours=11), "capacity": 30},
-        {"name": "Kids BJJ", "schedule": datetime.now() + timedelta(days=5, hours=16), "capacity": 12},
+        {"name": "BJJ Fundamentals", "day_offset": 1, "hour": 10, "capacity": 20},
+        {"name": "Wrestling", "day_offset": 2, "hour": 10, "capacity": 15},
+        {"name": "Advanced Grappling", "day_offset": 3, "hour": 10, "capacity": 10},
+        {"name": "Open Mat", "day_offset": 4, "hour": 11, "capacity": 30},
+        {"name": "Kids BJJ", "day_offset": 5, "hour": 16, "capacity": 12},
     ]
     classes = []
     for data in classes_data:
+        schedule = datetime.utcnow() + timedelta(days=data["day_offset"], hours=data["hour"])
         existing = db.query(models.FitnessClass).filter_by(name=data["name"]).first()
         if not existing:
             fitness_class = models.FitnessClass(
                 name=data["name"],
                 instructor="Jay Choi",
-                schedule=data["schedule"],
-                capacity=data["capacity"]
+                schedule=schedule,
+                capacity=data["capacity"],
             )
             db.add(fitness_class)
             classes.append(fitness_class)
     db.commit()
     return classes
+
+
+def refresh_demo_class_schedules(db: Session) -> None:
+    """Roll demo class schedules forward when the volume has only past dates."""
+    templates = [
+        ("BJJ Fundamentals", 1, 10, 20),
+        ("Wrestling", 2, 10, 15),
+        ("Advanced Grappling", 3, 10, 10),
+        ("Open Mat", 4, 11, 30),
+        ("Kids BJJ", 5, 16, 12),
+    ]
+    now = datetime.utcnow()
+    upcoming = (
+        db.query(models.FitnessClass)
+        .filter(models.FitnessClass.schedule >= now)
+        .count()
+    )
+    if upcoming > 0:
+        return
+    for name, day_offset, hour, capacity in templates:
+        row = db.query(models.FitnessClass).filter_by(name=name).first()
+        schedule = now + timedelta(days=day_offset, hours=hour)
+        if row:
+            row.schedule = schedule
+            row.capacity = capacity
+        else:
+            db.add(
+                models.FitnessClass(
+                    name=name,
+                    instructor="Jay Choi",
+                    schedule=schedule,
+                    capacity=capacity,
+                )
+            )
+    db.commit()
+
+
+def ensure_demo_bookings(db: Session) -> None:
+    """Ensure at least one confirmed booking for roster/admin smoke on stale volumes."""
+    jay = db.query(models.Member).filter_by(email="jay.choi@fitlio.com").first()
+    if not jay:
+        return
+    now = datetime.utcnow()
+    fitness_class = (
+        db.query(models.FitnessClass)
+        .filter(models.FitnessClass.schedule >= now)
+        .order_by(models.FitnessClass.schedule.asc())
+        .first()
+    )
+    if not fitness_class:
+        return
+    existing = (
+        db.query(models.Booking)
+        .filter(
+            models.Booking.member_id == jay.id,
+            models.Booking.class_id == fitness_class.id,
+            models.Booking.status != "cancelled",
+        )
+        .first()
+    )
+    if existing:
+        return
+    db.add(
+        models.Booking(
+            member_id=jay.id,
+            class_id=fitness_class.id,
+            status="confirmed",
+        )
+    )
+    fitness_class.current_count = (fitness_class.current_count or 0) + 1
+    db.commit()
 
 
 def seed_memberships(db: Session, members: list) -> list:
@@ -192,6 +264,8 @@ def seed_database():
         db.commit()
         ensure_admin_user(db)
         ensure_instructor_profiles(db)
+        refresh_demo_class_schedules(db)
+        ensure_demo_bookings(db)
 
         print("🔍 Checking database seed status...")
 

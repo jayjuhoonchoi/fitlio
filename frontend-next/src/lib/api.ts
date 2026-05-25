@@ -1,15 +1,25 @@
 "use client";
 
-const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
+import { getAuthToken } from "@/lib/session";
 
-function getAuthToken(): string {
-  if (typeof window === "undefined") {
-    return "";
+const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
+const DEFAULT_TIMEOUT_MS = 8000;
+
+export class ApiFetchError extends Error {
+  constructor(
+    message: string,
+    readonly status?: number
+  ) {
+    super(message);
+    this.name = "ApiFetchError";
   }
-  return window.localStorage.getItem("token") ?? "";
 }
 
-export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
+export async function apiFetch<T>(
+  path: string,
+  init?: RequestInit,
+  timeoutMs = DEFAULT_TIMEOUT_MS
+): Promise<T> {
   const token = getAuthToken();
   const headers = new Headers(init?.headers);
   if (!headers.has("Content-Type") && init?.body) {
@@ -18,15 +28,55 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
   if (token) {
     headers.set("Authorization", `Bearer ${token}`);
   }
-  const response = await fetch(`${baseUrl}${path}`, {
-    ...init,
-    headers,
-  });
-  const payload = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    const detail =
-      typeof payload?.detail === "string" ? payload.detail : "Request failed";
-    throw new Error(detail);
+
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const response = await fetch(`${baseUrl}${path}`, {
+      ...init,
+      headers,
+      signal: controller.signal
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const detail =
+        typeof payload?.detail === "string" ? payload.detail : "Request failed";
+      throw new ApiFetchError(detail, response.status);
+    }
+    return payload as T;
+  } catch (error) {
+    if (error instanceof ApiFetchError) {
+      throw error;
+    }
+    if (error instanceof DOMException && error.name === "AbortError") {
+      throw new ApiFetchError(
+        "API unreachable (start Docker: bash ~/fitlio/scripts/dev_local.sh)"
+      );
+    }
+    throw new ApiFetchError(
+      error instanceof Error ? error.message : "Network request failed"
+    );
+  } finally {
+    window.clearTimeout(timeout);
   }
-  return payload as T;
+}
+
+export async function pingApiHealth(timeoutMs = 4000): Promise<boolean> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(`${baseUrl}/health`, {
+      signal: controller.signal
+    });
+    if (!response.ok) {
+      return false;
+    }
+    const payload = await response.json().catch(() => ({}));
+    return payload?.status === "healthy";
+  } catch {
+    return false;
+  } finally {
+    clearTimeout(timeout);
+  }
 }

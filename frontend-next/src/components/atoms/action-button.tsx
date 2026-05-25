@@ -5,7 +5,10 @@ import type { ButtonHTMLAttributes, ReactNode } from "react";
 
 import { cn } from "@/lib/cn";
 
-type ActionButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
+type ActionButtonProps = Omit<
+  ButtonHTMLAttributes<HTMLButtonElement>,
+  "onDrag" | "onDragStart" | "onDragEnd" | "onAnimationStart"
+> & {
   children: ReactNode;
   tone?: "primary" | "ghost" | "danger";
 };

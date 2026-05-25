@@ -1,0 +1,6 @@
+# Local Mac/dev: publish FastAPI on loopback for Next.js proxy + smoke scripts.
+# Run: docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+services:
+  api:
+    ports:
+      - "127.0.0.1:8000:8000"

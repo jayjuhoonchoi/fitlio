@@ -72,9 +72,11 @@ export function AnalyticsCharts(): JSX.Element {
         setError(null);
       })
       .catch(() => {
+        if (!mounted) return;
         setData(revenueTrend);
         setError("Live analytics unavailable. Showing fallback trends.");
       });
+
     apiFetch<{ points: RetentionPoint[] }>("/admin/reports/retention?months=6")
       .then((retention) => {
         if (!mounted) return;
@@ -91,6 +93,7 @@ export function AnalyticsCharts(): JSX.Element {
         setCohorts(mapped);
       })
       .catch(() => {
+        if (!mounted) return;
         setCohorts(cohortData);
       })
       .finally(() => {
@@ -98,6 +101,7 @@ export function AnalyticsCharts(): JSX.Element {
           setLoading(false);
         }
       });
+
     return () => {
       mounted = false;
     };

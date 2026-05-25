@@ -11,7 +11,8 @@ export type NavItem = {
     | "settings";
   label: string;
   icon: LucideIcon;
-  href: string;
+  sectionId: string;
+  roles: Array<"guest" | "member" | "admin">;
 };
 
 export type DashboardCard = {

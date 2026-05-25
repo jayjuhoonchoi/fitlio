@@ -5,19 +5,23 @@ import { useState } from "react";
 import { ActionButton } from "@/components/atoms/action-button";
 import { SectionErrorBoundary } from "@/components/errors/section-error-boundary";
 import { StatCard } from "@/components/atoms/stat-card";
+import { AdminAttendanceSurface } from "@/components/molecules/admin-attendance-surface";
 import { AnalyticsCharts } from "@/components/molecules/analytics-charts";
-import { CheckinSurface } from "@/components/molecules/checkin-surface";
+import { ApiConnectionBanner } from "@/components/molecules/api-connection-banner";
 import { LeftRail } from "@/components/molecules/left-rail";
-import { MemberRiskTable } from "@/components/molecules/member-risk-table";
 import { MemberManagementSurface } from "@/components/molecules/member-management-surface";
+import { MemberQrCheckin } from "@/components/molecules/member-qr-checkin";
+import { MemberRiskTable } from "@/components/molecules/member-risk-table";
 import { QuickReserveModal } from "@/components/molecules/quick-reserve-modal";
 import { SectionShell } from "@/components/molecules/section-shell";
+import { SessionLoginPanel } from "@/components/molecules/session-login-panel";
 import { StripePaymentSurface } from "@/components/molecules/stripe-payment-surface";
 import { WeeklyReportEmailPreview } from "@/components/molecules/weekly-report-email-preview";
 import { WhiteLabelCMSSurface } from "@/components/molecules/whitelabel-cms-surface";
-import type { DashboardCard } from "@/types/layout";
+import { useFitlioSession } from "@/hooks/use-fitlio-session";
+import type { DashboardCard, NavItem } from "@/types/layout";
 
-const topCards: DashboardCard[] = [
+const adminCards: DashboardCard[] = [
   {
     key: "mrr",
     title: "MRR",
@@ -48,24 +52,83 @@ const topCards: DashboardCard[] = [
   }
 ];
 
+const memberCards: DashboardCard[] = [
+  {
+    key: "streak",
+    title: "Check-in Streak",
+    value: "4 days",
+    helper: "Keep the rhythm going",
+    trend: "up"
+  },
+  {
+    key: "bookings",
+    title: "Upcoming",
+    value: "2 classes",
+    helper: "Quick-reserve in two taps",
+    trend: "neutral"
+  },
+  {
+    key: "membership",
+    title: "Membership",
+    value: "Active",
+    helper: "Renewal in 18 days",
+    trend: "up"
+  },
+  {
+    key: "visits",
+    title: "Visits",
+    value: "6 / 8",
+    helper: "Monthly allowance",
+    trend: "neutral"
+  }
+];
+
+function sessionRole(session: ReturnType<typeof useFitlioSession>): "guest" | "member" | "admin" {
+  if (!session) {
+    return "guest";
+  }
+  return session.role === "admin" ? "admin" : "member";
+}
+
 export function DashboardLayout(): JSX.Element {
+  const session = useFitlioSession();
+  const role = sessionRole(session);
+  const isAdmin = role === "admin";
+  const isMember = role === "member";
+
   const [quickReserveOpen, setQuickReserveOpen] = useState<boolean>(false);
+  const [activeNav, setActiveNav] = useState<NavItem["key"]>("dashboard");
+
+  function scrollToSection(sectionId: string, key: NavItem["key"]): void {
+    setActiveNav(key);
+    document.getElementById(sectionId)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  const headline = isAdmin
+    ? "Admin Console"
+    : isMember
+      ? "Member App"
+      : "Fitlio Preview";
+  const subtitle = isAdmin
+    ? "Operations, retention risk, roster attendance, and studio configuration."
+    : isMember
+      ? "Book classes, show your check-in QR, and manage membership payments."
+      : "Sign in as member or admin — each mode shows different tools.";
 
   return (
     <div className="flex min-h-screen bg-bg">
-      <LeftRail />
+      <LeftRail activeKey={activeNav} role={role} onNavigate={scrollToSection} />
       <main className="flex-1 p-6">
-        <header className="mb-6">
-          <p className="text-xs uppercase tracking-[0.2em] text-silver">
-            Operations Console
-          </p>
-          <h1 className="mt-2 text-3xl font-semibold tracking-tight">
-            Studio Intelligence
-          </h1>
-          <p className="mt-2 max-w-3xl text-sm text-muted">
-            Mindbody-grade workflows with premium Glofox aesthetics. Designed for
-            zero-friction booking, one-tap attendance, and retention-first decisioning.
-          </p>
+        <header id="section-dashboard" className="mb-6 scroll-mt-6 space-y-4">
+          <div>
+            <p className="text-xs uppercase tracking-[0.2em] text-silver">
+              {isAdmin ? "Administration" : isMember ? "Member Experience" : "Operations Console"}
+            </p>
+            <h1 className="mt-2 text-3xl font-semibold tracking-tight">{headline}</h1>
+            <p className="mt-2 max-w-3xl text-sm text-muted">{subtitle}</p>
+          </div>
+          <ApiConnectionBanner />
+          <SessionLoginPanel />
         </header>
 
         <QuickReserveModal
@@ -75,90 +138,125 @@ export function DashboardLayout(): JSX.Element {
 
         <SectionErrorBoundary title="KPI Surface">
           <section className="mb-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            {topCards.map((card) => (
+            {(isAdmin ? adminCards : memberCards).map((card) => (
               <StatCard key={card.key} card={card} />
             ))}
           </section>
         </SectionErrorBoundary>
 
-        <section className="grid gap-4 xl:grid-cols-3">
-          <SectionErrorBoundary title="Quick Reserve Surface">
-            <SectionShell
-              title="Quick Reserve Modal Surface"
-              subtitle="Zero-friction booking with waitlist-ready UX"
-            >
-              <p className="mb-3 text-sm text-muted">
-                Reserve in two taps. Full classes route members into waitlist flow.
-              </p>
-              <ActionButton onClick={() => setQuickReserveOpen(true)}>
-                Open Quick Reserve
-              </ActionButton>
-            </SectionShell>
-          </SectionErrorBoundary>
-
-          <SectionErrorBoundary title="Check-in Surface">
-            <SectionShell
-              title="Check-in Surface"
-              subtitle="QR check-in + instructor one-tap attendance"
-            >
-              <CheckinSurface />
-            </SectionShell>
-          </SectionErrorBoundary>
-
-          <SectionErrorBoundary title="Reporting Surface">
-            <SectionShell
-              title="Reporting Surface"
-              subtitle="MRR, cohort, utilization, and retention risk"
-            >
-              <AnalyticsCharts />
-              <div className="mt-4">
-                <MemberRiskTable />
+        {isMember || !session ? (
+          <section className="grid gap-4 xl:grid-cols-2">
+            <SectionErrorBoundary title="Quick Reserve Surface">
+              <div id="section-booking" className="scroll-mt-6">
+                <SectionShell
+                  title="Quick Reserve"
+                  subtitle="Member booking with waitlist-ready UX"
+                >
+                  <p className="mb-3 text-sm text-muted">
+                    Reserve in two taps. Full classes route you into the waitlist flow.
+                  </p>
+                  <ActionButton onClick={() => setQuickReserveOpen(true)}>
+                    Open Quick Reserve
+                  </ActionButton>
+                </SectionShell>
               </div>
-            </SectionShell>
-          </SectionErrorBoundary>
-        </section>
+            </SectionErrorBoundary>
 
-        <section className="mt-4 grid gap-4 xl:grid-cols-2">
-          <SectionErrorBoundary title="Payments Surface">
-            <SectionShell
-              title="Stripe Global Billing"
-              subtitle="Subscription + dunning management scaffold"
-            >
-              <StripePaymentSurface />
-            </SectionShell>
-          </SectionErrorBoundary>
+            <SectionErrorBoundary title="Member QR Check-in">
+              <div id="section-checkin" className="scroll-mt-6">
+                <SectionShell
+                  title="Front Desk QR"
+                  subtitle="Show this at the tablet kiosk scanner"
+                >
+                  <MemberQrCheckin />
+                </SectionShell>
+              </div>
+            </SectionErrorBoundary>
+          </section>
+        ) : null}
 
-          <SectionErrorBoundary title="White-label Surface">
-            <SectionShell
-              title="White-label CMS"
-              subtitle="Subdomain-ready landing editor scaffold"
-            >
-              <WhiteLabelCMSSurface />
-            </SectionShell>
-          </SectionErrorBoundary>
-        </section>
+        {isAdmin ? (
+          <>
+            <section className="mt-4">
+              <SectionErrorBoundary title="Admin Attendance">
+                <div id="section-checkin" className="scroll-mt-6">
+                  <SectionShell
+                    title="Attendance & Tablet"
+                    subtitle="Front desk kiosk + instructor roster mark-present"
+                  >
+                    <AdminAttendanceSurface />
+                  </SectionShell>
+                </div>
+              </SectionErrorBoundary>
+            </section>
 
-        <section className="mt-4">
-          <SectionErrorBoundary title="Member Management Surface">
-            <SectionShell
-              title="Member Management Console"
-              subtitle="Admin can set member number, contact, active state, and level"
-            >
-              <MemberManagementSurface />
-            </SectionShell>
-          </SectionErrorBoundary>
-        </section>
+            <section className="mt-4">
+              <SectionErrorBoundary title="Reporting Surface">
+                <div id="section-reports" className="scroll-mt-6">
+                  <SectionShell
+                    title="Studio Reports"
+                    subtitle="MRR, cohort, utilization, and retention risk"
+                  >
+                    <AnalyticsCharts />
+                    <div className="mt-4">
+                      <MemberRiskTable />
+                    </div>
+                  </SectionShell>
+                </div>
+              </SectionErrorBoundary>
+            </section>
 
-        <section className="mt-4">
-          <SectionErrorBoundary title="Email Surface">
-            <SectionShell
-              title="Automated Weekly Report"
-              subtitle="Monday operator digest HTML preview"
-            >
-              <WeeklyReportEmailPreview />
-            </SectionShell>
-          </SectionErrorBoundary>
-        </section>
+            <section className="mt-4 grid gap-4 xl:grid-cols-2">
+              <SectionErrorBoundary title="White-label Surface">
+                <div id="section-settings" className="scroll-mt-6">
+                  <SectionShell
+                    title="White-label CMS"
+                    subtitle="Subdomain-ready landing editor scaffold"
+                  >
+                    <WhiteLabelCMSSurface />
+                  </SectionShell>
+                </div>
+              </SectionErrorBoundary>
+
+              <SectionErrorBoundary title="Email Surface">
+                <SectionShell
+                  title="Automated Weekly Report"
+                  subtitle="Monday operator digest HTML preview"
+                >
+                  <WeeklyReportEmailPreview />
+                </SectionShell>
+              </SectionErrorBoundary>
+            </section>
+
+            <section id="section-members" className="mt-4 scroll-mt-6">
+              <SectionErrorBoundary title="Member Management Surface">
+                <SectionShell
+                  title="Member Management"
+                  subtitle="Admin-only roster edits (number, level, active state)"
+                >
+                  <MemberManagementSurface />
+                </SectionShell>
+              </SectionErrorBoundary>
+            </section>
+          </>
+        ) : null}
+
+        {(isMember || isAdmin) && (
+          <section id="section-payments" className="mt-4 scroll-mt-6">
+            <SectionErrorBoundary title="Payments Surface">
+              <SectionShell
+                title={isAdmin ? "Billing Overview" : "My Membership & Payments"}
+                subtitle={
+                  isAdmin
+                    ? "Payment history scaffold for operator review"
+                    : "Purchase plan and view payment history"
+                }
+              >
+                <StripePaymentSurface />
+              </SectionShell>
+            </SectionErrorBoundary>
+          </section>
+        )}
       </main>
     </div>
   );

@@ -8,6 +8,7 @@ import { ActionButton } from "@/components/atoms/action-button";
 import { Badge } from "@/components/atoms/badge";
 import { InlineStatus } from "@/components/atoms/inline-status";
 import { apiFetch } from "@/lib/api";
+import { getMemberId } from "@/lib/session";
 
 const stripePromise = loadStripe("pk_test_fitlio_placeholder_public_key");
 
@@ -21,8 +22,7 @@ export function StripePaymentSurface(): JSX.Element {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    const id = window.localStorage.getItem("member_id") ?? "";
+    const id = getMemberId();
     setMemberId(id);
     if (!id) {
       setLoading(false);

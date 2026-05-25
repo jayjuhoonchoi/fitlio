@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { motion } from "framer-motion";
 
 import { cn } from "@/lib/cn";
@@ -9,15 +8,22 @@ import type { NavItem } from "@/types/layout";
 type IconNavButtonProps = {
   item: NavItem;
   active?: boolean;
+  onNavigate: (sectionId: string) => void;
 };
 
 export function IconNavButton({
   item,
-  active = false
+  active = false,
+  onNavigate
 }: IconNavButtonProps): JSX.Element {
   const Icon = item.icon;
   return (
-    <Link href={item.href} aria-label={item.label} title={item.label}>
+    <button
+      type="button"
+      aria-label={item.label}
+      title={item.label}
+      onClick={() => onNavigate(item.sectionId)}
+    >
       <motion.div
         whileHover={{ y: -2 }}
         whileTap={{ scale: 0.98 }}
@@ -30,6 +36,6 @@ export function IconNavButton({
       >
         <Icon className="h-4 w-4" />
       </motion.div>
-    </Link>
+    </button>
   );
 }
