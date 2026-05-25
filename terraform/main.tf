@@ -5,6 +5,13 @@ terraform {
       version = "~> 5.0"
     }
   }
+
+  backend "s3" {
+    bucket  = "fitlio-db-backup-jay"
+    key     = "terraform/fitlio.tfstate"
+    region  = "ap-southeast-2"
+    encrypt = true
+  }
 }
 
 provider "aws" {
