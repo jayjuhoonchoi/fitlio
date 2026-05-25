@@ -69,8 +69,8 @@
 | PaymentWebhookEvent | payment_webhook_events | Webhook log |
 
 ## Known Technical Debt
-- [x] datetime.utcnow() deprecated in Python 3.14 → fixed in app code (DB schema still naive)
-- [ ] POSTGRES_PASSWORD hardcoded in docker-compose.yml → move to .env
+- [x] Terraform S3 remote backend configured (fitlio-db-backup-jay/terraform/fitlio.tfstate)
+- [ ] Terraform state migration: run `terraform init` to migrate local state to S3
 
 
 
@@ -101,3 +101,11 @@
 - api, db, prometheus, grafana, node-exporter communicate via Docker internal network only
 - Direct external access to DB and monitoring tools is blocked
 - Principle of least privilege: expose only what is necessary
+
+## Terraform Resources Managed
+- VPC, subnets, IGW, route tables
+- Security Group (22/80/443 only)
+- EC2 t2.small + Elastic IP
+- IAM role + S3 policy
+- Lambda + CloudWatch Events (daily membership alerts + DB backup)
+- Remote state: s3://fitlio-db-backup-jay/terraform/fitlio.tfstate
