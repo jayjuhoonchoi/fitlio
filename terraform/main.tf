@@ -99,51 +99,6 @@ resource "aws_security_group" "fitlio_sg" {
     description = "HTTPS access"
   }
 
-  ingress {
-    from_port   = 8000
-    to_port     = 8000
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-    description = "Fitlio API"
-  }
-
-  ingress {
-    from_port   = 3000
-    to_port     = 3000
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-    description = "Grafana"
-  }
-  ingress {
-    from_port   = 30030
-    to_port     = 30030
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-    description = "Grafana NodePort (k3s)"
-  }
-  ingress {
-    from_port   = 30090
-    to_port     = 30090
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-    description = "Prometheus NodePort (k3s)"
-  }
-
-  ingress {
-    from_port   = 9090
-    to_port     = 9090
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-    description = "Prometheus"
-  }
-
-  ingress {
-    from_port   = 5432
-    to_port     = 5432
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-    description = "PostgreSQL - Lambda access"
-  }
 
   egress {
     from_port   = 0
