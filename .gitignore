@@ -20,3 +20,7 @@ terraform/*.bak
 k8s/promtail-secret.yaml
 # EC2: created by scripts/fix_https.sh when using k8s-alt-ports / FITLIO_HTTPS_VERIFY_PORT=8443
 .fitlio-k8s-alt-ports
+
+# Test coverage
+.coverage
+htmlcov/
