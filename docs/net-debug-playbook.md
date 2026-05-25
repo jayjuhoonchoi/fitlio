@@ -46,3 +46,122 @@ curl -v --max-time 15 https://fitlio-jay.duckdns.org:8443/health
 
 ## 실제 사례
 - [Incident 001](./incident-001-sg-8080.md): SG 8080 누락 → 외부 timeout → SG 추가 → 200 복구 (2026-05-17)
+
+
+
+# Network Debug Playbook
+
+## Principles
+- Always verify from external network (Mac/LTE) — never from inside EC2 (hairpin NAT)
+- tcpdump must run simultaneously with external curl
+- Fix one layer at a time: AWS → OS → Docker → App
+
+---
+
+## Step 1 — External curl
+```bash
+curl -v --max-time 10 https://fitlio-jay.duckdns.org/health
+```
+
+---
+
+## Step 2 — Branch by result
+
+### 2-1. timeout
+Packet never reached EC2.
+
+```bash
+# Check AWS SG inbound rules (console)
+# 443, 80 open? IP correct?
+
+# Check with tcpdump (run simultaneously)
+# Terminal A (EC2):
+sudo timeout 20 tcpdump -n -i eth0 tcp port 443
+# Terminal B (Mac) — at the same time:
+curl -v --max-time 10 https://fitlio-jay.duckdns.org/health
+```
+
+**tcpdump result:**
+
+| Result | Meaning | Action |
+|---|---|---|
+| 0 packets | AWS SG/NACL blocking | Check SG inbound rules |
+| packets → 10.43.x | k3s CNI intercepting | Remove k3s or change port |
+| SYN → SYN-ACK → data | Normal flow | Redefine problem |
+
+### 2-2. refused
+Packet reached EC2 but nothing listening.
+
+```bash
+# SSH into EC2
+docker ps
+```
+
+---
+
+## Step 3 — Branch by docker ps result
+
+### 3-1. nginx missing
+```bash
+docker restart fitlio-nginx-1
+```
+
+### 3-2. nginx exists but still refused
+```bash
+docker logs fitlio-nginx-1 --tail 20
+```
+
+| Log message | Meaning | Action |
+|---|---|---|
+| `address already in use` | Port taken by another process | `ss -tlnp \| grep 443` |
+| `certificate not found` | SSL cert missing | `sudo certbot certificates` |
+| `invalid parameter` | Config file error | Check nginx conf |
+
+### 3-3. api missing
+```bash
+docker restart fitlio-api-1
+docker logs fitlio-api-1 --tail 20
+```
+
+### 3-4. db missing
+```bash
+docker logs fitlio-db-1 --tail 20
+# Check disk: df -h
+# Check memory: free -h
+docker restart fitlio-db-1
+```
+
+### 3-5. everything missing
+```bash
+cd ~/fitlio
+docker compose up -d
+```
+
+---
+
+## Step 4 — Verify recovery
+```bash
+# From Mac/LTE only (never from inside EC2)
+curl https://fitlio-jay.duckdns.org/health
+# Expected: {"status":"healthy","service":"fitlio"}
+```
+
+---
+
+## tcpdump Flags Reference
+| Flag | Meaning |
+|---|---|
+| [S] | SYN — connection request |
+| [S.] | SYN-ACK — connection accepted |
+| [.] | ACK — acknowledged |
+| [P.] | PSH — data transfer |
+| [F.] | FIN — connection closing |
+| [R] | RST — connection refused/reset |
+
+---
+
+## Real Incidents
+- [Incident 001](./incident-001-sg-8080.md): timeout → SG missing port 8080
+- [Incident 002](./incident-002-actions-ssh-failure.md): CI/CD SSH failure → Secret whitespace
+- [Incident 003](./incident-003-yaml-syntax-error.md): deploy failure → YAML indentation
+- [Incident 004](./incident-004-https-setup.md): HTTPS timeout → k3s CNI intercepting port 443
