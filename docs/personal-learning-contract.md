@@ -21,12 +21,19 @@
 - 핑계 없음
 
 ## 합격 기준 (바이너리 — 됐다/안 됐다)
-- [ ] 외부에서 /health 200 확인
-- [ ] GitHub Actions 실패 로그에서 원인 한 줄 특정
-- [ ] timeout vs refused 구분 + tcpdump로 다음 액션 결정
-- [ ] Nginx ${FITLIO_DOMAIN} envsubst 경로 설명
-- [ ] k8s + compose 동시 80 충돌 설명 + 회피 전략 2가지
-- [ ] 15분 라이브 데모 멈춤 없이
+- [x] 외부에서 /health 200 확인
+- [x] GitHub Actions 배포 초록색
+- [x] timeout vs refused 구분 + tcpdump로 다음 액션 결정
+- [x] Nginx ${FITLIO_DOMAIN} envsubst 경로 설명
+- [x] k8s + compose 동시 80 충돌 설명 + 회피 전략 2가지
+- [x] HTTPS 포트 없이 접속
+- [x] DB 자동 백업 (S3)
+- [x] 모니터링 알림 (Grafana email)
+- [x] 포트 최소화 (22/80/443만 외부)
+- [x] Terraform 인프라 코드화
+- [ ] 15분 라이브 데모 멈춤 없이 (연습 필요)
+- [ ] staging 환경 구축
+
 
 ## 오늘 배운 것 (Day 1 — 0주차)
 - 장애 나면 순서대로 본다: 1) 앱 살아있나 2) 포트 열렸나 3) AWS가 막고있나
