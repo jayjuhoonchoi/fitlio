@@ -35,6 +35,11 @@
 - datetime.utcnow()는 Python 3.14에서 사라진다. timezone.utc로 바꿨다
 - 비밀번호 같은 민감한 값은 코드에 쓰지 않고 .env 파일에 따로 관리한다
 - 장애 기록 2개 추가, 이력서 초안 작성
+- Port isolation — nginx만 80/443, 나머지 Docker 내부 네트워크
+- DB 자동 백업 (S3 + cron)
+- Grafana 이메일 알림 설정
+- Terraform S3 remote state 설정
+- 면접 Q&A 20개 + 15분 데모 스크립트 작성
 
 (오늘 장애에서 직접 배운 것, 본인 말로 3줄 이상)
 
