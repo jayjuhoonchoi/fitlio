@@ -9,7 +9,7 @@ Owners get a live dashboard with attendance stats and membership status.
 🐍 Backend: FastAPI + PostgreSQL  
 🐳 Container: Docker + Docker Compose  
 🏗️ IaC: Terraform  
-☁️ Cloud: AWS EC2 (t3.micro, ap-southeast-2)  
+☁️ Cloud: AWS EC2 (t2.small, ap-southeast-2)
 🌐 Web Server: Nginx + Let's Encrypt  
 ⚙️ CI/CD: GitHub Actions  
 📊 Monitoring: Prometheus + Grafana + Node Exporter  
@@ -23,6 +23,25 @@ Owners get a live dashboard with attendance stats and membership status.
 📡 Prometheus scrapes metrics → 📊 Grafana visualizes dashboards  
 💬 Slack receives deployment notifications  
 ⏰ EventBridge triggers Lambda daily → 🔍 Scans expiring memberships → 📲 Slack alert  
+
+## 🔴 Live Demo
+- URL: https://fitlio-jay.duckdns.org/health
+- Status: Production (AWS EC2 ap-southeast-2, Sydney)
+
+## 🛡️ Security & Operations
+- External ports: 22 (SSH), 80 (HTTP redirect), 443 (HTTPS) only
+- Internal services (DB, Grafana, Prometheus) isolated in Docker network
+- Daily automated DB backup to S3 (`fitlio-db-backup-jay`)
+- Grafana alert: email notification when API down > 2 minutes
+- SSL: Let's Encrypt, auto-renewal via certbot
+
+## 📋 Real Incidents Resolved
+| # | Symptom | Root Cause | Resolution |
+|---|---|---|---|
+| 001 | External timeout | SG missing port 8080 | Added inbound rule |
+| 002 | CI/CD SSH failure | EC2_USER had trailing whitespace | Fixed Secret value |
+| 003 | Deploy failure | YAML `depends_on` nested in `environment` | Fixed indentation |
+| 004 | HTTPS timeout | k3s CNI intercepting port 443 | Removed k3s from node |
 
 ## 💪 Key Features
 🔐 HTTPS with Let's Encrypt SSL  
