@@ -71,6 +71,9 @@
 ## Known Technical Debt
 - [x] Terraform S3 remote backend configured (fitlio-db-backup-jay/terraform/fitlio.tfstate)
 - [ ] Terraform state migration: run `terraform init` to migrate local state to S3
+- [ ] Terraform plan shows EC2 replacement risk — code drifted from actual AWS config
+      DO NOT run terraform apply without reviewing plan carefully
+      Safe to apply: Lambda updates, SG updates only
 
 
 
