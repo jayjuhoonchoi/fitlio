@@ -20,13 +20,18 @@ bash scripts/backup_db.sh
 aws s3 ls s3://fitlio-db-backup-jay/daily/
 ```
 
-### Restore from backup
+### Restore from backup (tested 2026-05-24)
 ```bash
-# Download backup
+# 1. Download backup from S3
 aws s3 cp s3://fitlio-db-backup-jay/daily/<filename>.sql.gz /tmp/
 
-# Restore into running container
+# 2. Restore to target DB
 gunzip -c /tmp/<filename>.sql.gz | docker exec -i fitlio-db-1 psql -U fitlio fitlio
+
+# Notes:
+# - "already exists" errors are safe to ignore (idempotent)
+# - Always restore to staging first to verify
+# - Tested on 2026-05-24: 18 tables restored successfully
 ```
 
 ## Health Check
