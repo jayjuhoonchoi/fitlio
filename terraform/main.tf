@@ -344,15 +344,20 @@ output "fitlio_public_ip" {
 
 output "fitlio_url" {
   value       = "https://fitlio-jay.duckdns.org"
-  description = "Fitlio service URL"
+  description = "Fitlio production URL"
+}
+
+output "fitlio_staging_url" {
+  value       = "https://fitlio-jay.duckdns.org:8443"
+  description = "Fitlio staging URL"
 }
 
 output "grafana_url" {
-  value       = "http://${aws_eip.fitlio_eip.public_ip}:3000"
-  description = "Grafana monitoring URL"
+  value       = "SSH tunnel required: ssh -L 3001:<grafana-container-ip>:3000 ubuntu@${aws_eip.fitlio_eip.public_ip}"
+  description = "Grafana access via SSH tunnel only (port not exposed externally)"
 }
 
 output "prometheus_url" {
-  value       = "http://${aws_eip.fitlio_eip.public_ip}:9090"
-  description = "Prometheus metrics URL"
+  value       = "SSH tunnel required: internal only"
+  description = "Prometheus access via SSH tunnel only (port not exposed externally)"
 }
