@@ -3134,3 +3134,67 @@ def test_premium_overview_requires_auth():
     assert response.status_code == 401
 
     assert response.status_code == 401
+
+# ── Auth endpoint tests ──────────────────────────────────────────
+def test_auth_register_and_login(db_session):
+    """Register a new member then login with same credentials."""
+    import uuid
+    app.dependency_overrides[get_db] = _override_db(db_session)
+
+    unique_email = f"test_{uuid.uuid4().hex[:8]}@example.com"
+    payload = {
+        "email": unique_email,
+        "password": "testpassword123",
+        "full_name": "Test User",
+        "phone": "0400000000",
+        "country_code": "AU",
+    }
+
+    # Register
+    reg = client.post("/auth/register", json=payload)
+    assert reg.status_code == 201, f"Register failed: {reg.json()}"
+
+    # Login with same credentials
+    login = client.post("/auth/login", json={
+        "email": unique_email,
+        "password": "testpassword123",
+    })
+    assert login.status_code == 200, f"Login failed: {login.json()}"
+    assert "access_token" in login.json()
+    assert login.json()["role"] == "member"
+
+    app.dependency_overrides.clear()
+
+
+def test_auth_login_wrong_password(db_session):
+    """Login with wrong password returns 401."""
+    app.dependency_overrides[get_db] = _override_db(db_session)
+
+    response = client.post("/auth/login", json={
+        "email": "nonexistent@example.com",
+        "password": "wrongpassword",
+    })
+    assert response.status_code == 401
+
+    app.dependency_overrides.clear()
+
+
+def test_auth_register_duplicate_email(db_session):
+    """Registering same email twice returns 400."""
+    import uuid
+    app.dependency_overrides[get_db] = _override_db(db_session)
+
+    unique_email = f"dup_{uuid.uuid4().hex[:8]}@example.com"
+    payload = {
+        "email": unique_email,
+        "password": "testpassword123",
+        "full_name": "Test User",
+        "phone": "0400000000",
+        "country_code": "AU",
+    }
+
+    client.post("/auth/register", json=payload)
+    dup = client.post("/auth/register", json=payload)
+    assert dup.status_code == 400
+
+    app.dependency_overrides.clear()
