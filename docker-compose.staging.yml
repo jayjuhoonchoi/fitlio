@@ -1,0 +1,54 @@
+services:
+  nginx:
+    image: nginx:latest
+    ports:
+      - "8080:80"
+      - "8443:443"
+    environment:
+      FITLIO_DOMAIN: fitlio-jay.duckdns.org
+      FITLIO_PORT_IN_REDIRECT: ""
+    volumes:
+      - ./nginx/default.http.conf:/etc/nginx/templates/default.http.conf:ro
+      - ./nginx/default.https.conf:/etc/nginx/templates/default.https.conf:ro
+      - ./nginx/entrypoint/40-fitlio-ssl-auto.sh:/docker-entrypoint.d/40-fitlio-ssl-auto.sh:ro
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+      - /var/www/certbot:/var/www/certbot
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
+  api:
+    image: fitlio-api
+    environment:
+      DATABASE_URL: postgresql://fitlio:fitlio123@db:5432/fitlio_staging
+      SECRET_KEY: fitlio-staging-secret-key
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')"]
+      interval: 5s
+      timeout: 5s
+      retries: 18
+      start_period: 25s
+
+  db:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: fitlio
+      POSTGRES_PASSWORD: fitlio123
+      POSTGRES_DB: fitlio_staging
+    volumes:
+      - postgres_staging_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fitlio -d fitlio_staging"]
+      interval: 3s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+
+volumes:
+  postgres_staging_data:
