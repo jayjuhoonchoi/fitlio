@@ -109,3 +109,13 @@
 - IAM role + S3 policy
 - Lambda + CloudWatch Events (daily membership alerts + DB backup)
 - Remote state: s3://fitlio-db-backup-jay/terraform/fitlio.tfstate
+
+## Staging Environment
+
+| | Production | Staging |
+|---|---|---|
+| URL | https://fitlio-jay.duckdns.org | https://fitlio-jay.duckdns.org:8443 |
+| Branch | main | develop |
+| DB | fitlio | fitlio_staging |
+| Directory | ~/fitlio | ~/fitlio-staging |
+| Deploy | Auto via GitHub Actions | Auto via GitHub Actions |
