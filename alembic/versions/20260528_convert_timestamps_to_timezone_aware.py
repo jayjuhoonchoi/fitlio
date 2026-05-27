@@ -24,7 +24,6 @@ TIMESTAMP_COLUMNS = [
     ("memberships", "created_at"),
     ("payments", "created_at"),
     ("attendances", "checked_in_at"),
-    ("attendances", "created_at"),
     ("notification_requests", "created_at"),
     ("direct_messages", "created_at"),
     ("notification_delivery_attempts", "attempted_at"),
