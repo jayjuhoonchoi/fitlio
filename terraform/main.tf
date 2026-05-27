@@ -337,10 +337,6 @@ resource "aws_eip_association" "fitlio_eip_assoc" {
 # ─────────────────────────────────────────
 # Outputs
 # ─────────────────────────────────────────
-output "fitlio_public_ip" {
-  value       = aws_eip.fitlio_eip.public_ip
-  description = "Stable public IPv4 (Elastic IP) for Fitlio EC2"
-}
 
 output "fitlio_url" {
   value       = "https://fitlio-jay.duckdns.org"
