@@ -74,6 +74,8 @@
 - [ ] Terraform plan shows EC2 replacement risk — code drifted from actual AWS config
       DO NOT run terraform apply without reviewing plan carefully
       Safe to apply: Lambda updates, SG updates only
+- [x] SECRET_KEY hardcoded → rotated 2026-05-29, now in .env only
+
 
 
 
