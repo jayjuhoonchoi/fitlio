@@ -223,7 +223,7 @@ data "aws_ami" "ubuntu" {
 # ─────────────────────────────────────────
 resource "aws_instance" "fitlio_server" {
   ami = "ami-06b1edeb7d9034c36"
-  instance_type          = "t2.small"
+  instance_type          = "t3.small"
   subnet_id              = aws_subnet.public.id
   vpc_security_group_ids = [aws_security_group.fitlio_sg.id]
   key_name               = aws_key_pair.fitlio_key.key_name
@@ -320,6 +320,7 @@ resource "aws_instance" "fitlio_server" {
     # ── 10. Fitlio 앱 리소스 적용 (CRD 의존 없음) ─────────────
     kubectl apply -f /home/ubuntu/fitlio/k8s/postgres.yaml
     kubectl apply -f /home/ubuntu/fitlio/k8s/api.yaml
+    kubectl apply -f /home/ubuntu/fitlio/k8s/web.yaml
     kubectl apply -f /home/ubuntu/fitlio/k8s/ingress.yaml
     echo "✅ Fitlio 리소스 적용 완료"
 
