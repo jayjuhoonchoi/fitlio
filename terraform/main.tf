@@ -165,6 +165,24 @@ resource "aws_iam_role" "fitlio_ec2_role" {
   })
 }
 
+resource "aws_iam_role_policy" "fitlio_ec2_cloudwatch_policy" {
+  name = "fitlio-ec2-cloudwatch-policy"
+  role = aws_iam_role.fitlio_ec2_role.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect = "Allow"
+      Action = [
+        "logs:CreateLogGroup",
+        "logs:CreateLogStream",
+        "logs:PutLogEvents",
+        "logs:DescribeLogStreams"
+      ]
+      Resource = "arn:aws:logs:ap-southeast-2:238391222114:*"
+    }]
+  })
+}
+
 resource "aws_iam_role_policy" "fitlio_ec2_s3_policy" {
   name = "fitlio-ec2-s3-policy"
   role = aws_iam_role.fitlio_ec2_role.id
