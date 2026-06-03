@@ -4,8 +4,8 @@ import type { ReactNode } from "react";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Fitlio Premium CRM",
-  description: "High-end fitness CRM dashboard layout scaffold"
+  title: "Fitlio",
+  description: "Gwanghwamun studio — member booking and admin operations"
 };
 
 type RootLayoutProps = {

@@ -20,6 +20,10 @@ spec:
         env:
         - name: FITLIO_API_PROXY_TARGET
           value: http://api:8000
+        - name: NEXT_PUBLIC_CENTER_SLUG
+          value: gwanghwamun
+        - name: NEXT_PUBLIC_CENTER_NAME
+          value: "Fitlio Gwanghwamun"
         ports:
         - containerPort: 3000
         livenessProbe:

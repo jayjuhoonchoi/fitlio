@@ -17,14 +17,11 @@ const API_PREFIXES = [
   "health"
 ];
 
-/** Legacy Jinja HTML until Next routes replace them (Week 2–4). */
-const LEGACY_HTML_PREFIXES = [
-  "login",
-  "admin-login",
-  "app",
-  "center",
-  "assets",
-  "legacy"
+/** Legacy Jinja HTML (tablet kiosk, center landing, static assets). */
+const LEGACY_HTML_PREFIXES = ["center", "assets", "legacy"];
+
+const LEGACY_HTML_PATHS = [
+  { source: "/app/tablet/:path*", destination: `${API_ORIGIN}/app/tablet/:path*` }
 ];
 
 /** @type {import('next').NextConfig} */
@@ -48,7 +45,7 @@ const nextConfig = {
       { source: `/${prefix}/:path*`, destination: `${API_ORIGIN}/${prefix}/:path*` }
     ]);
 
-    return [...apiRewrites, ...legacyRewrites];
+    return [...apiRewrites, ...legacyRewrites, ...LEGACY_HTML_PATHS];
   }
 };
 

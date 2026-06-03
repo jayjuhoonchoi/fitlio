@@ -1,5 +1,5 @@
-import { DashboardLayout } from "@/components/organisms/dashboard-layout";
+import { PortalLanding } from "@/components/organisms/portal-landing";
 
 export default function HomePage(): JSX.Element {
-  return <DashboardLayout />;
+  return <PortalLanding />;
 }

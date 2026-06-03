@@ -14,7 +14,8 @@ import { MemberQrCheckin } from "@/components/molecules/member-qr-checkin";
 import { MemberRiskTable } from "@/components/molecules/member-risk-table";
 import { QuickReserveModal } from "@/components/molecules/quick-reserve-modal";
 import { SectionShell } from "@/components/molecules/section-shell";
-import { SessionLoginPanel } from "@/components/molecules/session-login-panel";
+import { UserMenu } from "@/components/molecules/user-menu";
+import { centerConfig } from "@/lib/center";
 import { StripePaymentSurface } from "@/components/molecules/stripe-payment-surface";
 import { WeeklyReportEmailPreview } from "@/components/molecules/weekly-report-email-preview";
 import { WhiteLabelCMSSurface } from "@/components/molecules/whitelabel-cms-surface";
@@ -83,18 +84,15 @@ const memberCards: DashboardCard[] = [
   }
 ];
 
-function sessionRole(session: ReturnType<typeof useFitlioSession>): "guest" | "member" | "admin" {
-  if (!session) {
-    return "guest";
-  }
-  return session.role === "admin" ? "admin" : "member";
-}
+type DashboardLayoutProps = {
+  mode: "member" | "admin";
+};
 
-export function DashboardLayout(): JSX.Element {
+export function DashboardLayout({ mode }: DashboardLayoutProps): JSX.Element {
   const session = useFitlioSession();
-  const role = sessionRole(session);
-  const isAdmin = role === "admin";
-  const isMember = role === "member";
+  const isAdmin = mode === "admin";
+  const isMember = mode === "member";
+  const role = mode;
 
   const [quickReserveOpen, setQuickReserveOpen] = useState<boolean>(false);
   const [activeNav, setActiveNav] = useState<NavItem["key"]>("dashboard");
@@ -104,16 +102,10 @@ export function DashboardLayout(): JSX.Element {
     document.getElementById(sectionId)?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
-  const headline = isAdmin
-    ? "Admin Console"
-    : isMember
-      ? "Member App"
-      : "Fitlio Preview";
+  const headline = isAdmin ? "Admin Console" : "Member App";
   const subtitle = isAdmin
-    ? "Operations, retention risk, roster attendance, and studio configuration."
-    : isMember
-      ? "Book classes, show your check-in QR, and manage membership payments."
-      : "Sign in as member or admin — each mode shows different tools.";
+    ? `${centerConfig.name} — operations, roster, and retention.`
+    : `${centerConfig.name} — book classes, check in, and manage membership.`;
 
   return (
     <div className="flex min-h-screen bg-bg">
@@ -122,13 +114,13 @@ export function DashboardLayout(): JSX.Element {
         <header id="section-dashboard" className="mb-6 scroll-mt-6 space-y-4">
           <div>
             <p className="text-xs uppercase tracking-[0.2em] text-silver">
-              {isAdmin ? "Administration" : isMember ? "Member Experience" : "Operations Console"}
+              {isAdmin ? "Administration" : "Member Experience"}
             </p>
             <h1 className="mt-2 text-3xl font-semibold tracking-tight">{headline}</h1>
             <p className="mt-2 max-w-3xl text-sm text-muted">{subtitle}</p>
           </div>
           <ApiConnectionBanner />
-          <SessionLoginPanel />
+          <UserMenu />
         </header>
 
         <QuickReserveModal
@@ -144,7 +136,7 @@ export function DashboardLayout(): JSX.Element {
           </section>
         </SectionErrorBoundary>
 
-        {isMember || !session ? (
+        {isMember ? (
           <section className="grid gap-4 xl:grid-cols-2">
             <SectionErrorBoundary title="Quick Reserve Surface">
               <div id="section-booking" className="scroll-mt-6">
@@ -241,7 +233,7 @@ export function DashboardLayout(): JSX.Element {
           </>
         ) : null}
 
-        {(isMember || isAdmin) && (
+        {session && (
           <section id="section-payments" className="mt-4 scroll-mt-6">
             <SectionErrorBoundary title="Payments Surface">
               <SectionShell
