@@ -41,7 +41,7 @@ jobs:
             cd ~/fitlio
             git fetch origin main
             git reset --hard origin/main
-            bash scripts/deploy_k8s.sh
+            bash scripts/deploy.sh
 
       - name: Notify Slack on success
         if: success()

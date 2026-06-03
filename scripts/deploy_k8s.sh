@@ -11,7 +11,17 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
+if ! command -v k3s >/dev/null 2>&1; then
+  echo "[fitlio-k8s] ERROR: k3s is not installed on this host."
+  echo "[fitlio-k8s] This EC2 uses docker compose. Run: bash scripts/deploy_compose.sh"
+  exit 1
+fi
+
 export KUBECONFIG="${KUBECONFIG:-/etc/rancher/k3s/k3s.yaml}"
+if [[ ! -f "${KUBECONFIG}" ]]; then
+  echo "[fitlio-k8s] ERROR: missing ${KUBECONFIG}"
+  exit 1
+fi
 
 API_IMAGE="${FITLIO_API_IMAGE:-jayjuhoonchoi/fitlio:latest}"
 WEB_IMAGE="${FITLIO_WEB_IMAGE:-jayjuhoonchoi/fitlio-web:latest}"
